@@ -9,6 +9,8 @@ import { FactChips } from '@/components/record-sheet';
 import { Button } from '@/components/ui/button';
 import { useOrderInvoice } from '@/features/finance/api';
 import { SettlementBadge } from '@/features/finance/badges';
+import { ErxesOrderSection } from '@/features/erxes/erxes-order-section';
+import { useErxesCreatorName } from '@/features/erxes/erxes-texts';
 import { useBranches } from '@/features/identity/api';
 import { formatUbDateTime, formatUbMinute } from '@/lib/dayjs';
 import { formatTugrik } from '@/lib/money';
@@ -73,6 +75,8 @@ export function OrderOverview({
       : (branches.data?.find((entry) => entry.id === branchId)?.name ?? null);
   const invoiced = order.status === 'INVOICED' || order.status === 'CLOSED';
   const invoice = useOrderInvoice(order.id, invoiced);
+  // A copied erxes deal whose creator is no Bto user shows the erxes name (ADR-0218 #5).
+  const erxesCreator = useErxesCreatorName(order.id);
   const facts: { label: string; value: ReactNode }[] = [
     { label: t('sales.order.customer'), value: `${order.customerName} · ${order.customerCode}` },
     { label: t('sales.order.deliveryDate'), value: order.deliveryDate },
@@ -90,7 +94,7 @@ export function OrderOverview({
     {
       label: t('sales.order.createdBy'),
       value: t('sales.panel.createdAt', {
-        name: order.createdByName ?? t('sales.panel.activity.someone'),
+        name: order.createdByName ?? erxesCreator ?? t('sales.panel.activity.someone'),
         at: formatUbDateTime(Date.parse(order.createdAt)),
       }),
     },
@@ -162,6 +166,7 @@ export function OrderOverview({
           {order.note ?? t('sales.panel.noNote')}
         </p>
       </section>
+      <ErxesOrderSection order={order} />
       <section>
         <div className="mb-1 flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">{t('sales.panel.recent')}</h3>

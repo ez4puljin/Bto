@@ -94,6 +94,7 @@ import {
 } from '@/features/finance/supplier-payables-pages';
 import { EbarimtPage } from '@/features/ebarimt-check/ebarimt-page';
 import { ErkhetSyncPage } from '@/features/erkhet/erkhet-sync-page';
+import { ErxesPage } from '@/features/erxes/erxes-page';
 import { FinanceSettingsPage } from '@/features/finance/finance-settings-page';
 import { InvoicesPage } from '@/features/finance/invoices-page';
 import { BankStatementsPage } from '@/features/finance/bank-statements-page';
@@ -655,6 +656,15 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="sales.boards.manage">
                 <DocumentTemplateEditorPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'sales/erxes',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="sales.orders.manage">
+                <ErxesPage />
               </RequirePermission>
             ),
           },

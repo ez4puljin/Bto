@@ -83,6 +83,9 @@ const MODULE_DEPS = {
   // Erkhet's lists against Bto's (ADR-0203): reads the three, changes customers and prices through
   // their own services; nobody imports it.
   erkhet: ['identity', 'partners', 'catalog', 'pricing'],
+  // erxes's deals as draft orders (ADR-0218): reads the three, makes orders only through sales'
+  // own draft path; nobody imports it.
+  erxes: ['identity', 'catalog', 'partners', 'sales'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.

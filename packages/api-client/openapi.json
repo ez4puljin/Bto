@@ -46285,6 +46285,753 @@
           "erkhet"
         ]
       }
+    },
+    "/api/v1/erxes/settings": {
+      "get": {
+        "operationId": "Erxes_viewSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      },
+      "patch": {
+        "operationId": "Erxes_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesSettingsUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/settings/test": {
+      "post": {
+        "operationId": "Erxes_testSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesSettingsTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Signs in to erxes with what is typed or saved; saves nothing and reads nothing.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/pipelines": {
+      "get": {
+        "operationId": "Erxes_pipelines",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErxesPipeline"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/pipelines/refresh": {
+      "post": {
+        "operationId": "Erxes_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesCheck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reads erxes's boards, pipelines and users again; ticks nothing.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/pipelines/{id}": {
+      "patch": {
+        "operationId": "Erxes_updatePipeline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesPipelineUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErxesPipeline"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/users": {
+      "get": {
+        "operationId": "Erxes_users",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErxesUser"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/users/{id}": {
+      "patch": {
+        "operationId": "Erxes_mapUser",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesUserUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ErxesUser"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/pull": {
+      "post": {
+        "operationId": "Erxes_pull",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesPullResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Одоо татах»: one pull now, as the worker does every minute.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/deals": {
+      "get": {
+        "operationId": "Erxes_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "WAITING",
+              "type": "string",
+              "enum": [
+                "WAITING",
+                "COPIED",
+                "DISMISSED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesDealPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/deals/{id}": {
+      "get": {
+        "operationId": "Erxes_deal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesDeal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      },
+      "patch": {
+        "operationId": "Erxes_choose",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErxesDealChoiceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesDeal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The customer, or a line's product, a person chose for a waiting deal.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/deals/{id}/copy": {
+      "post": {
+        "operationId": "Erxes_copy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesDeal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Bto руу хуулах»: tries the deal now. The answer is the deal: an order's id when it was\ncopied, the reasons when it still waits. A deal already copied answers the same order.",
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/deals/{id}/dismiss": {
+      "post": {
+        "operationId": "Erxes_dismiss",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesDeal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/deals/{id}/restore": {
+      "post": {
+        "operationId": "Erxes_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesDeal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "erxes"
+        ]
+      }
+    },
+    "/api/v1/erxes/orders/{orderId}/deal": {
+      "get": {
+        "operationId": "Erxes_orderDeal",
+        "parameters": [
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErxesOrderDeal"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The deal an order was copied from, for the order panel; `deal` is null for Bto's own orders.",
+        "tags": [
+          "erxes"
+        ]
+      }
     }
   },
   "info": {
@@ -94449,6 +95196,934 @@
           "stale",
           "refused",
           "skipped"
+        ]
+      },
+      "ErxesSettings": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "A password is saved"
+          },
+          "passwordUnreadable": {
+            "type": "boolean",
+            "description": "A saved password ERKHET_KEY_SECRET no longer opens"
+          },
+          "secretReady": {
+            "type": "boolean",
+            "description": "ERKHET_KEY_SECRET is set, so a password can be saved"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The every-minute copy is on"
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "The sign-in is whole"
+          },
+          "lastPullAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastOkAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "The last pull that read every ticked pipeline"
+          },
+          "lastFailure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "INTERNAL"
+            ],
+            "type": "string"
+          },
+          "lastFailureDetail": {
+            "type": "string",
+            "nullable": true
+          },
+          "waiting": {
+            "type": "number",
+            "description": "Deals that wait for a person"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "baseUrl",
+          "email",
+          "hasPassword",
+          "passwordUnreadable",
+          "secretReady",
+          "enabled",
+          "complete",
+          "lastPullAt",
+          "lastOkAt",
+          "lastFailure",
+          "lastFailureDetail",
+          "waiting",
+          "updatedAt",
+          "updatedBy"
+        ]
+      },
+      "ErxesSettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "erxes's address, https only; null: the company's own"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "format": "email",
+            "description": "The email of the erxes user Bto signs in as"
+          },
+          "password": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 200,
+            "writeOnly": true,
+            "description": "null removes the saved password. Never returned"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "New deals of the ticked pipelines are copied every minute"
+          }
+        }
+      },
+      "ErxesSettingsTestRequest": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Typed values; the saved ones fill what is not typed"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 200,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "writeOnly": true
+          }
+        }
+      },
+      "ErxesCheck": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "nullable": true,
+            "enum": [
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "type": "number",
+            "nullable": true,
+            "description": "erxes's HTTP status, when it gave one"
+          }
+        },
+        "required": [
+          "ok",
+          "reason",
+          "status"
+        ]
+      },
+      "ErxesPipeline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "erxesId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "boardName": {
+            "type": "string",
+            "nullable": true
+          },
+          "blocked": {
+            "type": "boolean",
+            "description": "A board that is never copied"
+          },
+          "gone": {
+            "type": "boolean",
+            "description": "erxes no longer lists it"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "enabledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Deals created after this are copied"
+          },
+          "btoPipelineId": {
+            "type": "number",
+            "nullable": true
+          },
+          "btoStageId": {
+            "type": "number",
+            "nullable": true
+          },
+          "btoPipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "btoStageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "placeOk": {
+            "type": "boolean",
+            "description": "The chosen stage is live and takes new orders"
+          },
+          "lastPullAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lastSeenCreatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "erxesId",
+          "name",
+          "boardName",
+          "blocked",
+          "gone",
+          "enabled",
+          "enabledAt",
+          "btoPipelineId",
+          "btoStageId",
+          "btoPipelineName",
+          "btoStageName",
+          "placeOk",
+          "lastPullAt",
+          "lastSeenCreatedAt"
+        ]
+      },
+      "ErxesPipelineUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Ticked: deals created from now on are copied"
+          },
+          "btoPipelineId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The Bto pipeline the copies go in"
+          },
+          "btoStageId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "A stage of it without an action; left out: its first such stage"
+          }
+        }
+      },
+      "ErxesUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "erxesId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "btoUserId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The Bto user a person chose"
+          },
+          "btoUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "matchedUserId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The Bto user the phone or the name finds"
+          },
+          "matchedUserName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "erxesId",
+          "email",
+          "fullName",
+          "btoUserId",
+          "btoUserName",
+          "matchedUserId",
+          "matchedUserName"
+        ]
+      },
+      "ErxesUserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "btoUserId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null: match by phone and name again"
+          }
+        },
+        "required": [
+          "btoUserId"
+        ]
+      },
+      "ErxesPullResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "erxes was reached and every ticked pipeline read"
+          },
+          "failure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER",
+              "INTERNAL"
+            ],
+            "type": "string"
+          },
+          "pipelines": {
+            "type": "number"
+          },
+          "seen": {
+            "type": "number",
+            "description": "Deals seen for the first time"
+          },
+          "copied": {
+            "type": "number",
+            "description": "Deals that became orders"
+          },
+          "waiting": {
+            "type": "number",
+            "description": "Deals still waiting"
+          }
+        },
+        "required": [
+          "ok",
+          "failure",
+          "pipelines",
+          "seen",
+          "copied",
+          "waiting"
+        ]
+      },
+      "ErxesWaitIssue": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "NO_STAGE",
+              "NO_CUSTOMER",
+              "CUSTOMER_NOT_FOUND",
+              "CUSTOMER_AMBIGUOUS",
+              "PRODUCT_NOT_FOUND",
+              "PRODUCT_AMBIGUOUS",
+              "UNIT_NOT_FOUND",
+              "BAD_QUANTITY",
+              "ORDER_REFUSED"
+            ],
+            "type": "string"
+          },
+          "erxesProductId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "An erxes code, a product's or a customer's"
+          },
+          "name": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string",
+            "description": "ORDER_REFUSED: Bto's error code"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "ErxesDealRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "erxesId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "WAITING",
+              "COPIED",
+              "DISMISSED"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "creatorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "erxesCreatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesWaitIssue"
+            }
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "lastTriedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "copiedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "erxesId",
+          "status",
+          "name",
+          "number",
+          "pipelineName",
+          "creatorName",
+          "erxesCreatedAt",
+          "issues",
+          "orderId",
+          "lastTriedAt",
+          "copiedAt"
+        ]
+      },
+      "ErxesDealPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesDealRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "ErxesDealLabel": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "color"
+        ]
+      },
+      "ErxesDealField": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ]
+      },
+      "ErxesDealParty": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "COMPANY",
+              "CUSTOMER"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "regNo": {
+            "type": "string",
+            "nullable": true
+          },
+          "phones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "code",
+          "regNo",
+          "phones"
+        ]
+      },
+      "ErxesUnitChoice": {
+        "type": "object",
+        "properties": {
+          "productUnitId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "unitName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productUnitId",
+          "productId",
+          "sku",
+          "productName",
+          "unitName"
+        ]
+      },
+      "ErxesDealLine": {
+        "type": "object",
+        "properties": {
+          "erxesProductId": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "uom": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "erxes's price of one unit"
+          },
+          "discount": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountPercent": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string",
+            "nullable": true
+          },
+          "unit": {
+            "nullable": true,
+            "description": "The Bto unit of the line",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErxesUnitChoice"
+              }
+            ]
+          }
+        },
+        "required": [
+          "erxesProductId",
+          "code",
+          "name",
+          "uom",
+          "quantity",
+          "unitPrice",
+          "discount",
+          "discountPercent",
+          "amount",
+          "unit"
+        ]
+      },
+      "ErxesDealAttachment": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url"
+        ]
+      },
+      "ErxesDealCustomer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "ErxesDeal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "erxesId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "WAITING",
+              "COPIED",
+              "DISMISSED"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "number": {
+            "type": "string",
+            "nullable": true
+          },
+          "pipelineName": {
+            "type": "string",
+            "nullable": true
+          },
+          "creatorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "erxesCreatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesWaitIssue"
+            }
+          },
+          "orderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "lastTriedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "copiedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "description": "Where the deal opens in erxes"
+          },
+          "stageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "startDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "closeDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "creatorUserId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The Bto user the creator was matched to"
+          },
+          "creatorUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigned": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesDealLabel"
+            }
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesDealField"
+            }
+          },
+          "parties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesDealParty"
+            }
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesDealLine"
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesDealAttachment"
+            }
+          },
+          "customer": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErxesDealCustomer"
+              }
+            ]
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The deal exactly as erxes answered"
+          }
+        },
+        "required": [
+          "id",
+          "erxesId",
+          "status",
+          "name",
+          "number",
+          "pipelineName",
+          "creatorName",
+          "erxesCreatedAt",
+          "issues",
+          "orderId",
+          "lastTriedAt",
+          "copiedAt",
+          "url",
+          "stageName",
+          "description",
+          "startDate",
+          "closeDate",
+          "creatorUserId",
+          "creatorUserName",
+          "assigned",
+          "labels",
+          "customFields",
+          "parties",
+          "lines",
+          "attachments",
+          "customer",
+          "raw"
+        ]
+      },
+      "ErxesUnitChoiceInput": {
+        "type": "object",
+        "properties": {
+          "erxesProductId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "productUnitId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null takes the choice back"
+          }
+        },
+        "required": [
+          "erxesProductId",
+          "productUnitId"
+        ]
+      },
+      "ErxesDealChoiceRequest": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The Bto customer; null takes the choice back"
+          },
+          "units": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErxesUnitChoiceInput"
+            }
+          }
+        }
+      },
+      "ErxesOrderDeal": {
+        "type": "object",
+        "properties": {
+          "deal": {
+            "nullable": true,
+            "description": "null: the order was made in Bto",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErxesDeal"
+              }
+            ]
+          }
+        },
+        "required": [
+          "deal"
         ]
       },
       "ErrorCode": {

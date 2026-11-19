@@ -1,0 +1,45 @@
+# ADR-0218: New erxes deals are copied into Bto as draft orders
+
+| | |
+|---|---|
+| Status | Accepted |
+| Date | 2026-11-17 |
+| Deciders | Owner (2026-11-17: the pipelines to copy are ticked on a settings page; a deal is copied once as first seen; the order shows the person who made the deal in erxes; nothing of the deal is lost; the copy stays a draft; a deal that cannot be matched waits in a list; Bto pulls, erxes is never written to), Claude (worker `bto-core`, task `erxes-deal-copy`) |
+| Migration | `0111_erxes_deal_copy` (new tables only) |
+| Related | ADR-0056, ADR-0057, ADR-0059 (boards, pipelines, the order panel), ADR-0098 (the erxes product master), ADR-0203 (Erkhet: the same sealed sign-in and read-only use), ADR-0214 (the guide) |
+
+## Context
+
+The wholesale side still enters its sales in the company's erxes (`https://erxes.bto.mn`), board «Хөвсгөл»: «Мөрөн Борлуулалт», «Бэлэн борлуулалт», «Орон нутаг борлуулалт», «Гэрээт компаний борлуулалт», «BTO300 борлуулалт» and two movement pipelines. Bto's boards were copied from erxes by name (ADR-0056). Until the wholesale side works in Bto alone, every sale typed in erxes has to appear in Bto without being typed twice, with nothing of it lost and with the same person as its author.
+
+erxes cannot call Bto: the office's web answers only from Mongolia behind Cloudflare (ADR-0189), and the erxes server is not ours to configure. Its GraphQL has introspection switched off, so its exact field names cannot be read from it.
+
+## Decision
+
+1. **A module `erxes`.** It owns `erxes_settings`, `erxes_pipelines`, `erxes_users` and `erxes_deals`; it reads catalog, partners and identity through their public services and makes orders only through `SalesOrdersService.createInTx`; nobody imports it. Sales changes in one type only: `createInTx` takes an `AuditActor`.
+2. **The sign-in is typed, sealed and read-only in use.** The address (`https://` only, the company's erxes by default), an erxes user's email and password. The password is sealed with AES-256-GCM under `ERKHET_KEY_SECRET` with its own context (`erxes_settings.password`), as Erkhet's and WeSend's are: no new secret. It goes only to the saved address; a new address clears it; no response, audit row or log carries it. Bto signs in with erxes's `login` mutation and keeps the session token in the process's memory only. After that it sends queries only: the client writes every document itself with the word `query`.
+3. **Which deals.** «Erxes-ээс шинэчлэх» reads erxes's boards and pipelines. The owner ticks pipelines; ticking stamps the moment, and only deals created after it are copied. Each ticked pipeline has the Bto pipeline and stage its copies land in: by default the Bto pipeline of the same name and its first live stage without an action; a stage with an action is refused, because a draft cannot sit on it. A board whose name is «Хархорин» is never copied and cannot be ticked: Kharkhorin has its own installation (ADR-0084).
+4. **Copy once, lose nothing.** A deal is one row of `erxes_deals`, unique on erxes's `_id`, and becomes at most one order (`order_id` unique; the copy locks the row). The row keeps the deal whole as erxes answered (`raw`, never rewritten), what erxes said of its products and the labels of its custom fields. Later changes in erxes do not touch the order. What fits the order is mapped: the customer, the lines in their unit and quantity, the deal's name and description as the note (cut at the note's length; whole in `raw`), the close date as the delivery date when it is not past (else tomorrow), the first person and Mongolian mobile as the contact, the pipeline and stage, the author. The order panel shows the rest in an «Erxes» section: name, number, creator, assigned users, labels, custom fields under their erxes labels, erxes's price, discount and amount of each line beside Bto's, attachments as links and a link to the deal.
+5. **The author.** The erxes creator is matched to a Bto user: first the choice a person made on the settings page (erxes user → Bto user; this is where an email is matched, since Bto's users have no email), then the phone, then the full name with its words in any order, and only when exactly one user fits. That user is the order's `created_by`, so «Оруулсан» shows them. Without a match the order has no Bto author and the panel shows «Erxes: <the name in erxes>», never «Систем».
+6. **Matching, and waiting.** A product is found by erxes's product code as a Bto code (SKU) first, then by that code or erxes's barcodes as a barcode, and only when one product holds it. Its unit is the Bto unit named like the line's; a line in the erxes product's own unit takes Bto's base unit; any other unit waits. A customer is found by the code of the deal's companies and customers, then the register number, then the phone. A deal that cannot be matched is not dropped: it waits in the list «Erxes-ээс ирсэн» with its reasons (`NO_STAGE`, `NO_CUSTOMER`, `CUSTOMER_NOT_FOUND`, `CUSTOMER_AMBIGUOUS`, `PRODUCT_NOT_FOUND`, `PRODUCT_AMBIGUOUS`, `UNIT_NOT_FOUND`, `BAD_QUANTITY`, `ORDER_REFUSED` with Bto's own error code). A person chooses the customer or a line's product there and presses «Bto руу хуулах»; every pull tries the waiting deals again, so one goes through by itself once its product or customer exists. A person may set a deal aside and take it back.
+7. **Money and stock.** The copy is a DRAFT made by the office's own draft path: numbered, priced by nobody, nothing reserved, nothing posted. It is never submitted automatically. A deal says neither how the goods leave nor how they are paid: the draft takes «Өөрөө авна» and «Бэлнээр», and the staff set both before they submit it.
+8. **Listening is pulling.** `erxes.pull` runs every minute in the worker while the switch is on: for each ticked pipeline, the deals newest first (`deals` by `pipelineId`, sorted by `createdAt`) down to ten minutes before the newest one seen; each new deal is read whole (`dealDetail`), kept, and tried. «Одоо татах» does the same at once from the api. Two pulls at once are harmless (4). Because the field lists are best knowledge, every query and the reading of a deal live in one file (`erxes-wire.ts`) with a fixture beside it; a field erxes refuses is cut from the query and the query sent again; a root query has an older name to fall back on; and the first answers of each pipeline are logged and kept (`erxes_pipelines.first_pull`) to be compared with the fixture.
+9. **Rights.** No new permission. The sign-in, the pipelines and the users need `sales.boards.manage` (who configures the boards); the list «Erxes-ээс ирсэн», «Одоо татах» and «Bto руу хуулах» need `sales.orders.manage`; the panel's section needs `sales.orders.read` and the caller must see the order.
+10. **The screen.** «Борлуулалт → Erxes-ээс ирсэн» (`/sales/erxes`): the list with its three states, «Одоо татах», the last pull and its failure, and «Тохиргоо» for the sign-in, the pipelines and the users.
+
+## Alternatives considered
+
+| Alternative | Why rejected |
+|---|---|
+| A webhook from erxes | erxes cannot reach this PC, and a missed call would lose a deal silently; a pull catches up by itself |
+| Keeping the copy in step with later changes in erxes | Two places to edit one order; the owner chose «copy once», and the staff work the order in Bto from then on |
+| Submitting the copy (prices, reservation) | Stock and credit would move without a person of Bto deciding it |
+| A new order channel `ERXES` | A change of a shared enum and of a CHECK on `sales_orders` for a label; the deal's row already says where the order came from |
+| A new secret for the password | The worker and the api both hold `ERKHET_KEY_SECRET`, and a sealed value is bound to its own column by its context |
+| An `integrations/erxes` folder | The client is used by this module alone and is kept beside the one file that knows erxes's shape; it is still called only from flow services, between transactions |
+
+## Consequences
+
+**Positive.** A sale typed in erxes is a draft in Bto within a minute, under the name of the person who typed it, with the whole deal one click away. **Negative.** erxes's shape is assumed until the first real pull: a wrong field costs that field (it is cut and logged), a wrong argument of `deals` fails the pull with `UNEXPECTED_ANSWER` on the settings page, and the fix is in `erxes-wire.ts`. The erxes password, sealed, is in the database. A waiting deal is tried every minute until it is copied or set aside. `createInTx` now takes any audit actor (it used its caller only as one): an order without a Bto author is made by a system actor labelled with the erxes name.
+
+**Follow-ups.** The owner creates an erxes user for Bto that is a member of the pipelines to copy, types its sign-in, presses «Erxes-ээс шинэчлэх» and ticks the pipelines; the first pull's answers are compared with the fixture. A deal without a customer (the movement pipelines) waits for a person: a default customer per pipeline can be added when the owner says which.

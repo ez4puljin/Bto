@@ -11431,6 +11431,239 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/erxes/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Erxes_viewSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Erxes_updateSettings"];
+        trace?: never;
+    };
+    "/api/v1/erxes/settings/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Signs in to erxes with what is typed or saved; saves nothing and reads nothing. */
+        post: operations["Erxes_testSettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/pipelines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Erxes_pipelines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/pipelines/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reads erxes's boards, pipelines and users again; ticks nothing. */
+        post: operations["Erxes_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/pipelines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Erxes_updatePipeline"];
+        trace?: never;
+    };
+    "/api/v1/erxes/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Erxes_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Erxes_mapUser"];
+        trace?: never;
+    };
+    "/api/v1/erxes/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Одоо татах»: one pull now, as the worker does every minute. */
+        post: operations["Erxes_pull"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/deals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Erxes_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/deals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Erxes_deal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** The customer, or a line's product, a person chose for a waiting deal. */
+        patch: operations["Erxes_choose"];
+        trace?: never;
+    };
+    "/api/v1/erxes/deals/{id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * «Bto руу хуулах»: tries the deal now. The answer is the deal: an order's id when it was
+         *     copied, the reasons when it still waits. A deal already copied answers the same order.
+         */
+        post: operations["Erxes_copy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/deals/{id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Erxes_dismiss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/deals/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Erxes_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/erxes/orders/{orderId}/deal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The deal an order was copied from, for the order panel; `deal` is null for Bto's own orders. */
+        get: operations["Erxes_orderDeal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -24992,6 +25225,257 @@ export interface components {
             refused: number;
             /** @description Already settled, or nothing to do */
             skipped: number;
+        };
+        ErxesSettings: {
+            baseUrl: string;
+            email: string | null;
+            /** @description A password is saved */
+            hasPassword: boolean;
+            /** @description A saved password ERKHET_KEY_SECRET no longer opens */
+            passwordUnreadable: boolean;
+            /** @description ERKHET_KEY_SECRET is set, so a password can be saved */
+            secretReady: boolean;
+            /** @description The every-minute copy is on */
+            enabled: boolean;
+            /** @description The sign-in is whole */
+            complete: boolean;
+            /** Format: date-time */
+            lastPullAt: string | null;
+            /**
+             * Format: date-time
+             * @description The last pull that read every ticked pipeline
+             */
+            lastOkAt: string | null;
+            /** @enum {string|null} */
+            lastFailure: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "INTERNAL" | null;
+            lastFailureDetail: string | null;
+            /** @description Deals that wait for a person */
+            waiting: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+            updatedBy: string | null;
+        };
+        ErxesSettingsUpdateRequest: {
+            /** @description erxes's address, https only; null: the company's own */
+            baseUrl?: string | null;
+            /**
+             * Format: email
+             * @description The email of the erxes user Bto signs in as
+             */
+            email?: string | null;
+            /** @description null removes the saved password. Never returned */
+            password?: string | null;
+            /** @description New deals of the ticked pipelines are copied every minute */
+            enabled?: boolean;
+        };
+        ErxesSettingsTestRequest: {
+            /** @description Typed values; the saved ones fill what is not typed */
+            baseUrl?: string;
+            /** Format: email */
+            email?: string;
+            password?: string;
+        };
+        ErxesCheck: {
+            ok: boolean;
+            /** @enum {string|null} */
+            reason: "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "NOT_CONFIGURED" | "KEY_UNREADABLE" | null;
+            /** @description erxes's HTTP status, when it gave one */
+            status: number | null;
+        };
+        ErxesPipeline: {
+            id: number;
+            erxesId: string;
+            name: string;
+            boardName: string | null;
+            /** @description A board that is never copied */
+            blocked: boolean;
+            /** @description erxes no longer lists it */
+            gone: boolean;
+            enabled: boolean;
+            /**
+             * Format: date-time
+             * @description Deals created after this are copied
+             */
+            enabledAt: string | null;
+            btoPipelineId: number | null;
+            btoStageId: number | null;
+            btoPipelineName: string | null;
+            btoStageName: string | null;
+            /** @description The chosen stage is live and takes new orders */
+            placeOk: boolean;
+            /** Format: date-time */
+            lastPullAt: string | null;
+            /** Format: date-time */
+            lastSeenCreatedAt: string | null;
+        };
+        ErxesPipelineUpdateRequest: {
+            /** @description Ticked: deals created from now on are copied */
+            enabled?: boolean;
+            /** @description The Bto pipeline the copies go in */
+            btoPipelineId?: number | null;
+            /** @description A stage of it without an action; left out: its first such stage */
+            btoStageId?: number | null;
+        };
+        ErxesUser: {
+            id: number;
+            erxesId: string;
+            email: string | null;
+            fullName: string | null;
+            /** @description The Bto user a person chose */
+            btoUserId: number | null;
+            btoUserName: string | null;
+            /** @description The Bto user the phone or the name finds */
+            matchedUserId: number | null;
+            matchedUserName: string | null;
+        };
+        ErxesUserUpdateRequest: {
+            /** @description null: match by phone and name again */
+            btoUserId: number | null;
+        };
+        ErxesPullResult: {
+            /** @description erxes was reached and every ticked pipeline read */
+            ok: boolean;
+            /** @enum {string|null} */
+            failure: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | "INTERNAL" | null;
+            pipelines: number;
+            /** @description Deals seen for the first time */
+            seen: number;
+            /** @description Deals that became orders */
+            copied: number;
+            /** @description Deals still waiting */
+            waiting: number;
+        };
+        ErxesWaitIssue: {
+            /** @enum {string} */
+            reason: "NO_STAGE" | "NO_CUSTOMER" | "CUSTOMER_NOT_FOUND" | "CUSTOMER_AMBIGUOUS" | "PRODUCT_NOT_FOUND" | "PRODUCT_AMBIGUOUS" | "UNIT_NOT_FOUND" | "BAD_QUANTITY" | "ORDER_REFUSED";
+            erxesProductId?: string;
+            /** @description An erxes code, a product's or a customer's */
+            code?: string;
+            name?: string;
+            /** @description ORDER_REFUSED: Bto's error code */
+            errorCode?: string;
+        };
+        ErxesDealRow: {
+            id: number;
+            erxesId: string;
+            /** @enum {string} */
+            status: "WAITING" | "COPIED" | "DISMISSED";
+            name: string | null;
+            number: string | null;
+            pipelineName: string | null;
+            creatorName: string | null;
+            /** Format: date-time */
+            erxesCreatedAt: string | null;
+            issues: components["schemas"]["ErxesWaitIssue"][];
+            orderId: number | null;
+            /** Format: date-time */
+            lastTriedAt: string | null;
+            /** Format: date-time */
+            copiedAt: string | null;
+        };
+        ErxesDealPage: {
+            data: components["schemas"]["ErxesDealRow"][];
+            nextCursor: string | null;
+        };
+        ErxesDealLabel: {
+            name: string;
+            color: string | null;
+        };
+        ErxesDealField: {
+            label: string;
+            value: string;
+        };
+        ErxesDealParty: {
+            /** @enum {string} */
+            kind: "COMPANY" | "CUSTOMER";
+            name: string | null;
+            code: string | null;
+            regNo: string | null;
+            phones: string[];
+        };
+        ErxesUnitChoice: {
+            productUnitId: number;
+            productId: number;
+            sku: string;
+            productName: string;
+            unitName: string;
+        };
+        ErxesDealLine: {
+            erxesProductId: string | null;
+            code: string | null;
+            name: string | null;
+            uom: string | null;
+            quantity: string | null;
+            /** @description erxes's price of one unit */
+            unitPrice: string | null;
+            discount: string | null;
+            discountPercent: string | null;
+            amount: string | null;
+            /** @description The Bto unit of the line */
+            unit: components["schemas"]["ErxesUnitChoice"] | null;
+        };
+        ErxesDealAttachment: {
+            name: string | null;
+            url: string;
+        };
+        ErxesDealCustomer: {
+            id: number;
+            code: string;
+            name: string;
+        };
+        ErxesDeal: {
+            id: number;
+            erxesId: string;
+            /** @enum {string} */
+            status: "WAITING" | "COPIED" | "DISMISSED";
+            name: string | null;
+            number: string | null;
+            pipelineName: string | null;
+            creatorName: string | null;
+            /** Format: date-time */
+            erxesCreatedAt: string | null;
+            issues: components["schemas"]["ErxesWaitIssue"][];
+            orderId: number | null;
+            /** Format: date-time */
+            lastTriedAt: string | null;
+            /** Format: date-time */
+            copiedAt: string | null;
+            /** @description Where the deal opens in erxes */
+            url: string;
+            stageName: string | null;
+            description: string | null;
+            /** Format: date-time */
+            startDate: string | null;
+            /** Format: date-time */
+            closeDate: string | null;
+            /** @description The Bto user the creator was matched to */
+            creatorUserId: number | null;
+            creatorUserName: string | null;
+            assigned: string[];
+            labels: components["schemas"]["ErxesDealLabel"][];
+            customFields: components["schemas"]["ErxesDealField"][];
+            parties: components["schemas"]["ErxesDealParty"][];
+            lines: components["schemas"]["ErxesDealLine"][];
+            attachments: components["schemas"]["ErxesDealAttachment"][];
+            customer: components["schemas"]["ErxesDealCustomer"] | null;
+            /** @description The deal exactly as erxes answered */
+            raw: {
+                [key: string]: unknown;
+            };
+        };
+        ErxesUnitChoiceInput: {
+            erxesProductId: string;
+            /** @description null takes the choice back */
+            productUnitId: number | null;
+        };
+        ErxesDealChoiceRequest: {
+            /** @description The Bto customer; null takes the choice back */
+            customerId?: number | null;
+            units?: components["schemas"]["ErxesUnitChoiceInput"][];
+        };
+        ErxesOrderDeal: {
+            /** @description null: the order was made in Bto */
+            deal: components["schemas"]["ErxesDeal"] | null;
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "QUERY_TIMEOUT" | "REPORTS_BUSY" | "REPORT_VIEW_LIMIT" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "ROLE_NAMED_ON_RECORDS" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "PRODUCT_OUT_OF_APP_STOCK" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "PICTURE_NOT_CONFIGURED" | "PICTURE_PROVIDER_FAILED" | "NOTE_READING_STATE" | "SCANNER_NOT_FOUND" | "SCANNER_FAILED" | "ERKHET_NOT_CONFIGURED" | "ERKHET_KEY_SECRET_MISSING" | "ERKHET_SYNC_RUNNING" | "ERKHET_RUN_SUPERSEDED" | "SMS_NOT_CONFIGURED" | "SMS_KEY_SECRET_MISSING" | "SMS_TEMPLATE_INVALID" | "SMS_TOO_LONG" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "ORDER_ALREADY_LOADED" | "ORDER_NOT_LOADABLE" | "LOAD_UNDO_FORBIDDEN" | "EBARIMT_FILE_UNREADABLE" | "EBARIMT_FILE_COLUMNS" | "EBARIMT_FILE_EMPTY" | "EBARIMT_FILE_ROW" | "EBARIMT_FILE_MONTHS" | "EBARIMT_FILE_LIMIT" | "EBARIMT_CELL_CONFLICT" | "EBARIMT_FILE_CHANGED" | "PICK_INCOMPLETE" | "COUNT_SESSIONS_OPEN" | "COUNT_SESSION_REQUIRED" | "PICK_TAKEN" | "LINE_EDIT_PART_DONE" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "BANK_STATEMENT_UNREADABLE" | "BANK_STATEMENT_NO_ACCOUNT" | "BANK_STATEMENT_EMPTY" | "BANK_STATEMENT_POSTED" | "BANK_STATEMENT_UNLINKED" | "BANK_STATEMENT_CURRENCY" | "BANK_LINE_LOCKED" | "BANK_LINE_POSTED" | "BANK_LINE_INCOMPLETE" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_CARD_PENDING" | "POS_CARD_NOT_CHARGED" | "POS_CARD_ATTEMPT_STATE" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE" | "EXPIRY_ITEM_EXISTS" | "EXPIRY_ITEM_CHANGED" | "EXPIRY_ITEM_ARCHIVED";
@@ -52106,6 +52590,495 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErkhetApplyResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_viewSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErxesSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_testSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErxesSettingsTestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesCheck"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_pipelines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesPipeline"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesCheck"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_updatePipeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErxesPipelineUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesPipeline"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_users: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesUser"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_mapUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErxesUserUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesUser"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_pull: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesPullResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                status?: "WAITING" | "COPIED" | "DISMISSED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesDealPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_deal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesDeal"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_choose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErxesDealChoiceRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesDeal"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_copy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesDeal"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_dismiss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesDeal"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesDeal"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Erxes_orderDeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErxesOrderDeal"];
                 };
             };
             /** @description RFC 9457 problem details */

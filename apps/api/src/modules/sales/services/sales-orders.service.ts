@@ -36,7 +36,6 @@ import {
   type AuditEntry,
   AuditService,
   type AuthContext,
-  type CustomerActor,
   OrgService,
   ScopeService,
 } from '../../identity';
@@ -259,7 +258,7 @@ export class SalesOrdersService implements OnModuleInit {
    */
   async createInTx(
     tx: Tx,
-    ctx: AuthContext | CustomerActor,
+    ctx: AuditActor,
     input: OrderInput,
     options: {
       channel: OrderChannel;

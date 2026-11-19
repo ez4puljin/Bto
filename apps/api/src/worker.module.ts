@@ -8,6 +8,7 @@ import { WorkerHealthServer } from './health/worker-health.server';
 import { ErkhetIntegrationModule } from './integrations/erkhet';
 import { SmsIntegrationModule } from './integrations/sms';
 import { ErkhetWorkerModule } from './modules/erkhet';
+import { ErxesWorkerModule } from './modules/erxes';
 import { FinBridgeModule } from './modules/fin-bridge';
 import { FinanceWorkerModule } from './modules/finance';
 import { IdentityWorkerModule } from './modules/identity';
@@ -35,6 +36,8 @@ import { ReportingWorkerModule } from './modules/reporting';
     // The checks of Erkhet's lists (ADR-0203): the worker signs in to Erkhet and compares.
     ErkhetIntegrationModule,
     ErkhetWorkerModule,
+    // erxes's new deals as draft orders (ADR-0218): the worker pulls every minute.
+    ErxesWorkerModule,
     // Settlement SMS (ADR-0216): the worker sends the batches through WeSend.
     SmsIntegrationModule,
   ],

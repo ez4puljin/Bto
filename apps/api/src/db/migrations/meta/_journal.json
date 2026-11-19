@@ -764,6 +764,13 @@
       "when": 1794904610964,
       "tag": "0110_sales_free_qty",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1794906713241,
+      "tag": "0111_erxes_deal_copy",
+      "breakpoints": true
     }
   ]
 }

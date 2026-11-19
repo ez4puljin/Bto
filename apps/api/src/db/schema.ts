@@ -265,6 +265,7 @@ export {
 } from '../modules/ebarimt-check/schema';
 export { ebarimtReceipts } from '../modules/ebarimt/schema';
 export { erkhetSettings, erkhetSyncItems, erkhetSyncRuns } from '../modules/erkhet/schema';
+export { erxesDeals, erxesPipelines, erxesSettings, erxesUsers } from '../modules/erxes/schema';
 export {
   expiryItemChanges,
   expiryItemRoles,

@@ -17,6 +17,7 @@ import { EbarimtHttpModule } from './modules/ebarimt';
 import { EbarimtCheckHttpModule } from './modules/ebarimt-check';
 import { CustomerHttpModule } from './modules/customer';
 import { ErkhetHttpModule } from './modules/erkhet';
+import { ErxesHttpModule } from './modules/erxes';
 import { ExpiryHttpModule } from './modules/expiry';
 import { FinBridgeHttpModule } from './modules/fin-bridge';
 import { FinanceHttpModule } from './modules/finance';
@@ -69,6 +70,7 @@ import { SegmentsHttpModule } from './modules/segments';
     ExpiryHttpModule,
     EbarimtHttpModule,
     ErkhetHttpModule,
+    ErxesHttpModule,
   ],
 })
 export class AppModule {}

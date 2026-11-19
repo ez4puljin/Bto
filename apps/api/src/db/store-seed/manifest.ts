@@ -332,6 +332,12 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   ),
   'public.erkhet_sync_runs': empty(HISTORY),
   'public.erkhet_sync_items': empty(HISTORY),
+  'public.erxes_settings': empty(
+    "erxes's password is sealed with ERKHET_KEY_SECRET, which is new on the store PC: typed again on «Erxes-ээс ирсэн»",
+  ),
+  'public.erxes_pipelines': empty('read again from erxes and ticked on the store PC'),
+  'public.erxes_users': empty('read again from erxes'),
+  'public.erxes_deals': empty(HISTORY),
   'public.report_views': empty('saved report views are made again'),
   'public.screen_usage': empty(HISTORY),
   'public.screen_usage_seen': empty(HISTORY),
