@@ -15,7 +15,7 @@
 
 ## 2. Shared rules (`@tugeel/shared`, `packages/shared/src/stock-problems/index.ts`)
 
-`STOCK_PROBLEM_EVENT_KINDS` (`POS_SHORTFALL`, `BACKORDER`, `SHORT_PICK`), `STOCK_PROBLEM_GROUPS` (`RED` «Улайсан», `CUT` «Дарагдсан») and `stockProblemGroup(kind)`, `STOCK_PROBLEM_RESOLUTION_KINDS`, `STOCK_PROBLEM_RESOLUTION_STATUSES`, `STOCK_PROBLEM_SHEET_STATUSES`, `STOCK_PROBLEM_OUTCOMES`, `STOCK_PROBLEM_WINDOW_DAYS = 30`, `STOCK_PROBLEM_NOTE_MAX = 300`, `STOCK_PROBLEM_QTY_PATTERN`, `STOCK_PROBLEM_SHEET_HOUR = 7`, `stockProblemDifference(counted, onHand)`, `stockProblemOutcome(difference)`. Exported from the package root (no subpath). Texts: mn.json `stockProblems.*`, `roles.system.PRODUCT_SPECIALIST`, `roles.groups.stockProblems`, `permissions.stockProblems.*`.
+`STOCK_PROBLEM_EVENT_KINDS` (`POS_SHORTFALL`, `BACKORDER`, `SHORT_PICK`), `STOCK_PROBLEM_GROUPS` (`RED` «Улайсан», `CUT` «Дарагдсан») and `stockProblemGroup(kind)`, `STOCK_PROBLEM_RESOLUTION_KINDS`, `STOCK_PROBLEM_RESOLUTION_STATUSES`, `STOCK_PROBLEM_SHEET_STATUSES`, `STOCK_PROBLEM_OUTCOMES`, `STOCK_PROBLEM_WINDOW_DAYS = 30`, `STOCK_PROBLEM_NOTE_MAX = 300`, `STOCK_PROBLEM_QTY_PATTERN`, `STOCK_PROBLEM_SHEET_HOUR = 7`, `stockProblemDifference(counted, onHand)`, `stockProblemOutcome(difference)`. Exported from the package root (no subpath). Texts: mn.json `stockProblems.*`, `roles.system.PRODUCT_SPECIALIST`, `roles.groups.problems`, `permissions.problems.*`.
 
 ## 3. API (`/api/v1`)
 
@@ -23,18 +23,18 @@ Every route answers only for the warehouses of the caller's write scope (no scop
 
 | Route | Right | Body / query → answer |
 |---|---|---|
-| `GET /stock-problems/warehouses` | `stockProblems.read` | → `StockProblemWarehouseDto[]`: `warehouseId, warehouseCode, warehouseName, productCount, redCount, cutCount, settingsReady` for each warehouse of the scope. |
-| `GET /stock-problems?warehouseId=` | `stockProblems.read` | `warehouseId` required → `{ data: StockProblemDto[] }`, newest event first, not paged (bounded by the window). |
-| `POST /stock-problems/legitimate` | `stockProblems.manage`, `Idempotency-Key` | `{ warehouseId, productId, note? }` → 200 `StockProblemResolutionDto` (`LEGIT`, `DONE`). 404 when the product is not on the list; 409 `CONFLICT` `params.reason = STOCK_PROBLEM_PENDING` while a decision waits. |
-| `POST /stock-problems/zero-out` | `stockProblems.manage`, `Idempotency-Key` | `{ warehouseId, productId, qty? }` (`qty` base units; omitted = the whole on-hand) → 201 `StockProblemResolutionDto` (`ZERO_OUT`, `PENDING`, `issueId`, `issueStatus` `SENT`). 409 `SETTING_MISSING` (`params.key = stockProblems.settings`, `warehouseId`); 409 `STOCK_INSUFFICIENT` (more than on hand); 422 `qty` `min` (nothing on hand); 404 / 409 as above. |
-| `GET /stock-problems/settings` | `stockProblems.read` | → `StockProblemSettingsDto[]`: `warehouseId, warehouseCode, warehouseName, customerId, customerName, expenseTypeId, expenseTypeName, updatedAt`, one per warehouse of the scope (nulls when never set). |
-| `PUT /stock-problems/settings/:warehouseId` | `stockProblems.manage` | `{ customerId: number \| null, expenseTypeId: number \| null }` → `StockProblemSettingsDto`. 404 unknown customer or type; 409 `EXPENSE_TYPE_INACTIVE`. The expense types are `GET /issues/expense-types`. |
-| `POST /stock-problems/sheets/build` | `stockProblems.manage`, `Idempotency-Key` | `{ warehouseId? }` (omitted = every warehouse of the scope) → 200 `StockProblemSheetDto[]`: today's sheets, built or topped up (§5). |
-| `GET /stock-problems/sheets` | `stockProblems.read` | `warehouseId?, status?, sheetDate?, cursor?, limit?` → `{ data: StockProblemSheetDto[], nextCursor }`, newest first. |
-| `GET /stock-problems/sheets/:id` | `stockProblems.read` | → `StockProblemSheetDetailDto` (the sheet + `lines` in shelf order): the read the web prints. |
-| `GET /stock-problems/sheets/mine` | `stockProblems.count` | → `StockProblemSheetDetailDto[]`: today's `OPEN` sheets of the caller's warehouses, with lines (the staff app). |
-| `POST /stock-problems/sheet-lines/:id/count` | `stockProblems.count`, `Idempotency-Key` | `{ countedQty }` (base units, ≥ 0, ≤ 3 decimals) → 200 `StockProblemSheetLineDto`. May be sent again until the approval (a new key re-reads the on-hand). 409 `DOC_STATE_INVALID` once the sheet is not `OPEN`. |
-| `POST /stock-problems/sheets/:id/approve` | `stockProblems.manage`, `Idempotency-Key` | `{ countedOnly? }` → 200 `StockProblemSheetDetailDto` (`APPROVED`, `issueId`, `adjustmentId`, each line's `outcome`). 409 `CONFLICT` `params = { reason: SHEET_LINES_UNCOUNTED, count }` unless `countedOnly`; 422 `lines` `empty` when nothing is counted; 409 `SETTING_MISSING` with a shortage and no defaults; 409 `STOCK_INSUFFICIENT` when a shortage is more than is on hand now; `PRODUCT_NOT_IN_WAREHOUSE` for a surplus of a product homed elsewhere. Repeating it on an approved sheet changes nothing. |
+| `GET /stock-problems/warehouses` | `problems.read` | → `StockProblemWarehouseDto[]`: `warehouseId, warehouseCode, warehouseName, productCount, redCount, cutCount, settingsReady` for each warehouse of the scope. |
+| `GET /stock-problems?warehouseId=` | `problems.read` | `warehouseId` required → `{ data: StockProblemDto[] }`, newest event first, not paged (bounded by the window). |
+| `POST /stock-problems/legitimate` | `problems.manage`, `Idempotency-Key` | `{ warehouseId, productId, note? }` → 200 `StockProblemResolutionDto` (`LEGIT`, `DONE`). 404 when the product is not on the list; 409 `CONFLICT` `params.reason = STOCK_PROBLEM_PENDING` while a decision waits. |
+| `POST /stock-problems/zero-out` | `problems.manage`, `Idempotency-Key` | `{ warehouseId, productId, qty? }` (`qty` base units; omitted = the whole on-hand) → 201 `StockProblemResolutionDto` (`ZERO_OUT`, `PENDING`, `issueId`, `issueStatus` `SENT`). 409 `SETTING_MISSING` (`params.key = stockProblems.settings`, `warehouseId`); 409 `STOCK_INSUFFICIENT` (more than on hand); 422 `qty` `min` (nothing on hand); 404 / 409 as above. |
+| `GET /stock-problems/settings` | `problems.read` | → `StockProblemSettingsDto[]`: `warehouseId, warehouseCode, warehouseName, customerId, customerName, expenseTypeId, expenseTypeName, updatedAt`, one per warehouse of the scope (nulls when never set). |
+| `PUT /stock-problems/settings/:warehouseId` | `problems.manage` | `{ customerId: number \| null, expenseTypeId: number \| null }` → `StockProblemSettingsDto`. 404 unknown customer or type; 409 `EXPENSE_TYPE_INACTIVE`. The expense types are `GET /issues/expense-types`. |
+| `POST /stock-problems/sheets/build` | `problems.manage`, `Idempotency-Key` | `{ warehouseId? }` (omitted = every warehouse of the scope) → 200 `StockProblemSheetDto[]`: today's sheets, built or topped up (§5). |
+| `GET /stock-problems/sheets` | `problems.read` | `warehouseId?, status?, sheetDate?, cursor?, limit?` → `{ data: StockProblemSheetDto[], nextCursor }`, newest first. |
+| `GET /stock-problems/sheets/:id` | `problems.read` | → `StockProblemSheetDetailDto` (the sheet + `lines` in shelf order): the read the web prints. |
+| `GET /stock-problems/sheets/mine` | `problems.count` | → `StockProblemSheetDetailDto[]`: today's `OPEN` sheets of the caller's warehouses, with lines (the staff app). |
+| `POST /stock-problems/sheet-lines/:id/count` | `problems.count`, `Idempotency-Key` | `{ countedQty }` (base units, ≥ 0, ≤ 3 decimals) → 200 `StockProblemSheetLineDto`. May be sent again until the approval (a new key re-reads the on-hand). 409 `DOC_STATE_INVALID` once the sheet is not `OPEN`. |
+| `POST /stock-problems/sheets/:id/approve` | `problems.manage`, `Idempotency-Key` | `{ countedOnly? }` → 200 `StockProblemSheetDetailDto` (`APPROVED`, `issueId`, `adjustmentId`, each line's `outcome`). 409 `CONFLICT` `params = { reason: SHEET_LINES_UNCOUNTED, count }` unless `countedOnly`; 422 `lines` `empty` when nothing is counted; 409 `SETTING_MISSING` with a shortage and no defaults; 409 `STOCK_INSUFFICIENT` when a shortage is more than is on hand now; `PRODUCT_NOT_IN_WAREHOUSE` for a surplus of a product homed elsewhere. Repeating it on an approved sheet changes nothing. |
 
 `StockProblemDto`: `warehouseId; product: { id, sku, name, baseUomName }; onHand; redQty; cutQty; lastEventAt; events: StockProblemEventDto[]; pending: { id, kind, qtyBase, issueId, adjustmentId, sheetId, createdAt } | null`.
 
@@ -63,9 +63,9 @@ Every route answers only for the warehouses of the caller's write scope (no scop
 
 | Right | Roles (defaults) | Allows |
 |---|---|---|
-| `stockProblems.read` | ADMIN, ACCOUNTANT, WAREHOUSE, PRODUCT_SPECIALIST | the list, the settings, the sheets |
-| `stockProblems.count` | ADMIN, PRODUCT_SPECIALIST | today's sheets in the staff app, a line's count |
-| `stockProblems.manage` | ADMIN, ACCOUNTANT | «Зүй ёсны», «Үлдэгдэл тэглэх», build, approve, the settings |
+| `problems.read` | ADMIN, ACCOUNTANT, WAREHOUSE, PRODUCT_SPECIALIST | the list, the settings, the sheets |
+| `problems.count` | ADMIN, PRODUCT_SPECIALIST | today's sheets in the staff app, a line's count |
+| `problems.manage` | ADMIN, ACCOUNTANT | «Зүй ёсны», «Үлдэгдэл тэглэх», build, approve, the settings |
 
 `PRODUCT_SPECIALIST` «Барааны мэргэжилтэн» is a system role (ADR-0165); give the person a warehouse scope, else they see every warehouse.
 

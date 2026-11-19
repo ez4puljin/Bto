@@ -50849,9 +50849,9 @@
           "chat.answer",
           "chat.answer_own",
           "chat.settings.manage",
-          "stockProblems.read",
-          "stockProblems.count",
-          "stockProblems.manage"
+          "problems.read",
+          "problems.count",
+          "problems.manage"
         ]
       },
       "RoleRef": {

@@ -30,7 +30,7 @@ type Tab = (typeof TABS)[number];
  */
 export function StockProblemsPage() {
   const { t } = useTranslation();
-  const canManage = useHasPermission('stockProblems.manage');
+  const canManage = useHasPermission('problems.manage');
   const [params] = useSearchParams();
   const setParam = useSetParam();
   const tab: Tab = params.get('tab') === 'sheets' ? 'sheets' : 'list';
@@ -41,7 +41,7 @@ export function StockProblemsPage() {
   const current = all.find((entry) => entry.warehouseId === wanted) ?? all[0];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="space-y-4">
       <PageHeader
         title={t('stockProblems.title')}
         description={t('stockProblems.page.description')}

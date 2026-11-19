@@ -17,7 +17,7 @@ export const EXPIRY_MANAGE_RIGHT = 'expiry.items.manage';
 export const PRODUCT_REGISTER_RIGHT = 'catalog.products.register';
 
 /** «Асуудалтай бараа» (ADR-0230): the product specialist counts the morning sheet on the phone. */
-export const STOCK_PROBLEMS_COUNT_RIGHT = 'stockProblems.count';
+export const STOCK_PROBLEMS_COUNT_RIGHT = 'problems.count';
 
 /** A sales rep: the shop, the cart and the orders are theirs. */
 export function isRep(me: Pick<Me, 'permissions'>): boolean {

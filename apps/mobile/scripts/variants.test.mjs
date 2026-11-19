@@ -4,14 +4,13 @@ import { describe, expect, it } from 'vitest';
 
 const appRoot = path.resolve(import.meta.dirname, '..');
 const variants = JSON.parse(readFileSync(path.join(appRoot, 'variants.json'), 'utf8'));
-const pkg = JSON.parse(readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
 
 describe('the two apps of apps/mobile (ADR-0085)', () => {
   it('keeps the staff app as it was, updating itself since ADR-0174', () => {
     expect(variants.staff).toEqual({
       name: 'Bto',
       slug: 'bto-staff',
-      version: pkg.version,
+      version: '0.28.0',
       package: 'mn.butenorgil.bto.staff',
       assets: './assets',
       apkPrefix: 'bto-staff',

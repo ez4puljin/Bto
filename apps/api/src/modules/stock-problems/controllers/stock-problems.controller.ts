@@ -46,9 +46,9 @@ import {
   type WarehouseSettings,
 } from '../services/stock-problems.service';
 
-const READ = 'stockProblems.read';
-const COUNT = 'stockProblems.count';
-const MANAGE = 'stockProblems.manage';
+const READ = 'problems.read';
+const COUNT = 'problems.count';
+const MANAGE = 'problems.manage';
 
 const toProductDto = (product: ProductSummary): StockProblemProductDto => ({
   id: product.id,

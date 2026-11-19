@@ -50,7 +50,7 @@ const COLUMNS: readonly ColumnSpec[] = [
 export function StockProblemSheetPage() {
   const { t } = useTranslation();
   const id = Number.parseInt(useParams().id ?? '', 10);
-  const canManage = useHasPermission('stockProblems.manage');
+  const canManage = useHasPermission('problems.manage');
   const sheet = useStockProblemSheet(id);
   const [approving, setApproving] = useState(false);
   const loadProblem = problemFromError(sheet.error);
@@ -58,7 +58,7 @@ export function StockProblemSheetPage() {
   const detail = sheet.data;
   if (!detail) return <p className="text-sm text-muted-foreground">{t('common.loading')}</p>;
   return (
-    <div className="flex flex-col gap-3">
+    <div className="space-y-4">
       <PageHeader
         title={t('stockProblems.sheets.title', { date: detail.sheetDate })}
         crumbs={[{ label: t('stockProblems.title'), to: `${SHEETS_ROOT}?tab=sheets` }]}

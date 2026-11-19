@@ -70,8 +70,8 @@ describe('the phases of the two apps', () => {
 });
 
 describe('the stock problems count (ADR-0230)', () => {
-  it('is for who holds stockProblems.count only', () => {
-    const specialist = { id: 20, permissions: ['stockProblems.count'] } as unknown as Me;
+  it('is for who holds problems.count only', () => {
+    const specialist = { id: 20, permissions: ['problems.count'] } as unknown as Me;
     expect(mayCountStockProblems(specialist)).toBe(true);
     expect(mayCountStockProblems(office)).toBe(false);
   });

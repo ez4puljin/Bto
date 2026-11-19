@@ -38,7 +38,7 @@ import {
 } from './problem-sources.service';
 import { ShortfallResolver } from './shortfall-resolver';
 
-const MANAGE = 'stockProblems.manage';
+const MANAGE = 'problems.manage';
 const ZERO = new Decimal(0);
 
 /** The warehouses with a problem list: where goods are kept and sold (as goods issues, ADR-0081). */

@@ -278,7 +278,7 @@ export const routes: RouteObject[] = [
     path: '/inventory/stock-problems/sheets/:id/print',
     element: (
       <RequireAuth>
-        <RequirePermission permission="stockProblems.read">
+        <RequirePermission permission="problems.read">
           <StockProblemSheetPrintPage />
         </RequirePermission>
       </RequireAuth>
@@ -507,7 +507,7 @@ export const routes: RouteObject[] = [
             path: 'inventory/stock-problems',
             handle: { width: 'wide' },
             element: (
-              <RequirePermission permission="stockProblems.read">
+              <RequirePermission permission="problems.read">
                 <StockProblemsPage />
               </RequirePermission>
             ),
@@ -516,7 +516,7 @@ export const routes: RouteObject[] = [
             path: 'inventory/stock-problems/sheets/:id',
             handle: { width: 'wide' },
             element: (
-              <RequirePermission permission="stockProblems.read">
+              <RequirePermission permission="problems.read">
                 <StockProblemSheetPage />
               </RequirePermission>
             ),

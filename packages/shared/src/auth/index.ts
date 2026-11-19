@@ -138,9 +138,10 @@ export const PERMISSIONS = [
   'chat.settings.manage',
   // «Асуудалтай бараа» (ADR-0230): the list per warehouse; counting the morning sheet in the staff
   // app; marking a product legitimate, zeroing its balance, approving a sheet and the settings.
-  'stockProblems.read',
-  'stockProblems.count',
-  'stockProblems.manage',
+  // Their own first segment keeps them a group of their own on the rights page.
+  'problems.read',
+  'problems.count',
+  'problems.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -244,7 +245,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     // The accountant sends a goods issue, the keeper confirms their warehouse's part (ADR-0117).
     'inventory.issues.confirm',
     // The keeper sees why a product of their warehouse is on the problem list (ADR-0230).
-    'stockProblems.read',
+    'problems.read',
     'sales.orders.read',
     'sales.orders.pick',
     // Keepers type their own warehouse's quantities into an order while «Бэлдэж» (ADR-0115).
@@ -266,8 +267,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
     // The accountant creates and sends goods issues; the keepers confirm them (ADR-0117).
     'inventory.issues.manage',
     // The problem list's decisions end in a goods issue, the accountant's document (ADR-0230).
-    'stockProblems.read',
-    'stockProblems.manage',
+    'problems.read',
+    'problems.manage',
     // The price check compares a receipt with its order's last prices (ADR-0115).
     'procurement.orders.read',
     'procurement.prices.read',
@@ -321,7 +322,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   DRIVER: ['sales.orders.load'],
   // «Барааны мэргэжилтэн» (ADR-0230): counts the morning sheet of the problem products of the
   // warehouses in their scope, in the staff app; decides nothing.
-  PRODUCT_SPECIALIST: ['stockProblems.read', 'stockProblems.count'],
+  PRODUCT_SPECIALIST: ['problems.read', 'problems.count'],
 };
 
 /** One admin's tick on a system role, kept as a difference from the code (ADR-0165 #2). */

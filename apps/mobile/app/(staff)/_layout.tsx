@@ -102,7 +102,7 @@ export default function StaffLayout() {
                     <Stack.Screen name="chats/index" />
                     <Stack.Screen name="chats/[id]" />
                   </Stack.Protected>
-                  {/* «Асуудалтай бараа» (ADR-0230): who has `stockProblems.count`. */}
+                  {/* «Асуудалтай бараа» (ADR-0230): who has `problems.count`. */}
                   <Stack.Protected guard={specialist}>
                     <Stack.Screen name="stock-problems/index" />
                     <Stack.Screen name="stock-problems/[id]" />

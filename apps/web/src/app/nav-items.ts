@@ -231,7 +231,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         to: '/inventory/stock-problems',
         label: 'nav.stockProblems',
         icon: TriangleAlert,
-        permission: 'stockProblems.read',
+        permission: 'problems.read',
       },
       { to: '/inventory/movements', label: 'nav.movements', icon: History },
       {
