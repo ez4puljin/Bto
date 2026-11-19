@@ -25485,9 +25485,9 @@ export interface components {
              * @enum {string}
              */
             issue?: "MISSING_IN_BTO" | "GROUP_NOT_TAKEN" | "NAME_DIFFERS" | "PRICE_DIFFERS" | "NO_BTO_PRICE" | "INACTIVE_IN_BTO" | "AMBIGUOUS" | "NO_BARCODE" | "MISSING_IN_ERKHET";
-            /** @description The category of the products added from Erkhet; required for those rows */
+            /** @description The category of a product added from Erkhet that erxes does not settle (ADR-0223); without it such rows are refused */
             categoryId?: number;
-            /** @description The price profile of the prices taken from Erkhet; required for new and unpriced products */
+            /** @description The price profile of a new or unpriced product that erxes does not settle (ADR-0223); without it such rows are refused */
             profileId?: number;
         };
         ErkhetApplyResult: {
@@ -25499,6 +25499,13 @@ export interface components {
             refused: number;
             /** @description Already settled, or nothing to do */
             skipped: number;
+            /** @description Applied products that took the request's category or profile because erxes did not settle theirs (ADR-0223) */
+            fallback: number;
+            /**
+             * @description Why erxes was not read for the products; null when it was or was not needed
+             * @enum {string|null}
+             */
+            erxesFailure: "NOT_CONFIGURED" | "KEY_UNREADABLE" | "LOGIN_FAILED" | "UNREACHABLE" | "TIMEOUT" | "UNEXPECTED_ANSWER" | null;
         };
         ErkhetLedgerAccountSummary: {
             /** @description Erkhet's account code */

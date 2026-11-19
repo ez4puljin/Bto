@@ -30,6 +30,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
+import { ERXES_FACTS_FAILURES, type ErxesFactsFailure } from '../../erxes';
 import {
   customerPlanOf,
   ERKHET_RUN_TRIGGERS,
@@ -331,7 +332,8 @@ export class ErkhetApplyDto {
   issue?: ErkhetSyncIssue;
 
   @ApiPropertyOptional({
-    description: 'The category of the products added from Erkhet; required for those rows',
+    description:
+      'The category of a product added from Erkhet that erxes does not settle (ADR-0223); without it such rows are refused',
   })
   @IsOptional()
   @IsInt()
@@ -340,7 +342,7 @@ export class ErkhetApplyDto {
 
   @ApiPropertyOptional({
     description:
-      'The price profile of the prices taken from Erkhet; required for new and unpriced products',
+      'The price profile of a new or unpriced product that erxes does not settle (ADR-0223); without it such rows are refused',
   })
   @IsOptional()
   @IsInt()
@@ -354,6 +356,17 @@ export class ErkhetApplyResultDto {
   @ApiProperty({ description: 'Bto changed since the check: left alone' }) stale: number;
   @ApiProperty({ description: 'A rule of Bto refused the change' }) refused: number;
   @ApiProperty({ description: 'Already settled, or nothing to do' }) skipped: number;
+  @ApiProperty({
+    description:
+      "Applied products that took the request's category or profile because erxes did not settle theirs (ADR-0223)",
+  })
+  fallback: number;
+  @ApiProperty({
+    enum: ERXES_FACTS_FAILURES,
+    nullable: true,
+    description: 'Why erxes was not read for the products; null when it was or was not needed',
+  })
+  erxesFailure: ErxesFactsFailure | null;
 }
 
 // ------------------------------------------------------------------------------------------------

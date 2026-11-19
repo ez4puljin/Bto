@@ -5,6 +5,7 @@ import { CatalogModule } from '../catalog';
 import { IdentityModule } from '../identity';
 import { InventoryModule } from '../inventory';
 import { PartnersModule } from '../partners';
+import { PricingModule } from '../pricing';
 import { SalesModule } from '../sales';
 import { ErxesController } from './controllers/erxes.controller';
 import { ErxesStockController } from './controllers/erxes-stock.controller';
@@ -14,6 +15,7 @@ import { ErxesStockReadJob } from './jobs/erxes-stock-read.job';
 import { ErxesCopyService } from './services/erxes-copy.service';
 import { ErxesDealsService } from './services/erxes-deals.service';
 import { ErxesDirectoryFlowService } from './services/erxes-directory-flow.service';
+import { ErxesProductFactsFlowService } from './services/erxes-product-facts-flow.service';
 import { ErxesProductMatchService } from './services/erxes-product-match.service';
 import { ErxesPullFlowService } from './services/erxes-pull-flow.service';
 import { ErxesRangeFlowService } from './services/erxes-range-flow.service';
@@ -28,8 +30,13 @@ import { ErxesStockService } from './services/erxes-stock.service';
 const IMPORTS = [IdentityModule, PartnersModule, CatalogModule, SalesModule, InventoryModule];
 
 /** The module's own way out to erxes; tests replace ERXES_FETCH with a scripted fetch. */
+const FETCH = {
+  provide: ERXES_FETCH,
+  useValue: ((url, init) => fetch(url, init)) satisfies ErxesFetch,
+};
+
 const PROVIDERS = [
-  { provide: ERXES_FETCH, useValue: ((url, init) => fetch(url, init)) satisfies ErxesFetch },
+  FETCH,
   { provide: ERXES_STOCK_PACE, useValue: DEFAULT_STOCK_PACE },
   ErxesSettingsFlowService,
   ErxesDirectoryFlowService,
@@ -53,6 +60,17 @@ const PROVIDERS = [
   controllers: [ErxesController, ErxesStockController],
 })
 export class ErxesHttpModule {}
+
+/**
+ * How erxes files and prices a product (ADR-0223), for «Эрхэт тулгалт» (erkhet imports this
+ * module): the saved sign-in and `ErxesProductFactsFlowService`, which only reads erxes.
+ */
+@Module({
+  imports: [IdentityModule, CatalogModule, PricingModule],
+  providers: [FETCH, ErxesSettingsFlowService, ErxesProductFactsFlowService],
+  exports: [ErxesProductFactsFlowService],
+})
+export class ErxesFactsModule {}
 
 /** Registers the every-minute pull and the stock read once the worker has started (worker only). */
 @Injectable()

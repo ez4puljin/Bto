@@ -95976,12 +95976,12 @@
           "categoryId": {
             "type": "number",
             "minimum": 1,
-            "description": "The category of the products added from Erkhet; required for those rows"
+            "description": "The category of a product added from Erkhet that erxes does not settle (ADR-0223); without it such rows are refused"
           },
           "profileId": {
             "type": "number",
             "minimum": 1,
-            "description": "The price profile of the prices taken from Erkhet; required for new and unpriced products"
+            "description": "The price profile of a new or unpriced product that erxes does not settle (ADR-0223); without it such rows are refused"
           }
         }
       },
@@ -96003,13 +96003,32 @@
           "skipped": {
             "type": "number",
             "description": "Already settled, or nothing to do"
+          },
+          "fallback": {
+            "type": "number",
+            "description": "Applied products that took the request's category or profile because erxes did not settle theirs (ADR-0223)"
+          },
+          "erxesFailure": {
+            "nullable": true,
+            "enum": [
+              "NOT_CONFIGURED",
+              "KEY_UNREADABLE",
+              "LOGIN_FAILED",
+              "UNREACHABLE",
+              "TIMEOUT",
+              "UNEXPECTED_ANSWER"
+            ],
+            "type": "string",
+            "description": "Why erxes was not read for the products; null when it was or was not needed"
           }
         },
         "required": [
           "applied",
           "stale",
           "refused",
-          "skipped"
+          "skipped",
+          "fallback",
+          "erxesFailure"
         ]
       },
       "ErkhetLedgerAccountSummary": {

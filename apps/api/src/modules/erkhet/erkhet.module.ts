@@ -2,6 +2,7 @@ import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common'
 import { JobWorkerService } from '../../common/jobs/worker/job-worker.service';
 import { JobsWorkerModule } from '../../common/jobs/worker/jobs-worker.module';
 import { CatalogModule } from '../catalog';
+import { ErxesFactsModule } from '../erxes';
 import { FinBridgeModule } from '../fin-bridge';
 import { FinanceModule } from '../finance';
 import { IdentityModule } from '../identity';
@@ -36,7 +37,8 @@ const IMPORTS = [
  * comes from the global ErkhetIntegrationModule of the composition root.
  */
 @Module({
-  imports: IMPORTS,
+  // ADR-0223: «Bto-д нэмэх» files a product as erxes files it (read only).
+  imports: [...IMPORTS, ErxesFactsModule],
   providers: [
     ErkhetSettingsFlowService,
     ErkhetSyncService,

@@ -67,12 +67,13 @@ export function erkhetIssueAppliable(kind: ErkhetSyncKind, issue: ErkhetSyncIssu
   return issue === 'PRICE_DIFFERS' || issue === 'MISSING_IN_BTO' || issue === 'NO_BTO_PRICE';
 }
 
-/** What a person chooses before «Bto-д тааруулах» acts on rows of an issue (ADR-0222). */
+/** What a product row of «Bto-д тааруулах» takes beyond Erkhet's cells (ADR-0222, ADR-0223). */
 export type ErkhetApplyChoice = 'categoryId' | 'profileId';
 
 /**
- * The choices an issue's rows need: a new product takes the category and the price profile chosen
- * in the dialog, a product priced from Erkhet the profile. The other issues need none.
+ * What an issue's rows take: a new product a category and a price profile, a product priced from
+ * Erkhet a profile; the other issues none. Each is the one erxes gives the same product, else the
+ * one chosen in the dialog (ADR-0223).
  */
 export function erkhetApplyChoices(
   kind: ErkhetSyncKind,

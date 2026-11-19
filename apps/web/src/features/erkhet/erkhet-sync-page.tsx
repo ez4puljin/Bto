@@ -209,6 +209,8 @@ export function ErkhetSyncPage() {
     const done = await action.run(async () => {
       const result = await actions.apply.mutateAsync({ ...target, ...chosenValues });
       toast.success(t('erkhet.apply.done', { count: result.applied }));
+      // ADR-0223: products erxes did not settle took the dialog's category or profile.
+      if (result.fallback > 0) toast.info(t('erkhet.apply.fallback', { count: result.fallback }));
       if (result.stale + result.refused > 0) {
         toast.warning(t('erkhet.apply.left', { stale: result.stale, refused: result.refused }));
       }

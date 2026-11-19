@@ -29,9 +29,11 @@ const parseId = (value: string): number | undefined =>
   value ? Number.parseInt(value, 10) : undefined;
 
 /**
- * «Bto-д нэмэх» and «Үнийг тааруулах» for products (ADR-0222): one Bto category for every new
- * product (adding only) and the price profile of Erkhet's prices, «Үндсэн» proposed. What the
- * products take from Erkhet, and what is filled later on their page, is said above the fields.
+ * «Bto-д нэмэх» and «Үнийг тааруулах» for products (ADR-0222, ADR-0223): each product takes the
+ * category and the price profile erxes gives it; the two fields are what a product erxes does not
+ * settle takes instead: a category (adding only, optional: without it such products are refused)
+ * and a price profile, «Үндсэн» proposed. What the products take from Erkhet, and what is filled
+ * later on their page, is said above the fields.
  */
 export function ErkhetApplyDialog(props: {
   action: 'addProducts' | 'priceProducts';
@@ -60,7 +62,7 @@ export function ErkhetApplyDialog(props: {
   const [categoryId, setCategoryId] = useState<number | undefined>();
   const [chosenProfile, setChosenProfile] = useState<number | undefined>();
   const profileId = chosenProfile ?? proposed;
-  const ready = profileId !== undefined && (!adding || categoryId !== undefined);
+  const ready = profileId !== undefined;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -81,6 +83,7 @@ export function ErkhetApplyDialog(props: {
           problem={props.problem ?? problemFromError(categories.error ?? profiles.error)}
         />
         <form id="erkhet-apply" className="grid gap-4" onSubmit={submit}>
+          <p className="text-sm text-muted-foreground">{t('erkhet.apply.fromErxes')}</p>
           {adding ? (
             <FormField label={t('erkhet.apply.category')} htmlFor="erkhet-apply-category">
               <NativeSelect
@@ -88,7 +91,7 @@ export function ErkhetApplyDialog(props: {
                 value={categoryId === undefined ? '' : String(categoryId)}
                 onChange={(event) => setCategoryId(parseId(event.target.value))}
               >
-                <option value="">{t('catalog.products.bulk.chooseCategory')}</option>
+                <option value="">{t('erkhet.apply.noCategory')}</option>
                 {tree.map((node) => (
                   <option key={node.category.id} value={String(node.category.id)}>
                     {node.path}

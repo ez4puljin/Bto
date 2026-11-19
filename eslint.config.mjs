@@ -84,11 +84,14 @@ const MODULE_DEPS = {
   // their own services; nobody imports it.
   // ADR-0219: the copies of Erkhet's receivable and payable transactions post through fin-bridge
   // (`FinErkhetBooks`), and Bto's own vouchers and entries are reversed through finance.
-  erkhet: ['identity', 'partners', 'catalog', 'pricing', 'fin-bridge', 'finance'],
+  // ADR-0223: a product added from Erkhet takes the category and price profile erxes gives the
+  // same product (erxes' `ErxesProductFactsFlowService`, read only).
+  erkhet: ['identity', 'partners', 'catalog', 'pricing', 'fin-bridge', 'finance', 'erxes'],
   // erxes's deals as draft orders (ADR-0218): reads the three, makes orders only through sales'
   // own draft path; nobody imports it. ADR-0221: reads inventory's on-hand (StockQueryService)
-  // beside Erkhet's stock, never writes it.
-  erxes: ['identity', 'catalog', 'partners', 'sales', 'inventory'],
+  // beside Erkhet's stock, never writes it. ADR-0223: reads pricing's profiles and terms in force to
+  // tell which Bto profile an erxes price group became; erkhet imports it for that alone.
+  erxes: ['identity', 'catalog', 'partners', 'sales', 'inventory', 'pricing'],
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.

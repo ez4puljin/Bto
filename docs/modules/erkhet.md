@@ -1,4 +1,4 @@
-# Module: erkhet («Эрхэт тулгалт», ADR-0203, ADR-0222; «Авлага, өглөгийн гүйлгээ», ADR-0219)
+# Module: erkhet («Эрхэт тулгалт», ADR-0203, ADR-0222, ADR-0223; «Авлага, өглөгийн гүйлгээ», ADR-0219)
 
 Erkhet's customers and items checked against Bto's while Erkhet is still the company's books, and Bto brought to Erkhet for the differences that close safely. Web: `/finance/erkhet`. It never writes to Erkhet. It reads partners, catalog and pricing through their public services and changes customers, products and prices only through them; nobody imports it. Since ADR-0219 it also copies Erkhet's receivable and payable transactions into Bto's books (the second half of this document). It ends with Erkhet on the go-live day (ADR-0077).
 
@@ -21,7 +21,8 @@ Erkhet has no API. `ErkhetClient` signs in as a browser would (the form's token 
 - **Customers by code.** `NAME_DIFFERS` (names compared as Bto stores them), `INACTIVE_IN_BTO`, `MISSING_IN_BTO` (its Erkhet group is an active customer category in Bto; the row carries the plan: that category, and the settlement group and kind most of its customers have, the first phone that reads), `GROUP_NOT_TAKEN` (no such category: Kharkhorin and the suppliers of ADR-0107), `MISSING_IN_ERKHET` (active in Bto only).
 - **Items by barcode**, through `lookupCandidates`; without a barcode by code, only to a Bto product without barcodes. `PRICE_DIFFERS` (Erkhet's «Нэгж үнэ» against the warehouse price in force today, more than 0.5 apart; an empty or zero Erkhet price is not compared), `MISSING_IN_BTO`, `NO_BTO_PRICE`, `INACTIVE_IN_BTO`, `AMBIGUOUS`, `NO_BARCODE`, `MISSING_IN_ERKHET`.
 - A code repeated in a list is read once. A list without its columns («Код», «Нэр», «Баркод», «Нэгж үнэ»; «Код», «Нэр», «Бүлэг нэр») or without rows fails the check with `UNEXPECTED_FILE`. «Ангилал нэр», «Хэмжих нэгж код», «Хэмжих нэгж нэр», «Задрах харьцаа» and «Жин» are read when present.
-- **A new product** (ADR-0222, `services/erkhet-new-product.ts`): the base unit by Erkhet's unit name, else its code, among Bto's units (else `PCS`); a `BOX` of n base units when «Задрах харьцаа» is 1/n or n with n whole and ≥ 2 (none when the base unit is the box); the weight from «Жин» above nothing, to four places; Erkhet's code when digits only and no product has that number, else the next free code of the chosen category (the shared code-range rules, as `SkuRangesService.suggest`).
+- **A new product** (ADR-0222, `services/erkhet-new-product.ts`): the base unit by Erkhet's unit name, else its code, among Bto's units (else `PCS`); a `BOX` of n base units when «Задрах харьцаа» is 1/n or n with n whole and ≥ 2 (none when the base unit is the box); the weight from «Жин» above nothing, to four places; Erkhet's code when digits only and no product has that number, else the next free code of its category (the shared code-range rules, as `SkuRangesService.suggest`).
+- **Its category and price profile come from erxes** (ADR-0223, amending ADR-0222 #3): before any row, the apply reads erxes once through `ErxesProductFactsFlowService` (module erxes, read only) for the rows of `MISSING_IN_BTO` and `NO_BTO_PRICE` products: the erxes product whose code is Erkhet's code, else the one holding its barcode; its category → the Bto category the product master made of it; its price group (the till's tag plans that reach it) → the profile most Bto products of that group carry. What erxes does not settle (not found, no Bto counterpart, no saved erxes sign-in, erxes down) takes the request's `categoryId` / `profileId`; without one the row is `REFUSED`. The result counts the applied products that took a choice (`fallback`) and says why erxes was not read (`erxesFailure`).
 
 ## Reads and writes in other modules
 
@@ -31,6 +32,7 @@ The ledger copy adds: `fin-bridge` `FinErkhetBooks` (posting, the copied open it
 - `catalog`: `CatalogImportService.directory()` (every product with its barcode count), `barcodeOwners(lookupKeys)`, `reference()`, `productsByIds`, `createManyInTx` (ADR-0222); `CategoriesService.list()` (the chosen category, the code ranges).
 - `pricing`: `ProductPricesService.inForce(ids, day)`, `setInTx`; `PriceProfilesService.forImport()` (the chosen profile); `SaleReadinessService.completeManyInTx` (ADR-0222).
 - `identity`: `AuditService`, `UserNamesService`.
+- `erxes` (ADR-0223): `ErxesFactsModule`, `ErxesProductFactsFlowService.read(keys)`, between transactions.
 
 ## Jobs
 
@@ -48,7 +50,7 @@ The ledger copy adds: `fin-bridge` `FinErkhetBooks` (posting, the copied open it
 | `GET sync` | `erkhet.sync.read` | `{ configured, nightly, active, latest, failed }`: the check under way, the latest finished one with its counts, and a later failed one |
 | `POST sync/runs` | `erkhet.sync.manage` | 202 with the queued run; 409 `ERKHET_NOT_CONFIGURED`, `ERKHET_SYNC_RUNNING` |
 | `GET sync/items?kind&issue&q&open&cursor&limit` | `erkhet.sync.read` | rows of the latest finished check, keyset by id; `q` matches either side's code, name and barcodes and Erkhet's group or category; a row carries `plan` (a customer's) and `productPlan` (Erkhet's units of a missing product) |
-| `POST sync/apply` `{ itemIds }` or `{ kind, issue }`, with `categoryId`, `profileId` | `erkhet.sync.manage` | brings Bto to Erkhet, up to 500 rows: `{ applied, stale, refused, skipped }`; 409 `ERKHET_RUN_SUPERSEDED` for rows of an older check; 422 when a row needs a choice (`erkhetApplyChoices`: a category and a profile for new products, a profile for unpriced ones) that is missing, unknown, archived or without values today |
+| `POST sync/apply` `{ itemIds }` or `{ kind, issue }`, with `categoryId`, `profileId` (both optional: what a product erxes does not settle takes, ADR-0223) | `erkhet.sync.manage` | brings Bto to Erkhet, up to 500 rows: `{ applied, stale, refused, skipped, fallback, erxesFailure }`; 409 `ERKHET_RUN_SUPERSEDED` for rows of an older check; 422 for a `categoryId` that is unknown or a `profileId` that is unknown, archived or without values today |
 
 ## Invariants
 
@@ -59,11 +61,11 @@ The ledger copy adds: `fin-bridge` `FinErkhetBooks` (posting, the copied open it
 
 ## Tests
 
-`integrations/erkhet/erkhet.client.spec.ts`, `services/erkhet-compare.spec.ts`, `services/erkhet-sheets.spec.ts`, `services/erkhet-new-product.spec.ts` (the box either way round, the weight, the unit, the code; synthetic rows only) and `test/integration/erkhet-sync.int-spec.ts` (rights, the sign-in's secrecy, a check end to end against a scripted Erkhet, the three changes of ADR-0203, products added from ticked rows with their code, barcodes, box, weight, price and completion, a stale and a refused row, the choices refused, unpriced products priced and completed with the largest pack whole, stale and superseded rows, failures, the nightly start).
+`integrations/erkhet/erkhet.client.spec.ts`, `services/erkhet-compare.spec.ts`, `services/erkhet-sheets.spec.ts`, `services/erkhet-new-product.spec.ts` (the box either way round, the weight, the unit, the code; synthetic rows only) and `test/integration/erkhet-sync.int-spec.ts` (rights, the sign-in's secrecy, a check end to end against a scripted Erkhet, the three changes of ADR-0203, products added from ticked rows with their code, barcodes, box, weight, price and completion, a stale and a refused row, an unusable choice refused, unpriced products priced and completed with the largest pack whole, products filed and priced as a scripted erxes files them with the choices as the fallback, erxes down and no sign-in counted as fallback, queries only, stale and superseded rows, failures, the nightly start).
 
 ## The page («Тулгалт», ADR-0203, ADR-0222)
 
-The issue's list; on an issue «Bto-д тааруулах» acts on, a tick on each open row and «Бүгдийг сонгох» in the head. The button acts on the ticked rows, or on every open row of the issue: «Bto-д нэмэх» and «Нэрийг тааруулах» for customers and «Үнийг тааруулах» for price differences after a confirmation; «Bto-д нэмэх» for products (`erkhet-apply-dialog.tsx`: the Bto category and the price profile, «Үндсэн» proposed) and «Үнийг тааруулах» for products without a price (the profile) after a dialog. Products show Erkhet's category beside the barcodes.
+The issue's list; on an issue «Bto-д тааруулах» acts on, a tick on each open row and «Бүгдийг сонгох» in the head. The button acts on the ticked rows, or on every open row of the issue: «Bto-д нэмэх» and «Нэрийг тааруулах» for customers and «Үнийг тааруулах» for price differences after a confirmation; «Bto-д нэмэх» for products and «Үнийг тааруулах» for products without a price after a dialog (`erkhet-apply-dialog.tsx`, ADR-0223): «Ангилал, үнийн профайлыг бараа бүрээр erxes.bto.mn-ээс авна.», then the fallbacks «Erxes-ээс олдохгүй бол ангилал» (adding only, may be left empty: such products are refused) and «Erxes-ээс олдохгүй бол үнийн профайл» («Үндсэн» proposed). After applying, a toast counts the products that took them. Products show Erkhet's category beside the barcodes.
 
 ---
 

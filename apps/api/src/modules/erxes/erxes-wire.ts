@@ -773,3 +773,169 @@ export function readRemainders(raw: unknown): ErkhetRemainder[] {
   }
   return found;
 }
+
+// ------------------------------------------------------------------------------------------------
+// A product's category and price group in erxes (ADR-0223): «Эрхэт тулгалт» adds Erkhet's items the
+// way erxes files them. Every shape and field below was checked read-only against the company's
+// erxes on 2026-11-19 (13,142 active products, 101 categories, 294 pricing plans, 112 product tags).
+
+/** A page of erxes's active products with what files and prices them. */
+export const PRODUCT_FACTS_PAGE: readonly QueryShape[] = [
+  {
+    root: 'products',
+    declare: '$perPage: Int, $page: Int',
+    args: 'status: "active", perPage: $perPage, page: $page',
+    selection: { _id: true, code: true, barcodes: true, categoryId: true, tagIds: true },
+  },
+];
+
+/** erxes's product categories; a name is numbered like «101 Дарс виски» (ADR-0098). */
+export const PRODUCT_CATEGORIES: readonly QueryShape[] = [
+  {
+    root: 'productCategories',
+    selection: { _id: true, name: true, code: true, parentId: true },
+  },
+];
+
+/** erxes's product tags; a pricing plan of a tag takes its child tags too. */
+export const PRODUCT_TAGS: readonly QueryShape[] = [
+  {
+    root: 'tags',
+    args: 'type: "core:product", perPage: 1000',
+    selection: { _id: true, name: true, parentId: true },
+  },
+];
+
+/** The tills of erxes: which branch and department a plan must name to price a till. */
+export const POS_LIST: readonly QueryShape[] = [
+  { root: 'posList', selection: { _id: true, name: true, branchId: true, departmentId: true } },
+];
+
+/** Pricing plans: 294 on 2026-11-19, so one page of 1000 holds them. */
+export const PRICING_PLANS: readonly QueryShape[] = [
+  {
+    root: 'pricingPlans',
+    args: 'perPage: 1000',
+    selection: {
+      _id: true,
+      name: true,
+      status: true,
+      isPriority: true,
+      applyType: true,
+      products: true,
+      productsExcluded: true,
+      tags: true,
+      tagsExcluded: true,
+      branchIds: true,
+      departmentIds: true,
+      pipelineId: true,
+    },
+  },
+];
+
+/**
+ * The supermarket's till in erxes's `posList` (the till «Мөрөн-P.O.S» prices for, ADR-0207): its
+ * branch and department choose the plans Bto's price profiles were copied from.
+ */
+export const ERXES_TILL_POS = 'Бүтэн Оргил ХХК';
+
+const texts = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(textOf).filter((text): text is string => text !== null) : [];
+
+export interface ErxesFactProduct {
+  erxesId: string;
+  code: string | null;
+  barcodes: string[];
+  categoryId: string | null;
+  tagIds: string[];
+}
+
+export function readFactProduct(value: unknown): ErxesFactProduct | null {
+  if (!isObject(value)) return null;
+  const erxesId = textOf(value._id);
+  if (erxesId === null) return null;
+  return {
+    erxesId,
+    code: textOf(value.code),
+    barcodes: texts(value.barcodes),
+    categoryId: textOf(value.categoryId),
+    tagIds: texts(value.tagIds),
+  };
+}
+
+export interface ErxesCategory {
+  erxesId: string;
+  name: string | null;
+}
+
+export function readCategories(raw: unknown): ErxesCategory[] {
+  return objects(raw).flatMap((row) => {
+    const erxesId = textOf(row._id);
+    return erxesId === null ? [] : [{ erxesId, name: textOf(row.name) }];
+  });
+}
+
+export interface ErxesTag {
+  erxesId: string;
+  parentId: string | null;
+}
+
+export function readTags(raw: unknown): ErxesTag[] {
+  return objects(raw).flatMap((row) => {
+    const erxesId = textOf(row._id);
+    return erxesId === null ? [] : [{ erxesId, parentId: textOf(row.parentId) }];
+  });
+}
+
+export interface ErxesPos {
+  name: string | null;
+  branchId: string | null;
+  departmentId: string | null;
+}
+
+export function readPosList(raw: unknown): ErxesPos[] {
+  return objects(raw).map((row) => ({
+    name: textOf(row.name),
+    branchId: textOf(row.branchId),
+    departmentId: textOf(row.departmentId),
+  }));
+}
+
+export interface ErxesPlan {
+  erxesId: string;
+  name: string | null;
+  active: boolean;
+  isPriority: boolean;
+  /** `tag`, `product`, `category`, `bundle`, `segment`, `vendor`. */
+  applyType: string | null;
+  products: string[];
+  productsExcluded: string[];
+  tags: string[];
+  tagsExcluded: string[];
+  branchIds: string[];
+  departmentIds: string[];
+  pipelineId: string | null;
+}
+
+export function readPlans(raw: unknown): ErxesPlan[] {
+  return objects(raw).flatMap((row) => {
+    const erxesId = textOf(row._id);
+    if (erxesId === null) return [];
+    return [
+      {
+        erxesId,
+        name: textOf(row.name),
+        active: textOf(row.status) === 'active',
+        isPriority: row.isPriority === true,
+        applyType: textOf(row.applyType),
+        products: texts(row.products),
+        productsExcluded: texts(row.productsExcluded),
+        tags: texts(row.tags),
+        tagsExcluded: texts(row.tagsExcluded),
+        branchIds: texts(row.branchIds),
+        departmentIds: texts(row.departmentIds),
+        pipelineId: textOf(row.pipelineId),
+      },
+    ];
+  });
+}

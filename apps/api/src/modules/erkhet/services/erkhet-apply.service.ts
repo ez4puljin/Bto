@@ -17,6 +17,11 @@ import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid } from '../../../common/errors/app-error';
 import { databaseErrorOf } from '../../../common/errors/problem-details';
 import { CatalogImportService, type CatalogReference, CategoriesService } from '../../catalog';
+import {
+  type ErxesFactsFailure,
+  type ErxesProductFacts,
+  ErxesProductFactsFlowService,
+} from '../../erxes';
 import type { AuthContext } from '../../identity';
 import { CustomersService } from '../../partners';
 import { PriceProfilesService, ProductPricesService, SaleReadinessService } from '../../pricing';
@@ -32,16 +37,24 @@ export interface ErkhetApplyInput {
   itemIds?: number[];
   kind?: ErkhetSyncKind;
   issue?: ErkhetSyncIssue;
-  /** The category of the products added from Erkhet (ADR-0222). */
+  /** The category of a product added from Erkhet that erxes does not settle (ADR-0223). */
   categoryId?: number;
-  /** The price profile of the prices taken from Erkhet for new and unpriced products (ADR-0222). */
+  /** The price profile of a new or unpriced product that erxes does not settle (ADR-0223). */
   profileId?: number;
 }
 
-/** What the person chose for the rows, checked once for the request. */
+/** What the person chose for the rows erxes does not settle, checked once for the request. */
 interface Choices {
   categoryId: number | null;
   profileId: number | null;
+}
+
+/** What a row of a product takes: erxes's category and profile, else the person's (ADR-0223). */
+interface RowChoices {
+  categoryId: number | null;
+  profileId: number | null;
+  /** A dialog's choice was taken for what erxes did not settle. */
+  fallback: boolean;
 }
 
 /**
@@ -66,6 +79,13 @@ export interface ErkhetApplyResult {
   refused: number;
   /** Rows that were already looked at, or that nothing can be done for. */
   skipped: number;
+  /**
+   * Applied products that took the dialog's category or profile because erxes did not settle
+   * theirs: not found there, no Bto counterpart, or erxes not read (ADR-0223).
+   */
+  fallback: number;
+  /** Why erxes was not read for the products; null when it was, or was not needed. */
+  erxesFailure: ErxesFactsFailure | null;
 }
 
 /** A row's change did not go through, and why it is not an error of the request. */
@@ -93,6 +113,7 @@ export class ErkhetApplyService {
     private readonly categories: CategoriesService,
     private readonly profiles: PriceProfilesService,
     private readonly readiness: SaleReadinessService,
+    private readonly erxes: ErxesProductFactsFlowService,
   ) {}
 
   async apply(actor: AuthContext, input: ErkhetApplyInput): Promise<ErkhetApplyResult> {
@@ -117,19 +138,37 @@ export class ErkhetApplyService {
     const open = rows.filter(
       (row) => row.resolution === null && erkhetIssueAppliable(row.kind, row.issue),
     );
-    const choices = await this.choices(input, open);
+    const choices = await this.choices(input);
     const adding = open.some((row) => row.kind === 'PRODUCT' && row.issue === 'MISSING_IN_BTO');
     const newProducts = adding ? await this.newProducts() : null;
-    const result: ErkhetApplyResult = { applied: 0, stale: 0, refused: 0, skipped: 0 };
+    // erxes is read once, before any transaction, for the rows a category or profile is chosen for.
+    const asking = open.filter((row) => erkhetApplyChoices(row.kind, row.issue).length > 0);
+    const erxes = await this.erxes.read(
+      asking.map((row) => ({
+        code: row.erkhetCode,
+        barcodes: splitBarcodes(row.erkhetBarcodes ?? ''),
+      })),
+    );
+    const factsOf = new Map(asking.map((row, at) => [row.id, erxes.facts[at] ?? null]));
+    const result: ErkhetApplyResult = {
+      applied: 0,
+      stale: 0,
+      refused: 0,
+      skipped: 0,
+      fallback: 0,
+      erxesFailure: asking.length > 0 ? erxes.failure : null,
+    };
     for (const row of rows) {
       if (row.resolution !== null || !erkhetIssueAppliable(row.kind, row.issue)) {
         result.skipped += 1;
         continue;
       }
+      const taken = rowChoices(row, choices, factsOf.get(row.id) ?? null);
       // A new product's code is chosen before its transaction, which then only uses it.
-      const sku = newProducts ? this.codeFor(row, choices, newProducts) : null;
-      const resolution = await this.applyOne(actor, row, choices, newProducts, sku);
+      const sku = newProducts ? this.codeFor(row, taken, newProducts) : null;
+      const resolution = await this.applyOne(actor, row, taken, newProducts, sku);
       if (resolution === 'APPLIED' && sku !== null) newProducts?.taken.add(BigInt(sku));
+      if (resolution === 'APPLIED' && taken.fallback) result.fallback += 1;
       if (resolution === null) result.skipped += 1;
       else if (resolution === 'APPLIED') result.applied += 1;
       else if (resolution === 'STALE') result.stale += 1;
@@ -139,26 +178,20 @@ export class ErkhetApplyService {
   }
 
   /**
-   * The choices the rows need (ADR-0222): a category for new products, a price profile for new and
-   * unpriced products. A missing or unusable choice refuses the whole request, before any row.
+   * The person's choices for what erxes does not settle (ADR-0223): a category for new products, a
+   * price profile for new and unpriced products. Either may be left out (such rows are then
+   * refused); a choice that is given but unusable refuses the whole request, before any row.
    */
-  private async choices(input: ErkhetApplyInput, rows: readonly ItemRow[]): Promise<Choices> {
-    const needed = new Set(rows.flatMap((row) => erkhetApplyChoices(row.kind, row.issue)));
+  private async choices(input: ErkhetApplyInput): Promise<Choices> {
     const choices: Choices = { categoryId: null, profileId: null };
-    if (needed.has('categoryId')) {
-      if (input.categoryId === undefined) {
-        throw invalid('categoryId', 'required', 'choose the category of the new products');
-      }
+    if (input.categoryId !== undefined) {
       const categories = await this.categories.list();
       if (!categories.some((category) => category.id === input.categoryId)) {
         throw invalid('categoryId', 'exists', 'unknown category');
       }
       choices.categoryId = input.categoryId;
     }
-    if (needed.has('profileId')) {
-      if (input.profileId === undefined) {
-        throw invalid('profileId', 'required', 'choose the price profile');
-      }
+    if (input.profileId !== undefined) {
       const profile = (await this.profiles.forImport()).find((one) => one.id === input.profileId);
       if (!profile) throw invalid('profileId', 'exists', 'unknown price profile');
       // Prices are set from today: the profile must be live and hold values today.
@@ -188,10 +221,11 @@ export class ErkhetApplyService {
 
   /**
    * A new product's code (ADR-0222): Erkhet's own when it is digits only and no Bto product has
-   * that number (an import may use any code, ADR-0044 #1), else the next free code of the chosen
-   * category. Null for a row that adds no product, or when the category's range is full.
+   * that number (an import may use any code, ADR-0044 #1), else the next free code of its category
+   * (erxes's, else the chosen one, ADR-0223). Null for a row that adds no product, or when the
+   * category's range is full.
    */
-  private codeFor(row: ItemRow, choices: Choices, context: NewProducts): string | null {
+  private codeFor(row: ItemRow, choices: RowChoices, context: NewProducts): string | null {
     if (row.kind !== 'PRODUCT' || row.issue !== 'MISSING_IN_BTO') return null;
     if (row.erkhetCode && erkhetCodeFree(row.erkhetCode, context.taken)) return row.erkhetCode;
     if (choices.categoryId === null) return null;
@@ -202,7 +236,7 @@ export class ErkhetApplyService {
   private async applyOne(
     actor: AuthContext,
     row: ItemRow,
-    choices: Choices,
+    choices: RowChoices,
     newProducts: NewProducts | null,
     sku: string | null,
   ): Promise<ErkhetResolution | null> {
@@ -232,7 +266,7 @@ export class ErkhetApplyService {
     tx: Tx,
     actor: AuthContext,
     row: ItemRow,
-    choices: Choices,
+    choices: RowChoices,
     newProducts: NewProducts | null,
     sku: string | null,
   ): Promise<void> {
@@ -299,7 +333,7 @@ export class ErkhetApplyService {
     tx: Tx,
     actor: AuthContext,
     row: ItemRow,
-    choices: Choices,
+    choices: RowChoices,
     context: NewProducts | null,
     sku: string | null,
   ): Promise<void> {
@@ -362,7 +396,7 @@ export class ErkhetApplyService {
     tx: Tx,
     actor: AuthContext,
     row: ItemRow,
-    choices: Choices,
+    choices: RowChoices,
   ): Promise<void> {
     if (row.btoId === null || choices.profileId === null || !wholePrice(row.erkhetPrice)) {
       throw new Outcome('REFUSED');
@@ -400,6 +434,26 @@ export class ErkhetApplyService {
       .returning({ id: erkhetSyncItems.id });
     return rows.length > 0;
   }
+}
+
+/**
+ * What a product row takes (ADR-0223): the category and the profile erxes gives the same product,
+ * each falling back on the person's choice where erxes has none (not found, no Bto counterpart, or
+ * erxes not read).
+ */
+function rowChoices(row: ItemRow, choices: Choices, facts: ErxesProductFacts | null): RowChoices {
+  const needed = erkhetApplyChoices(row.kind, row.issue);
+  const categoryId = needed.includes('categoryId')
+    ? (facts?.categoryId ?? choices.categoryId)
+    : null;
+  const profileId = needed.includes('profileId') ? (facts?.profileId ?? choices.profileId) : null;
+  return {
+    categoryId,
+    profileId,
+    fallback:
+      (categoryId !== null && categoryId !== facts?.categoryId) ||
+      (profileId !== null && profileId !== facts?.profileId),
+  };
 }
 
 /** Bto's prices are whole tugriks above nothing (ADR-0048); Erkhet's may be anything. */

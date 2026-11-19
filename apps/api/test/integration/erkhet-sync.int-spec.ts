@@ -5,6 +5,8 @@ import ExcelJS from 'exceljs';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { ERKHET_FETCH, type ErkhetFetch } from '../../src/integrations/erkhet';
+import { ERXES_FETCH, type ErxesFetch } from '../../src/modules/erxes/erxes.client';
+import { ERXES_TILL_POS } from '../../src/modules/erxes/erxes-wire';
 import { systemActor } from '../../src/modules/identity';
 import { ErkhetRunFlowService } from '../../src/modules/erkhet/services/erkhet-run-flow.service';
 import { ErkhetSyncService } from '../../src/modules/erkhet/services/erkhet-sync.service';
@@ -20,6 +22,9 @@ const PASSWORD = 'test-erkhet-password-not-real';
 const COMPANY = '1234567890';
 const EAN_A = '4006381333931';
 const EAN_B = '5901234123457';
+/** Not a real sign-in either: the «erxes» below is scripted (ADR-0223). */
+const ERXES_EMAIL = 'bto@example.test';
+const ERXES_PASSWORD = 'test-erxes-password-not-real';
 
 async function workbook(rows: (string | number | null)[][]): Promise<Uint8Array<ArrayBuffer>> {
   const book = new ExcelJS.Workbook();
@@ -127,6 +132,66 @@ describe('Erkhet sync check', () => {
   };
   const http = () => request(app.getHttpServer());
 
+  /** What the scripted erxes holds (ADR-0223); a test fills it. */
+  const erxes = {
+    categories: [] as { _id: string; name: string; code: string; parentId: string | null }[],
+    tags: [] as { _id: string; name: string; parentId: string | null }[],
+    tills: [
+      { _id: 'pos-1', name: ERXES_TILL_POS, branchId: 'br-murun', departmentId: 'dp-pos' },
+      { _id: 'pos-2', name: 'Хархорин', branchId: 'br-kh', departmentId: 'dp-kh' },
+    ],
+    plans: [] as Record<string, unknown>[],
+    products: [] as Record<string, unknown>[],
+    down: false,
+    writes: 0,
+    reads: 0,
+  };
+  const scriptedErxes: ErxesFetch = (_url, init) => {
+    const answer = (body: unknown, headers: Record<string, string> = {}) =>
+      Promise.resolve(new Response(JSON.stringify(body), { headers }));
+    if (erxes.down) return Promise.reject(new TypeError('fetch failed'));
+    const { query, variables } = JSON.parse(typeof init.body === 'string' ? init.body : '{}') as {
+      query: string;
+      variables: Record<string, unknown>;
+    };
+    if (query.startsWith('mutation login')) {
+      return variables.email === ERXES_EMAIL && variables.password === ERXES_PASSWORD
+        ? answer({ data: { login: 'loggedIn' } }, { 'set-cookie': 'auth-token=session1; Path=/' })
+        : answer({ errors: [{ message: 'Invalid login' }] });
+    }
+    if (!query.startsWith('query ')) {
+      erxes.writes += 1;
+      return answer({ errors: [{ message: 'not allowed' }] });
+    }
+    if ((init.headers as Record<string, string>).cookie !== 'auth-token=session1') {
+      return answer({ errors: [{ message: 'Login required' }] });
+    }
+    erxes.reads += 1;
+    const root = /^query bto(?:\([^)]*\))? \{\n(\w+)/.exec(query)?.[1];
+    switch (root) {
+      case 'productCategories':
+        return answer({ data: { productCategories: erxes.categories } });
+      case 'tags':
+        return answer({ data: { tags: erxes.tags } });
+      case 'posList':
+        return answer({ data: { posList: erxes.tills } });
+      case 'pricingPlans':
+        return answer({ data: { pricingPlans: erxes.plans } });
+      case 'products': {
+        expect(query).toContain('status: "active"');
+        const perPage = variables.perPage as number;
+        const page = variables.page as number;
+        return answer({
+          data: { products: erxes.products.slice((page - 1) * perPage, page * perPage) },
+        });
+      }
+      default:
+        return answer({
+          errors: [{ message: `Cannot query field "${root ?? ''}" on type "Query".` }],
+        });
+    }
+  };
+
   const scriptedErkhet: ErkhetFetch = (url, init) => {
     const headers = init.headers as Record<string, string>;
     const { pathname, searchParams } = new URL(url);
@@ -216,12 +281,19 @@ describe('Erkhet sync check', () => {
 
   beforeAll(async () => {
     app = await createHttpApp({
-      override: (builder) => builder.overrideProvider(ERKHET_FETCH).useValue(scriptedErkhet),
+      override: (builder) =>
+        builder
+          .overrideProvider(ERKHET_FETCH)
+          .useValue(scriptedErkhet)
+          .overrideProvider(ERXES_FETCH)
+          .useValue(scriptedErxes),
     });
     // The worker's side without its job polling: the test runs a check itself.
     worker = await Test.createTestingModule({ imports: [WorkerModule] })
       .overrideProvider(ERKHET_FETCH)
       .useValue(scriptedErkhet)
+      .overrideProvider(ERXES_FETCH)
+      .useValue(scriptedErxes)
       .compile();
     flow = worker.get(ErkhetRunFlowService, { strict: false });
     sql = await connectAs('migrator');
@@ -427,7 +499,7 @@ describe('Erkhet sync check', () => {
   it('brings Bto to Erkhet through the customers and prices own rules', async () => {
     const before = (await overview()).latest;
     const priced = await apply({ kind: 'PRODUCT', issue: 'PRICE_DIFFERS' }).expect(200);
-    expect(priced.body).toEqual({ applied: 1, stale: 0, refused: 0, skipped: 0 });
+    expect(priced.body).toMatchObject({ applied: 1, stale: 0, refused: 0, skipped: 0 });
     expect(await priceOf(juice.id)).toBe('2100.00');
     expect(await priceOf(cola.id)).toBe('1500.00');
     // Again: the row is settled, nothing is written twice.
@@ -436,6 +508,8 @@ describe('Erkhet sync check', () => {
       stale: 0,
       refused: 0,
       skipped: 0,
+      fallback: 0,
+      erxesFailure: null,
     });
 
     const customers = await items({ kind: 'CUSTOMER' });
@@ -452,7 +526,14 @@ describe('Erkhet sync check', () => {
       itemIds: [missing?.id, outside?.id, differs?.id],
     }).expect(200);
     // A group Bto never took is shown, never created.
-    expect(done.body).toEqual({ applied: 2, stale: 0, refused: 0, skipped: 1 });
+    expect(done.body).toEqual({
+      applied: 2,
+      stale: 0,
+      refused: 0,
+      skipped: 1,
+      fallback: 0,
+      erxesFailure: null,
+    });
     const created = await sql.query<{
       name: string;
       phone: string;
@@ -509,7 +590,7 @@ describe('Erkhet sync check', () => {
     // Someone sets another price by hand after the check.
     await pricingApi(app, admin).terms(cola.id, '1700', profile, null);
     const stale = await apply({ kind: 'PRODUCT', issue: 'PRICE_DIFFERS' }).expect(200);
-    expect(stale.body).toEqual({ applied: 0, stale: 1, refused: 0, skipped: 0 });
+    expect(stale.body).toMatchObject({ applied: 0, stale: 1, refused: 0, skipped: 0 });
     expect(await priceOf(cola.id)).toBe('1700.00');
     expect((await items({ kind: 'PRODUCT' })).data[0]).toMatchObject({ resolution: 'STALE' });
 
@@ -606,9 +687,7 @@ describe('Erkhet sync check', () => {
     for (const token of [reader, outsider]) {
       await apply({ itemIds: ticked, categoryId: chinese, profileId: profile }, token).expect(403);
     }
-    // Both choices are asked for, and only usable ones taken.
-    await apply({ itemIds: ticked, profileId: profile }).expect(422);
-    await apply({ itemIds: ticked, categoryId: chinese }).expect(422);
+    // A choice that is given must be usable (ADR-0223: either may be left out).
     await apply({ itemIds: ticked, categoryId: 999_999, profileId: profile }).expect(422);
     await apply({ itemIds: ticked, categoryId: chinese, profileId: 999_999 }).expect(422);
     expect(
@@ -618,7 +697,15 @@ describe('Erkhet sync check', () => {
     const added = await apply({ itemIds: ticked, categoryId: chinese, profileId: profile }).expect(
       200,
     );
-    expect(added.body).toEqual({ applied: 2, stale: 1, refused: 1, skipped: 0 });
+    // No erxes sign-in is saved yet: every product takes the dialog's choices (ADR-0223).
+    expect(added.body).toEqual({
+      applied: 2,
+      stale: 1,
+      refused: 1,
+      skipped: 0,
+      fallback: 2,
+      erxesFailure: 'NOT_CONFIGURED',
+    });
 
     const products = await sql.query<{
       id: string;
@@ -745,14 +832,20 @@ describe('Erkhet sync check', () => {
     expect((await overview()).latest?.summary.products.issues).toMatchObject({ NO_BTO_PRICE: 3 });
 
     await pricingApi(app, admin).terms(pricedSince.id, '750', profile, null);
-    await apply({ kind: 'PRODUCT', issue: 'NO_BTO_PRICE' }).expect(422);
     await apply({ kind: 'PRODUCT', issue: 'NO_BTO_PRICE', profileId: profile }, reader).expect(403);
     const priced = await apply({
       kind: 'PRODUCT',
       issue: 'NO_BTO_PRICE',
       profileId: profile,
     }).expect(200);
-    expect(priced.body).toEqual({ applied: 1, stale: 1, refused: 1, skipped: 0 });
+    expect(priced.body).toEqual({
+      applied: 1,
+      stale: 1,
+      refused: 1,
+      skipped: 0,
+      fallback: 1,
+      erxesFailure: 'NOT_CONFIGURED',
+    });
 
     // The largest pack is counted whole; the product is complete.
     const terms = await sql.query<{ price: string; whole: string | null; ready: boolean }>(
@@ -771,6 +864,215 @@ describe('Erkhet sync check', () => {
       '900011': 'REFUSED',
       '900012': 'STALE',
     });
+  });
+
+  it('files added and priced products as erxes files them, else as chosen (ADR-0223)', async () => {
+    const catalog = catalogApi(app, admin);
+    const pricing = pricingApi(app, admin);
+    const pcs = await catalog.uomId('PCS');
+    const category = async (name: string, skuFrom?: string, skuTo?: string) =>
+      (
+        (
+          await http()
+            .post('/api/v1/categories')
+            .set(bearer(admin))
+            .send({ name, ...(skuFrom ? { skuFrom, skuTo } : {}) })
+            .expect(201)
+        ).body as { id: number }
+      ).id;
+    // Bto's categories as the product master made them from erxes's (ADR-0098).
+    const liquor = await category('861 Тест архи', '861000', '861999');
+    const whisky = await category('862 Тест виски', '862000', '862999');
+    const group = await category('Тест групп');
+    const fallbackCategory = await category('Нөөц ангилал');
+    // Bto's profiles as the copy of erxes's plans made them (ADR-0207): «Архи» for the plans of
+    // the tag «Архи», the main one for none.
+    const liquorProfile = await pricing.profile('Тест Архи');
+    const mainProfile = await pricing.profile('Тест үндсэн');
+    // Bto's products of erxes's price group «Архи» carry «Тест Архи» but one.
+    const sibling = async (sku: string, profileId: number) => {
+      const product = await catalog.product({
+        sku,
+        name: `Архи ${sku}`,
+        categoryId: liquor,
+        baseUomId: pcs,
+        baseBarcodes: [],
+      });
+      await pricing.terms(product.id, '10000', profileId, null);
+    };
+    await sibling('861001', liquorProfile);
+    await sibling('861002', liquorProfile);
+    await sibling('861003', mainProfile);
+    // A product Bto has without a price: erxes prices it as «Архи».
+    const unpriced = await catalog.product({
+      sku: '861004',
+      name: 'Үнэгүй архи',
+      categoryId: liquor,
+      baseUomId: pcs,
+      baseBarcodes: ['8690000000203'],
+    });
+
+    erxes.categories = [
+      { _id: 'c-861', name: '861 Тест архи', code: '861', parentId: 'c-root' },
+      { _id: 'c-862', name: '862 Тест виски', code: '862', parentId: 'c-root' },
+      { _id: 'c-plus', name: '+Тест групп', code: '920', parentId: 'c-root' },
+      { _id: 'c-kh', name: 'Хархорин Боломж', code: '990', parentId: 'c-root' },
+    ];
+    erxes.tags = [
+      { _id: 't-liquor', name: '110 - Архи', parentId: null },
+      { _id: 't-liquor-kid', name: 'Архи 0.5', parentId: 't-liquor' },
+    ];
+    const plan = (id: string, fields: Record<string, unknown>) => ({
+      _id: id,
+      name: id,
+      status: 'active',
+      isPriority: true,
+      applyType: 'tag',
+      products: [],
+      productsExcluded: [],
+      tags: [],
+      tagsExcluded: [],
+      branchIds: ['br-murun'],
+      departmentIds: ['dp-pos'],
+      pipelineId: null,
+      ...fields,
+    });
+    erxes.plans = [
+      plan('pl-liquor', { tags: ['t-liquor'] }),
+      plan('pl-liquor-bulk', { tags: ['t-liquor'], isPriority: false }),
+      // Kharkhorin's till prices elsewhere: its plan is no part of a group here.
+      plan('pl-kh', { tags: ['t-liquor'], branchIds: ['br-kh'], departmentIds: ['dp-kh'] }),
+      // A plan naming one product: that product does not vote.
+      plan('pl-one', { applyType: 'product', products: ['e-861003'] }),
+    ];
+    const product = (
+      id: string,
+      code: string,
+      categoryId: string,
+      tagIds: string[],
+      barcodes: string[] = [],
+    ) => ({
+      _id: id,
+      code,
+      barcodes,
+      categoryId,
+      tagIds,
+    });
+    erxes.products = [
+      product('e-861001', '861001', 'c-861', ['t-liquor']),
+      product('e-861002', '861002', 'c-861', ['t-liquor-kid']),
+      product('e-861003', '861003', 'c-861', ['t-liquor']),
+      product('e-861004', '861004', 'c-861', ['t-liquor']),
+      product('e-whisky', '862010', 'c-862', ['t-liquor']),
+      // Erkhet's code is not erxes's here: found by its barcode.
+      product('e-group', '920001', 'c-plus', [], ['8690000000210']),
+      product('e-kh', '990001', 'c-kh', ['t-liquor']),
+    ];
+
+    erkhet.items = await fullItemSheet([
+      {
+        code: '862010',
+        name: 'Тест виски',
+        category: 'Архи',
+        barcodes: '8690000000227',
+        price: 25000,
+      },
+      {
+        code: '862011',
+        name: 'Тест бүлэг',
+        category: 'Бусад',
+        barcodes: '8690000000210',
+        price: 3000,
+      },
+      {
+        code: '862012',
+        name: 'Erxes-д байхгүй',
+        category: 'Бусад',
+        barcodes: '8690000000234',
+        price: 4000,
+      },
+      {
+        code: '990001',
+        name: 'Боломж бараа',
+        category: 'Хархорин Боломж',
+        barcodes: '8690000000241',
+        price: 5000,
+      },
+      {
+        code: '861004',
+        name: 'Үнэгүй архи',
+        category: 'Архи',
+        barcodes: '8690000000203',
+        price: 12000,
+      },
+    ]);
+    expect(await check()).toMatchObject({ status: 'DONE' });
+    const missing = (await items({ kind: 'PRODUCT', issue: 'MISSING_IN_BTO', open: 'true' })).data;
+    const rowOf = (code: string) => missing.find((one) => one.erkhetCode === code)?.id;
+
+    // erxes is not reached: nothing is known of it, nothing taken from it.
+    await http()
+      .patch('/api/v1/erxes/settings')
+      .set(bearer(admin))
+      .send({ email: ERXES_EMAIL, password: ERXES_PASSWORD })
+      .expect(200);
+    erxes.down = true;
+    const unreachable = await apply({ itemIds: [rowOf('862012')], profileId: mainProfile }).expect(
+      200,
+    );
+    // Without a category to fall back on, an item erxes does not settle is refused.
+    expect(unreachable.body).toEqual({
+      applied: 0,
+      stale: 0,
+      refused: 1,
+      skipped: 0,
+      fallback: 0,
+      erxesFailure: 'UNREACHABLE',
+    });
+    erxes.down = false;
+
+    const added = await apply({
+      itemIds: ['862010', '862011', '990001'].map(rowOf),
+      categoryId: fallbackCategory,
+      profileId: mainProfile,
+    }).expect(200);
+    // The group's product found by its barcode takes the chosen profile (its group has no Bto
+    // product), Kharkhorin's the chosen category (Bto has none of it).
+    expect(added.body).toEqual({
+      applied: 3,
+      stale: 0,
+      refused: 0,
+      skipped: 0,
+      fallback: 2,
+      erxesFailure: null,
+    });
+    const filed = await sql.query<{ sku: string; category: string; profile: string | null }>(
+      `SELECT p.sku, p.category_id::text AS category, t.profile_id::text AS profile
+       FROM products p LEFT JOIN product_prices t ON t.product_id = p.id AND t.valid_to IS NULL
+       WHERE p.sku IN ('862010', '862011', '990001') ORDER BY p.sku`,
+    );
+    expect(filed.rows).toEqual([
+      { sku: '862010', category: String(whisky), profile: String(liquorProfile) },
+      { sku: '862011', category: String(group), profile: String(mainProfile) },
+      { sku: '990001', category: String(fallbackCategory), profile: String(liquorProfile) },
+    ]);
+
+    // «Үнийг тааруулах» takes the group's profile too, over the chosen one.
+    const priced = await apply({
+      kind: 'PRODUCT',
+      issue: 'NO_BTO_PRICE',
+      profileId: mainProfile,
+    }).expect(200);
+    expect(priced.body).toMatchObject({ applied: 1, fallback: 0, erxesFailure: null });
+    const terms = await sql.query<{ price: string; profile: string }>(
+      `SELECT warehouse_price::text AS price, profile_id::text AS profile FROM product_prices
+       WHERE product_id = $1 AND valid_to IS NULL`,
+      [unpriced.id],
+    );
+    expect(terms.rows).toEqual([{ price: '12000.00', profile: String(liquorProfile) }]);
+    // Only queries reached erxes.
+    expect(erxes.reads).toBeGreaterThan(0);
+    expect(erxes.writes).toBe(0);
   });
 
   it('says why a check failed and keeps the last good one on the page', async () => {
