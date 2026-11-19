@@ -36,6 +36,7 @@ bash tools/brain/land.sh <slug>…                   land finished tasks: one co
 bash tools/brain/land.sh --no-push <slug>…         merge and check only
 bash tools/brain/int.sh <pattern>… | --integrity   the api's suites from a copy, one run at a time
 bash tools/brain/graph.sh explain|affected|path …  the code graph of origin/main (below)
+node tools/brain/monitor/serve.mjs                  the monitor page on :3310 (a user service; below)
 ```
 
 `land.sh` exits 0 when landed, 3 on a conflict, 4 when the check is red, 5 when a task is not
@@ -67,6 +68,29 @@ rewritten for Bto; no file or dependency of it is used.
   `down -v` is blocked. Only clear cases: quoted text, heredocs and comments are not commands, and
   any input it cannot read lets the command run. A blocked command is fixed, never worked around.
   The tests are in `brain.test.mjs`.
+
+## The monitor: the brain's work on one page
+
+`http://192.168.1.250:3310` on any PC or phone of the store's LAN (owner 2026-11-20) shows, every
+five seconds, what the brain is doing: the workers running now, the open tasks with the paths they
+hold, their commits and uncommitted files, each brain session with its workers, the last landings
+and whether the real system runs them (`/health` and the auto-deploy log), and how fresh the code
+graph is. `monitor/serve.mjs` (Node, no dependency) serves the page and `GET /api/state`; the user
+service `bto-brain-monitor` (`monitor/bto-brain-monitor.service`, installed and restarted by
+`install.sh`) runs it from `~/bto-dev`. Another port: `BRAIN_MONITOR_PORT`.
+
+- **Read-only.** It only reads the books, the copies (git), Claude Code's subagent transcripts
+  (`~/.claude/projects/*/<session>/subagents/`, read once and then only what was added) and the
+  real system's version; it writes nothing and has no buttons. Anything but `GET` is 405.
+- **LAN only.** Never through the Cloudflare tunnel (CLAUDE.md: nothing new is published outside
+  without a decision).
+- **What it hides.** A worker shows only its description, task, type, model, status, times, the
+  name of its last tool call, one line of its last text (at most 160 characters) and its tokens:
+  never a tool's input or output, a file's content, the environment or the brief's text (only the
+  slug of its `Copy:` line is taken from it).
+- Workers are the `bto-*` agents (and a `general-purpose` one whose brief names a copy) of the
+  last seven days. Running: not finished and written in the last ten minutes; not finished and
+  silent longer: «зогссон бололтой».
 
 ## The code graph: who calls this, what a change reaches
 

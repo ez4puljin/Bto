@@ -1,0 +1,17 @@
+[Unit]
+Description=Bto brain monitor, read-only (http://<LAN address>:3310, tools/brain/README.md)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/bto-dev
+Environment=PATH=%h/.local/opt/node/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=BRAIN_MONITOR_PORT=3310
+ExecStart=%h/.local/opt/node/bin/node tools/brain/monitor/serve.mjs
+Nice=10
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

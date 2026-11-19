@@ -107,5 +107,8 @@ copy, commit, `land.sh notes-<n>` (documents only: nothing is rebuilt).
 - A task the owner cancels is dropped at once, so that its files are free.
 - `bash ~/bto-dev/tools/brain/graph.sh status` shows how fresh the code graph is (each landing
   rebuilds it in the background).
+- When the owner asks how the work goes, also give the monitor's address: `http://192.168.1.250:3310`
+  (any PC or phone on the store's LAN; it shows the running workers, open tasks, landings and
+  whether the real system has them, refreshing by itself).
 - A session that works directly in `~/bto-dev` (the old way) is not in these books. If `land.sh`
   says a conflict with main, that is usually such a session's push: send the task back to rebase.

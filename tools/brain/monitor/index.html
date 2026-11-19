@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="mn">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Тархины хяналт</title>
+    <style>
+      :root {
+        --bg: #f5f6f8;
+        --card: #ffffff;
+        --ink: #14181f;
+        --muted: #5b6472;
+        --line: #e2e5ea;
+        --soft: #f0f2f5;
+        --run: #0b7a3b;
+        --run-bg: #e3f5ea;
+        --done: #3a4658;
+        --done-bg: #e8ebf0;
+        --warn: #8a5300;
+        --warn-bg: #fdf0d8;
+        --bad: #a32020;
+        --bad-bg: #fbe4e4;
+        --info: #1b5fc1;
+        --info-bg: #e3edfc;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1216;
+          --card: #171b21;
+          --ink: #e8ebf0;
+          --muted: #9aa3b0;
+          --line: #2a3039;
+          --soft: #1e232b;
+          --run: #5fd38d;
+          --run-bg: #133222;
+          --done: #b8c1ce;
+          --done-bg: #262c35;
+          --warn: #f1b75c;
+          --warn-bg: #3a2a10;
+          --bad: #ff8a8a;
+          --bad-bg: #3d1717;
+          --info: #8ab4ff;
+          --info-bg: #162a4a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.45 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      main {
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 16px 16px 48px;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 4px 16px;
+        margin-bottom: 8px;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0;
+      }
+      h2 {
+        font-size: 1.05rem;
+        margin: 26px 0 10px;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      h2 .count {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 0.95rem;
+      }
+      .stamp {
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .stamp.stale {
+        color: var(--bad);
+      }
+      .summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 6px 0 4px;
+      }
+      .summary span {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 12px;
+        font-size: 0.9rem;
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+        align-items: start;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .card.big {
+        border-width: 2px;
+        border-color: var(--run);
+        padding: 14px 16px;
+      }
+      .card.big .title {
+        font-size: 1.1rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 10px;
+      }
+      .title {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+      }
+      .meta b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .line {
+        margin-top: 6px;
+        font-size: 0.92rem;
+        background: var(--soft);
+        border-radius: 8px;
+        padding: 6px 8px;
+        overflow-wrap: anywhere;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border-radius: 999px;
+        padding: 1px 9px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .run {
+        color: var(--run);
+        background: var(--run-bg);
+      }
+      .done {
+        color: var(--done);
+        background: var(--done-bg);
+      }
+      .warn {
+        color: var(--warn);
+        background: var(--warn-bg);
+      }
+      .bad {
+        color: var(--bad);
+        background: var(--bad-bg);
+      }
+      .info {
+        color: var(--info);
+        background: var(--info-bg);
+      }
+      .tag {
+        font-size: 0.8rem;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 6px;
+        white-space: nowrap;
+      }
+      code {
+        font:
+          0.85rem ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
+        overflow-wrap: anywhere;
+      }
+      .paths {
+        margin: 6px 0 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .paths li {
+        background: var(--soft);
+        border-radius: 6px;
+        padding: 1px 6px;
+      }
+      .empty {
+        color: var(--muted);
+        background: var(--card);
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        font-size: 0.82rem;
+        color: var(--muted);
+        font-weight: 500;
+        background: var(--soft);
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      td.num {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .session .workers {
+        margin-top: 8px;
+        display: grid;
+        gap: 6px;
+      }
+      .session .worker {
+        border-top: 1px solid var(--line);
+        padding-top: 6px;
+        font-size: 0.9rem;
+      }
+      .notice {
+        margin-top: 8px;
+        padding: 8px 12px;
+        border-radius: 10px;
+      }
+      .deploy {
+        margin-top: 10px;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+      .deploy div {
+        overflow-wrap: anywhere;
+      }
+      footer {
+        margin-top: 30px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      @media (max-width: 640px) {
+        table,
+        thead,
+        tbody,
+        tr,
+        td {
+          display: block;
+        }
+        thead {
+          display: none;
+        }
+        table {
+          border: 0;
+          background: none;
+        }
+        tr {
+          background: var(--card);
+          border: 1px solid var(--line);
+          border-radius: 12px;
+          margin-bottom: 8px;
+          padding: 6px 4px;
+        }
+        td {
+          border: 0;
+          padding: 3px 10px;
+        }
+        td[data-label]::before {
+          content: attr(data-label) ': ';
+          color: var(--muted);
+          font-size: 0.85rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Тархины хяналт</h1>
+        <span id="stamp" class="stamp">ачаалж байна…</span>
+      </header>
+      <div id="summary" class="summary"></div>
+      <div id="notice"></div>
+
+      <h2>Одоо ажиллаж байгаа <span id="running-count" class="count"></span></h2>
+      <div id="running"></div>
+
+      <h2>Нээлттэй ажлууд <span id="tasks-count" class="count"></span></h2>
+      <div id="tasks"></div>
+
+      <h2>Тархины сессүүд <span id="sessions-count" class="count"></span></h2>
+      <div id="sessions"></div>
+
+      <h2>Сүүлд нэвтэрсэн <span id="landings-count" class="count"></span></h2>
+      <div id="landings"></div>
+
+      <h2>Кодын зураглал</h2>
+      <div id="graph"></div>
+
+      <footer>
+        Зөвхөн харах хуудас: энд юу ч өөрчлөгдөхгүй. 5 секунд тутамд өөрөө шинэчлэгдэнэ. Зөвхөн
+        дэлгүүрийн дотоод сүлжээнд.
+      </footer>
+    </main>
+    <script>
+      'use strict';
+      const TZ = 'Asia/Ulaanbaatar';
+      // The newest sessions and their newest workers: the landings below must stay in reach.
+      const SESSIONS_SHOWN = 8;
+      const SESSION_WORKERS_SHOWN = 5;
+      const hm = new Intl.DateTimeFormat('en-GB', {
+        timeZone: TZ,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+      const hms = new Intl.DateTimeFormat('en-GB', {
+        timeZone: TZ,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+      const day = new Intl.DateTimeFormat('en-CA', {
+        timeZone: TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+
+      /** «14:05», with the date before it when it is not today. */
+      function when(ms) {
+        if (!ms) return '—';
+        const d = new Date(ms);
+        const today = day.format(new Date());
+        const date = day.format(d);
+        return date === today ? hm.format(d) : `${date.slice(5)} ${hm.format(d)}`;
+      }
+      function duration(ms) {
+        if (ms == null || ms < 0) return '—';
+        const min = Math.round(ms / 60000);
+        if (min < 1) return `${Math.max(1, Math.round(ms / 1000))} сек`;
+        if (min < 60) return `${min} мин`;
+        const h = Math.floor(min / 60);
+        if (h < 48) return `${h} ц ${min % 60} мин`;
+        return `${Math.floor(h / 24)} өдөр`;
+      }
+      function ago(ms, now) {
+        if (!ms) return '—';
+        return now - ms < 30000 ? 'дөнгөж сая' : `${duration(now - ms)}-ийн өмнө`;
+      }
+      function tokens(n) {
+        if (!n) return '0';
+        if (n >= 1e6) return `${(n / 1e6).toFixed(1)} сая`;
+        if (n >= 1e3) return `${Math.round(n / 1e3)} мян.`;
+        return String(n);
+      }
+      function model(id) {
+        if (!id) return '—';
+        const m = /claude-([a-z]+)-(\d+)-(\d+)/.exec(id);
+        if (!m) return id;
+        return `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}`;
+      }
+
+      /** Elements built with textContent only: nothing from the server is read as HTML. */
+      function el(tag, attrs, ...children) {
+        const node = document.createElement(tag);
+        for (const [key, value] of Object.entries(attrs || {})) {
+          if (value == null || value === false) continue;
+          if (key === 'class') node.className = value;
+          else node.setAttribute(key, value);
+        }
+        for (const child of children.flat(Infinity)) {
+          if (child == null || child === false) continue;
+          node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+        }
+        return node;
+      }
+      const pill = (cls, text) => el('span', { class: `pill ${cls}` }, text);
+
+      const WORKER = {
+        running: ['run', 'ажиллаж байна'],
+        finished: ['done', 'дууссан'],
+        stalled: ['warn', 'зогссон бололтой'],
+      };
+      const RESULT = {
+        DONE: ['run', 'DONE: бэлэн'],
+        BLOCKED: ['bad', 'BLOCKED: асуулттай'],
+        NEED: ['warn', 'NEED: зам хэрэгтэй'],
+      };
+      const TYPE = {
+        'bto-ui': 'дэлгэц',
+        'bto-core': 'api / үндсэн',
+        'bto-scout': 'хайгуул',
+        'bto-review': 'хяналт',
+      };
+      const LANDING = {
+        live: ['run', 'ажиллаж байна'],
+        deploying: ['info', 'тавьж байна'],
+        waiting: ['info', 'CI хүлээж байна'],
+        pending: ['warn', 'хүлээгдэж байна'],
+        'rolled-back': ['bad', 'буцаагдсан'],
+        stuck: ['bad', 'CI улаан, буцаагдаагүй'],
+        refused: ['bad', 'CI улаан тул тавиагүй'],
+      };
+      const CI = {
+        green: ['run', 'CI ногоон'],
+        red: ['bad', 'CI улаан'],
+        cancelled: ['done', 'CI зогсоосон'],
+      };
+
+      function workerCard(w, now, big) {
+        const [cls, label] = WORKER[w.status] || ['done', w.status];
+        // A report's RESULT counts once the worker has stopped; a resumed worker's old one does not.
+        const result = w.status !== 'running' && w.result && RESULT[w.result];
+        return el(
+          'div',
+          { class: `card${big ? ' big' : ''}` },
+          el(
+            'div',
+            { class: 'row' },
+            pill(cls, label),
+            result && pill(result[0], result[1]),
+            el('span', { class: 'title' }, w.description || '(тайлбаргүй)'),
+          ),
+          el(
+            'div',
+            { class: 'meta' },
+            el('b', {}, w.type || '—'),
+            TYPE[w.type] ? ` (${TYPE[w.type]})` : '',
+            ' · ',
+            model(w.model),
+            w.slug ? [' · ажил ', el('code', {}, w.slug)] : '',
+          ),
+          el(
+            'div',
+            { class: 'meta' },
+            'Эхэлсэн ',
+            el('b', {}, when(w.startedAt)),
+            ' · сүүлд ',
+            el('b', {}, when(w.lastAt)),
+            ` (${ago(w.lastAt, now)})`,
+            ' · ',
+            el('b', {}, duration(w.durationMs)),
+          ),
+          el(
+            'div',
+            { class: 'meta' },
+            'Сүүлийн алхам: ',
+            el('code', {}, w.lastTool || '—'),
+            ' · токен ',
+            el('b', {}, tokens(w.tokens?.total)),
+            ` (гаралт ${tokens(w.tokens?.output)})`,
+          ),
+          w.lastText ? el('div', { class: 'line' }, w.lastText) : null,
+        );
+      }
+
+      function render(s) {
+        const now = s.now;
+        const workers = new Map(s.workers.map((w) => [w.id, w]));
+        const running = s.workers.filter((w) => w.status === 'running');
+        const stalled = s.workers.filter((w) => w.status === 'stalled');
+
+        document
+          .getElementById('summary')
+          .replaceChildren(
+            el('span', {}, `Ажиллаж буй: ${running.length}`),
+            el('span', {}, `Нээлттэй ажил: ${s.tasks.length}`),
+            el(
+              'span',
+              {},
+              `Жинхэнэ систем: `,
+              s.running.version ? el('code', {}, s.running.version) : 'хариу алга',
+            ),
+            stalled.length ? el('span', {}, `Зогссон бололтой: ${stalled.length}`) : null,
+          );
+        document
+          .getElementById('notice')
+          .replaceChildren(
+            ...(s.errors?.length
+              ? [
+                  el(
+                    'div',
+                    { class: 'notice warn' },
+                    `Зарим хэсгийг уншиж чадсангүй: ${s.errors.join(', ')}`,
+                  ),
+                ]
+              : []),
+            ...(!s.running.ok
+              ? [el('div', { class: 'notice bad' }, 'Жинхэнэ систем (/health) хариу өгсөнгүй.')]
+              : []),
+          );
+
+        document.getElementById('running-count').textContent = running.length
+          ? `(${running.length})`
+          : '';
+        document.getElementById('running').replaceChildren(
+          running.length
+            ? el(
+                'div',
+                { class: 'grid' },
+                running.map((w) => workerCard(w, now, true)),
+              )
+            : el('div', { class: 'empty' }, 'Одоо ажиллаж буй ажилтан алга.'),
+        );
+
+        document.getElementById('tasks-count').textContent = s.tasks.length
+          ? `(${s.tasks.length})`
+          : '';
+        document.getElementById('tasks').replaceChildren(
+          s.tasks.length
+            ? el(
+                'div',
+                { class: 'grid' },
+                s.tasks.map((t) => {
+                  const w = t.worker && workers.get(t.worker);
+                  const [cls, label] = w ? WORKER[w.status] : ['done', 'ажилтангүй'];
+                  return el(
+                    'div',
+                    { class: 'card' },
+                    el(
+                      'div',
+                      { class: 'row' },
+                      el('span', { class: 'title' }, el('code', {}, t.slug)),
+                      pill(cls, w ? `ажилтан ${label}` : label),
+                    ),
+                    t.exists
+                      ? el(
+                          'div',
+                          { class: 'meta' },
+                          'Commit: ',
+                          el('b', {}, t.ahead ?? '?'),
+                          ' · commit хийгээгүй файл: ',
+                          el('b', {}, t.dirty ?? '?'),
+                          t.openedAt ? [' · нээсэн ', el('b', {}, when(t.openedAt))] : '',
+                        )
+                      : el('div', { class: 'meta' }, pill('warn', 'хуулбар нь алга')),
+                    w
+                      ? el(
+                          'div',
+                          { class: 'meta' },
+                          `${w.description || ''} · ${w.type} · ${model(w.model)}`,
+                        )
+                      : null,
+                    el(
+                      'ul',
+                      { class: 'paths' },
+                      t.paths.map((p) => el('li', {}, el('code', {}, p))),
+                    ),
+                  );
+                }),
+              )
+            : el('div', { class: 'empty' }, 'Нээлттэй ажил алга.'),
+        );
+
+        document.getElementById('sessions-count').textContent = s.sessions.length
+          ? `(${s.sessions.length})`
+          : '';
+        document.getElementById('sessions').replaceChildren(
+          s.sessions.length
+            ? el(
+                'div',
+                { class: 'grid' },
+                s.sessions.slice(0, SESSIONS_SHOWN).map((b) => {
+                  const own = b.workers.map((id) => workers.get(id)).filter(Boolean);
+                  const live = own.filter((w) => w.status === 'running').length;
+                  return el(
+                    'div',
+                    { class: 'card session' },
+                    el(
+                      'div',
+                      { class: 'row' },
+                      pill(b.active ? 'run' : 'done', b.active ? 'идэвхтэй' : 'чимээгүй'),
+                      el('span', { class: 'title' }, b.title || `Сесс ${b.id.slice(0, 8)}`),
+                    ),
+                    el(
+                      'div',
+                      { class: 'meta' },
+                      'Сүүлд ',
+                      el('b', {}, when(b.lastAt)),
+                      ` (${ago(b.lastAt, now)})`,
+                      ' · ',
+                      model(b.model),
+                      ' · ',
+                      el('code', {}, b.id.slice(0, 8)),
+                      ' · ажилтан ',
+                      el('b', {}, own.length),
+                      live ? ` (${live} ажиллаж байна)` : '',
+                    ),
+                    el(
+                      'div',
+                      { class: 'workers' },
+                      own.slice(0, SESSION_WORKERS_SHOWN).map((w) => {
+                        const [cls, label] = WORKER[w.status];
+                        return el(
+                          'div',
+                          { class: 'worker row' },
+                          pill(cls, label),
+                          el('span', {}, w.description || '—'),
+                          el('span', { class: 'tag' }, w.type),
+                          w.slug ? el('code', {}, w.slug) : null,
+                          el(
+                            'span',
+                            { class: 'meta' },
+                            `${when(w.startedAt)} · ${duration(w.durationMs)} · ${tokens(w.tokens?.total)}`,
+                          ),
+                        );
+                      }),
+                      own.length > SESSION_WORKERS_SHOWN
+                        ? el(
+                            'div',
+                            { class: 'meta' },
+                            `… бас ${own.length - SESSION_WORKERS_SHOWN} ажилтан`,
+                          )
+                        : null,
+                    ),
+                  );
+                }),
+              )
+            : el('div', { class: 'empty' }, 'Сүүлийн 7 хоногт тархины сесс алга.'),
+          s.sessions.length > SESSIONS_SHOWN
+            ? el(
+                'div',
+                { class: 'meta' },
+                `… бас ${s.sessions.length - SESSIONS_SHOWN} сесс (сүүлийн 7 хоногийн)`,
+              )
+            : null,
+        );
+
+        document.getElementById('landings-count').textContent = s.landings.length
+          ? `(${s.landings.length})`
+          : '';
+        document.getElementById('landings').replaceChildren(
+          s.landings.length
+            ? el(
+                'table',
+                {},
+                el(
+                  'thead',
+                  {},
+                  el(
+                    'tr',
+                    {},
+                    el('th', {}, 'Хэзээ'),
+                    el('th', {}, 'Commit'),
+                    el('th', {}, 'Ажлууд'),
+                    el('th', {}, 'Жинхэнэ систем'),
+                    el('th', {}, 'CI'),
+                  ),
+                ),
+                el(
+                  'tbody',
+                  {},
+                  s.landings.map((l) => {
+                    const [cls, label] = LANDING[l.state] || ['done', l.state];
+                    const ci = l.ci && CI[l.ci];
+                    return el(
+                      'tr',
+                      {},
+                      el('td', { class: 'num', 'data-label': 'Хэзээ' }, when(l.at)),
+                      el('td', { 'data-label': 'Commit' }, el('code', {}, l.sha.slice(0, 8))),
+                      el(
+                        'td',
+                        { 'data-label': 'Ажлууд' },
+                        l.slugs.map((x, i) => [i ? ', ' : '', el('code', {}, x)]),
+                      ),
+                      el('td', { 'data-label': 'Жинхэнэ систем' }, pill(cls, label)),
+                      el('td', { 'data-label': 'CI' }, ci ? pill(ci[0], ci[1]) : '—'),
+                    );
+                  }),
+                ),
+              )
+            : el('div', { class: 'empty' }, 'Нэвтэрсэн ажил алга.'),
+          s.deploy?.length
+            ? el(
+                'div',
+                { class: 'deploy' },
+                el('div', {}, el('b', {}, 'Шинэчлэлтийн сүүлийн мөрүүд:')),
+                s.deploy.map((d) => el('div', {}, `${when(d.at)} ${d.text}`)),
+              )
+            : null,
+        );
+
+        const g = s.graph;
+        const GRAPH = {
+          idle: ['run', 'бэлэн'],
+          running: ['info', 'шинэчилж байна'],
+          failed: ['bad', 'сүүлийн бүтээлт амжилтгүй'],
+          stale: ['warn', 'шинэчлэлт тасарсан бололтой'],
+          none: ['done', 'мэдээ алга'],
+        };
+        document
+          .getElementById('graph')
+          .replaceChildren(
+            !g || !g.commit
+              ? el('div', { class: 'empty' }, 'Кодын зураглал хараахан бүтээгдээгүй.')
+              : el(
+                  'div',
+                  { class: 'card' },
+                  el(
+                    'div',
+                    { class: 'row' },
+                    pill(...(GRAPH[g.update?.state] || GRAPH.none)),
+                    g.behind === 0
+                      ? pill('run', 'main-тай адил')
+                      : g.behind != null
+                        ? pill('warn', `main-ээс ${g.behind} commit хоцорсон`)
+                        : null,
+                    el('code', {}, g.commit),
+                    el('span', {}, g.subject || ''),
+                  ),
+                  el(
+                    'div',
+                    { class: 'meta' },
+                    'Бүтээсэн ',
+                    el('b', {}, when(g.builtAt)),
+                    ` (${ago(g.builtAt, now)})`,
+                    g.update?.seconds != null ? ` · ${g.update.seconds} сек зарцуулсан` : '',
+                    g.sizeBytes ? ` · graph.json ${(g.sizeBytes / 1048576).toFixed(0)} МБ` : '',
+                    g.update?.state === 'running' && g.update.at
+                      ? ` · ${when(g.update.at)}-аас эхэлсэн`
+                      : '',
+                  ),
+                ),
+          );
+      }
+
+      let lastOk = 0;
+      async function poll() {
+        const stamp = document.getElementById('stamp');
+        try {
+          const response = await fetch('/api/state', { cache: 'no-store' });
+          if (!response.ok) throw new Error(String(response.status));
+          const state = await response.json();
+          render(state);
+          lastOk = Date.now();
+          stamp.textContent = `шинэчлэгдсэн ${hms.format(new Date(state.now))}`;
+          stamp.className = 'stamp';
+        } catch {
+          stamp.textContent = lastOk
+            ? `холболт тасарсан · сүүлд ${hms.format(new Date(lastOk))}`
+            : 'холбогдож чадсангүй';
+          stamp.className = 'stamp stale';
+        }
+      }
+      poll();
+      setInterval(poll, 5000);
+    </script>
+  </body>
+</html>

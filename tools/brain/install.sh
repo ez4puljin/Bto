@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Puts the brain where every Claude session on this PC finds it (ADR-0213): the workers' and the
 # reviewer's definitions in ~/.claude/agents, the brain's own rules as the skill `tarhi` in
-# ~/.claude/skills, the guard as a PreToolUse hook in ~/.claude/settings.json, and git's merge of
-# mn.json by key. Run it again after changing anything under tools/brain/.
+# ~/.claude/skills, the guard as a PreToolUse hook in ~/.claude/settings.json, git's merge of
+# mn.json by key, and the monitor's page as the user service bto-brain-monitor. Run it again after
+# changing anything under tools/brain/.
 #   bash tools/brain/install.sh
 set -euo pipefail
 # shellcheck source=tools/brain/lib.sh
@@ -35,6 +36,19 @@ echo "workers: $(ls "$HOME/.claude/agents" | grep '^bto-' | tr '\n' ' ')"
 echo "skill:   $HOME/.claude/skills/tarhi/SKILL.md"
 echo "guard:   PreToolUse Bash → $GUARD (in $HOME/.claude/settings.json)"
 echo "tasks:   $WORK (books in $STATE)"
+# The monitor (monitor/serve.mjs): a read-only page of the brain's work on the LAN, port 3310.
+# Restarted when already running, so that a changed serve.mjs is taken.
+UNIT=bto-brain-monitor.service
+mkdir -p "$HOME/.config/systemd/user"
+cp "$BRAIN_DIR/monitor/$UNIT" "$HOME/.config/systemd/user/$UNIT"
+if command -v systemctl >/dev/null && systemctl --user daemon-reload 2>/dev/null; then
+  systemctl --user enable -q "$UNIT" 2>/dev/null || echo "warning: could not enable $UNIT" >&2
+  systemctl --user restart "$UNIT" 2>/dev/null || echo "warning: could not start $UNIT (journalctl --user -u $UNIT)" >&2
+else
+  echo "warning: systemctl --user is not available; start the monitor by hand: node tools/brain/monitor/serve.mjs" >&2
+fi
+LAN=$(hostname -I 2>/dev/null | awk '{ print $1 }')
+echo "monitor: http://${LAN:-localhost}:3310"
 # The code graph (graph.sh): never installed or built from here; the build takes three minutes.
 if ! command -v graphify >/dev/null && [ ! -x "$HOME/.local/bin/graphify" ]; then
   echo "graph:   graphify is missing; install it once with «uv tool install graphifyy»"
