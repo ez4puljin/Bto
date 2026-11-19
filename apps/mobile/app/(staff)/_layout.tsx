@@ -11,7 +11,13 @@ import { OfflineNote } from '../../src/outbox/offline-note';
 import { KeptProvider } from '../../src/state/kept';
 import { OutboxProvider } from '../../src/state/outbox';
 import { useLiveStock } from '../../src/state/live-stock';
-import { isRep, mayLoad, mayPick, mayRequestTransfers } from '../../src/state/phase';
+import {
+  isRep,
+  mayCountStockProblems,
+  mayLoad,
+  mayPick,
+  mayRequestTransfers,
+} from '../../src/state/phase';
 import { useSignedIn } from '../../src/state/session';
 import { ShopProvider } from '../../src/state/shop';
 import { colors } from '../../src/theme/tokens';
@@ -35,6 +41,7 @@ export default function StaffLayout() {
   const picker = mayPick(me);
   const seller = mayRequestTransfers(me);
   const driver = mayLoad(me);
+  const specialist = mayCountStockProblems(me);
   return (
     // The rep's orders wait in the outbox (owner 2026-11-19): nothing locks the cart any more.
     <ShopProvider server={server} userId={me.id} keepsPending={false}>
@@ -94,6 +101,11 @@ export default function StaffLayout() {
                   <Stack.Protected guard={chatter}>
                     <Stack.Screen name="chats/index" />
                     <Stack.Screen name="chats/[id]" />
+                  </Stack.Protected>
+                  {/* «Асуудалтай бараа» (ADR-0230): who has `stockProblems.count`. */}
+                  <Stack.Protected guard={specialist}>
+                    <Stack.Screen name="stock-problems/index" />
+                    <Stack.Screen name="stock-problems/[id]" />
                   </Stack.Protected>
                   {/* «Ирц» (ADR-0131): everyone's. */}
                   <Stack.Screen name="attendance/index" />

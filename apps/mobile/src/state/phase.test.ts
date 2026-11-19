@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomerPrincipal, Me } from '../api/session';
-import { isRep, mayManageExpiry, mayPick, mayRequestTransfers, mayUseApp, phaseOf } from './phase';
+import {
+  isRep,
+  mayCountStockProblems,
+  mayManageExpiry,
+  mayPick,
+  mayRequestTransfers,
+  mayUseApp,
+  phaseOf,
+} from './phase';
 
 const rep = { id: 7, permissions: ['sales.orders.rep'] } as unknown as Me;
 const office = { id: 8, permissions: ['sales.orders.read'] } as unknown as Me;
@@ -58,5 +66,13 @@ describe('the phases of the two apps', () => {
     expect(mayRequestTransfers(both)).toBe(true);
     expect(isRep(rep)).toBe(true);
     expect(mayRequestTransfers(rep)).toBe(false);
+  });
+});
+
+describe('the stock problems count (ADR-0230)', () => {
+  it('is for who holds stockProblems.count only', () => {
+    const specialist = { id: 20, permissions: ['stockProblems.count'] } as unknown as Me;
+    expect(mayCountStockProblems(specialist)).toBe(true);
+    expect(mayCountStockProblems(office)).toBe(false);
   });
 });

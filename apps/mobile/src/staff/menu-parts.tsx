@@ -52,6 +52,7 @@ export const MENU_LOOK: Record<MenuKey, { Icon: LucideIcon; color: string }> = {
   transfers: { Icon: ArrowLeftRight, color: colors.tint.teal },
   expiry: { Icon: CalendarClock, color: colors.tint.red },
   counts: { Icon: ClipboardList, color: colors.tint.purple },
+  stockProblems: { Icon: ClipboardList, color: colors.tint.red },
   labels: { Icon: Tag, color: colors.tint.orange },
   productNew: { Icon: PackagePlus, color: colors.tint.blue },
   attendance: { Icon: CalendarCheck, color: colors.tint.green },

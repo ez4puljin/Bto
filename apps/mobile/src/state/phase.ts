@@ -16,6 +16,9 @@ export const EXPIRY_MANAGE_RIGHT = 'expiry.items.manage';
 /** Registering a new product (ADR-0044 #5), on the phone since ADR-0199. */
 export const PRODUCT_REGISTER_RIGHT = 'catalog.products.register';
 
+/** «Асуудалтай бараа» (ADR-0230): the product specialist counts the morning sheet on the phone. */
+export const STOCK_PROBLEMS_COUNT_RIGHT = 'stockProblems.count';
+
 /** A sales rep: the shop, the cart and the orders are theirs. */
 export function isRep(me: Pick<Me, 'permissions'>): boolean {
   return me.permissions.includes(REP_RIGHT);
@@ -49,6 +52,11 @@ export function isPickLead(me: Me): boolean {
 /** «Хугацаа илрүүлэлт» (ADR-0172 #9): who changes a record's status and archives it on the phone. */
 export function mayManageExpiry(me: Me): boolean {
   return me.permissions.includes(EXPIRY_MANAGE_RIGHT);
+}
+
+/** «Асуудалтай бараа» (ADR-0230): who counts the morning sheet of red and cut products. */
+export function mayCountStockProblems(me: Pick<Me, 'permissions'>): boolean {
+  return me.permissions.includes(STOCK_PROBLEMS_COUNT_RIGHT);
 }
 
 /**

@@ -54,6 +54,11 @@ describe('the staff menu', () => {
     expect(keysOf(['catalog.products.manage'])).not.toContain('productNew');
   });
 
+  it('shows «Асуудалтай бараа» only to who may count the stock problems (ADR-0230)', () => {
+    expect(keysOf([])).not.toContain('stockProblems');
+    expect(keysOf(['stockProblems.count'])).toContain('stockProblems');
+  });
+
   it('gives a driver «Ачилт» (ADR-0179), first among their favourites', () => {
     expect(keysOf(['sales.orders.load'])).toContain('loading');
     expect(keysOf(['sales.orders.pick'])).not.toContain('loading');

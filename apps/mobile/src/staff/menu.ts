@@ -1,4 +1,11 @@
-import { isRep, mayLoad, mayPick, mayRegisterProducts, mayRequestTransfers } from '../state/phase';
+import {
+  isRep,
+  mayCountStockProblems,
+  mayLoad,
+  mayPick,
+  mayRegisterProducts,
+  mayRequestTransfers,
+} from '../state/phase';
 import type { Me } from '../api/session';
 
 // «Цэс» of the staff app (ADR-0174): every screen the app has, by the person's rights, and the
@@ -12,6 +19,7 @@ export type MenuKey =
   | 'transfers'
   | 'expiry'
   | 'counts'
+  | 'stockProblems'
   | 'labels'
   | 'productNew'
   | 'attendance'
@@ -58,6 +66,10 @@ export function menuOf(me: Rights): MenuGroup[] {
         ...(mayRequestTransfers(me) ? [{ key: 'transfers' as const, href: '/transfers' }] : []),
         { key: 'expiry', href: '/expiry' },
         { key: 'counts', href: '/counts' },
+        // «Асуудалтай бараа» (ADR-0230): the product specialist's morning sheet.
+        ...(mayCountStockProblems(me)
+          ? [{ key: 'stockProblems' as const, href: '/stock-problems' }]
+          : []),
         // «Үнийн шошго»: the store seller's, who prints the labels of their till's products.
         ...(mayRequestTransfers(me) ? [{ key: 'labels' as const, href: '/labels' }] : []),
         ...(mayRegisterProducts(me) ? [{ key: 'productNew' as const, href: '/products/new' }] : []),
