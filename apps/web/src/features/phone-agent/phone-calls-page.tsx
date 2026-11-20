@@ -25,7 +25,7 @@ import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbMinute } from '@/lib/dayjs';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
-import { callerOf, formatDuration, narrowCalls, OUTCOME_TONE, OUTCOMES } from './call-format';
+import { callerOf, formatDuration, OUTCOME_TONE, OUTCOMES } from './call-format';
 import { usePhoneCalls, usePhoneNoHits } from './phone-agent-api';
 
 const TABS = ['calls', 'noHits'] as const;
@@ -82,12 +82,8 @@ function CallsList() {
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
   const hasOrder = params.get('order') === '1';
-  const calls = usePhoneCalls({ outcome });
-  const rows = narrowCalls(calls.data?.pages.flatMap((page) => page.data) ?? [], {
-    from,
-    to,
-    hasOrder,
-  });
+  const calls = usePhoneCalls({ outcome, from, to, hasOrder });
+  const rows = calls.data?.pages.flatMap((page) => page.data) ?? [];
   const none = <span className="text-muted-foreground">{t('phoneAgent.calls.none')}</span>;
   return (
     <>

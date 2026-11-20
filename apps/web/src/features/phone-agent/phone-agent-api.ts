@@ -36,10 +36,10 @@ export function usePhoneLines() {
 
 /**
  * The install line of the Windows call bridge (`tools/call-bridge/windows/install.ps1`, ADR-0232):
- * pasted into an administrator PowerShell on the PC beside the phone.
+ * pasted into an ordinary PowerShell window (not administrator) on the PC beside the phone.
  */
 export function callBridgeInstallLine(server: string, key: string): string {
-  return `powershell -ExecutionPolicy Bypass -File install.ps1 -Server ${server} -Key ${key}`;
+  return `[Net.ServicePointManager]::SecurityProtocol='Tls12'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ez4puljin/Bto/main/tools/call-bridge/windows/install.ps1))) -Server '${server}' -Key '${key}'`;
 }
 
 export function usePhoneLineMutations() {
@@ -77,8 +77,13 @@ export function usePhoneLineMutations() {
   };
 }
 
-/** Newest first; the api filters by outcome and answered, the page narrows by date and order. */
-export function usePhoneCalls(filters: { outcome?: PhoneCallOutcome | undefined }) {
+/** Newest first; the api filters by outcome, Ulaanbaatar days (from, to) and whether an order was placed. */
+export function usePhoneCalls(filters: {
+  outcome?: PhoneCallOutcome | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
+  hasOrder?: boolean | undefined;
+}) {
   const api = useApiClient();
   return useInfiniteQuery({
     queryKey: [...KEYS.calls, 'list', filters],
@@ -86,7 +91,16 @@ export function usePhoneCalls(filters: { outcome?: PhoneCallOutcome | undefined 
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.GET('/api/v1/phone-calls', {
-          params: { query: { cursor: pageParam, limit: 50, outcome: filters.outcome } },
+          params: {
+            query: {
+              cursor: pageParam,
+              limit: 50,
+              outcome: filters.outcome,
+              from: filters.from,
+              to: filters.to,
+              hasOrder: filters.hasOrder ? 'true' : undefined,
+            },
+          },
           signal,
         }),
       ),

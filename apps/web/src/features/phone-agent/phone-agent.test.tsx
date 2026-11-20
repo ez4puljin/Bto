@@ -76,8 +76,10 @@ describe('phone lines screen', () => {
     await user.type(within(dialog).getByLabelText(mn.phoneAgent.lines.fields.name), LINE.name);
     await user.click(within(dialog).getByRole('button', { name: mn.common.save }));
     const shown = await screen.findByText(/install\.ps1/);
-    expect(shown).toHaveTextContent(`-Server ${window.location.origin} -Key bpl_3_secret`);
-    expect(screen.getByText(/Түлхүүр зөвхөн одоо харагдана, хадгалаад ав/)).toBeInTheDocument();
+    expect(shown.textContent).toBe(
+      `[Net.ServicePointManager]::SecurityProtocol='Tls12'; & ([scriptblock]::Create((irm https://raw.githubusercontent.com/ez4puljin/Bto/main/tools/call-bridge/windows/install.ps1))) -Server '${window.location.origin}' -Key 'bpl_3_secret'`,
+    );
+    expect(screen.getByText(mn.phoneAgent.lines.keyDescription)).toBeInTheDocument();
   });
 
   it('saves the working hours and the greeting in the api shape', async () => {
