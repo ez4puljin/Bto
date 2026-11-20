@@ -203,7 +203,7 @@ describe('receipt discounts and supplier products', () => {
     await app.close();
   });
 
-  it('takes the line discounts first, then the note’s on what remains, and books the net', async () => {
+  it('takes the line discounts first, then the note’s on what remains, and books them as income', async () => {
     const receipt = await draft(vatSupplier, [
       { productUnitId: unitOf(water, 'BOX').id, enteredQty: '2', docUnitPrice: '13200' },
       line(juice, '10', { docAmount: '5500' }),
@@ -241,9 +241,10 @@ describe('receipt discounts and supplier products', () => {
     expect(
       typed.lines.map((row) => [row.discountAmount, row.netAmount, row.vatAmount, row.costAmount]),
     ).toEqual([
-      ['3828.00', '22572.00', '2052.00', '20520.00'],
-      ['1320.00', '4180.00', '380.00', '3800.00'],
-      ['319.00', '1881.00', '171.00', '1710.00'],
+      // The cost is the price before the discount, without the VAT (ADR-0236).
+      ['3828.00', '22572.00', '2052.00', '24000.00'],
+      ['1320.00', '4180.00', '380.00', '5000.00'],
+      ['319.00', '1881.00', '171.00', '2000.00'],
       [null, null, null, null],
     ]);
     const totals = {
@@ -252,7 +253,7 @@ describe('receipt discounts and supplier products', () => {
       discountTooLarge: false,
       netTotal: '28633.00',
       vatTotal: '2603.00',
-      costTotal: '26030.00',
+      costTotal: '31000.00',
       pricedLines: 4,
     };
     expect(typed.totals).toEqual(totals);
@@ -266,23 +267,25 @@ describe('receipt discounts and supplier products', () => {
     await costReceiptAsTyped(app, admin, receipt.id);
     expect(await get(receipt.id)).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     expect(await valuations(receipt.id)).toEqual([
-      { version: 1, doc_amount: '26400.00', discount_amount: '3828.00', amount: '20520.00' },
-      { version: 1, doc_amount: '5500.00', discount_amount: '1320.00', amount: '3800.00' },
-      { version: 1, doc_amount: '2200.00', discount_amount: '319.00', amount: '1710.00' },
+      { version: 1, doc_amount: '26400.00', discount_amount: '3828.00', amount: '24000.00' },
+      { version: 1, doc_amount: '5500.00', discount_amount: '1320.00', amount: '5000.00' },
+      { version: 1, doc_amount: '2200.00', discount_amount: '319.00', amount: '2000.00' },
       { version: 1, doc_amount: '0.00', discount_amount: null, amount: '0.00' },
     ]);
-    // The payable is Σ net, input VAT its VAT, the rest the stock itself (ADR-0233).
+    // The payable is Σ net and the input VAT its VAT; the stock goes in before the discounts,
+    // which are income without their VAT: 5,467 / 1.1 (ADR-0236).
     expect(await linesOf('GOODS_RECEIPT', String(receipt.id))).toEqual({
       '130301': '2603.00',
-      '140101': '26030.00',
+      '140101': '31000.00',
       '310101': '-28633.00',
+      '520202': '-4970.00',
     });
     expect(await balance(vatSupplier)).toBe('28633.00');
     expect(await goodsReceivedOf(receipt.id)).toBe('0');
     const costing = (
       await http().get(`/api/v1/receipts/${receipt.id}/costing`).set(bearer(admin)).expect(200)
     ).body as { discounts: DiscountJson[]; total: string; docTotal: string };
-    expect(costing).toMatchObject({ total: '26030.00', docTotal: '34100.00' });
+    expect(costing).toMatchObject({ total: '31000.00', docTotal: '34100.00' });
     expect(costing.discounts.map((row) => [row.kind, row.total])).toEqual([
       ['NOTE', '1507.00'],
       ['LINES', '3190.00'],
@@ -309,21 +312,21 @@ describe('receipt discounts and supplier products', () => {
         })
         .expect(200)
     ).body as { discounts: DiscountJson[]; total: string };
-    expect(recost.total).toBe('27900.00');
+    expect(recost.total).toBe('31000.00');
     expect(recost.discounts).toEqual([
       expect.objectContaining({ kind: 'NOTE', pct: '10', lineIds: [], total: '3410.00' }),
     ]);
     expect((await valuations(receipt.id)).filter((row) => row.version === 2)).toEqual([
-      { version: 2, doc_amount: '26400.00', discount_amount: '2640.00', amount: '21600.00' },
-      { version: 2, doc_amount: '5500.00', discount_amount: '550.00', amount: '4500.00' },
-      { version: 2, doc_amount: '2200.00', discount_amount: '220.00', amount: '1800.00' },
+      { version: 2, doc_amount: '26400.00', discount_amount: '2640.00', amount: '24000.00' },
+      { version: 2, doc_amount: '5500.00', discount_amount: '550.00', amount: '5000.00' },
+      { version: 2, doc_amount: '2200.00', discount_amount: '220.00', amount: '2000.00' },
       { version: 2, doc_amount: '0.00', discount_amount: null, amount: '0.00' },
     ]);
-    // 30,690 owed now: 2,057 more, 187 of it VAT, 1,870 into the stock.
+    // 30,690 owed now: 2,057 more, 187 of it VAT, 1,870 less income; the stock does not move.
     expect(await linesOf('RECEIPT_RECOST', `${receipt.id}:2`)).toEqual({
       '130301': '187.00',
-      '140101': '1870.00',
       '310101': '-2057.00',
+      '520202': '1870.00',
     });
     expect(await balance(vatSupplier)).toBe('30690.00');
     expect(await goodsReceivedOf(receipt.id)).toBe('0');
@@ -482,8 +485,9 @@ describe('receipt discounts and supplier products', () => {
     // The line the draft had as a bonus does, once the costing prices it.
     const costed = (await costs([{ kind: 'LINES', pct: '10', lineIds: [wasFree] }]).expect(200))
       .body as { discounts: DiscountJson[]; total: string };
+    // The costing's total is the cost, before the discount (ADR-0236); 370 is owed.
     expect(costed).toMatchObject({
-      total: '370.00',
+      total: '400.00',
       discounts: [expect.objectContaining({ lineIds: [wasFree], total: '30.00' })],
     });
   });

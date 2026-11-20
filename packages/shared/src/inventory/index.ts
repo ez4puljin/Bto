@@ -470,6 +470,30 @@ export function receiptLineCost(docAmount: DecimalInput, vatRatePct: DecimalInpu
   return new Decimal(docAmount).minus(receiptLineVat(docAmount, vatRatePct));
 }
 
+/**
+ * Whether a costed receipt line keeps its discount out of its cost (ADR-0236): since that decision a
+ * line's cost is its delivery-note amount before the discount, without the VAT, and the discount is
+ * the books' income; before it the cost was taken from the amount after the discount (ADR-0099 #4).
+ * Read from the costing row itself, with the receipt's frozen VAT rate (a line of a product without
+ * VAT has rate 0, so both are tried): null for a line whose discount is inside its cost or that has
+ * none; else the VAT rate the line was costed at.
+ */
+export function receiptDiscountOutsideCost(
+  line: {
+    docAmount: DecimalInput | null;
+    discountAmount: DecimalInput | null;
+    amount: DecimalInput;
+  },
+  receiptVatRatePct: DecimalInput,
+): { vatRatePct: Decimal } | null {
+  if (line.docAmount === null || line.discountAmount === null) return null;
+  if (!new Decimal(line.discountAmount).gt(0)) return null;
+  const amount = new Decimal(line.amount);
+  const rates = [new Decimal(receiptVatRatePct), new Decimal(0)];
+  const vatRatePct = rates.find((rate) => amount.eq(receiptLineCost(line.docAmount ?? 0, rate)));
+  return vatRatePct === undefined ? null : { vatRatePct };
+}
+
 /** A delivery note's discount (ADR-0099 #4): a percentage of its total or an amount, never both. */
 export interface ReceiptDiscount {
   pct: DecimalInput | null;

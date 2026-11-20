@@ -17,6 +17,7 @@ import {
   MOVEMENT_TYPES,
   normalizeBinCode,
   ReceiptDiscountError,
+  receiptDiscountOutsideCost,
   receiptDiscountTotal,
   receiptLineCost,
   receiptLineVat,
@@ -238,6 +239,29 @@ describe('receipt prices (ADR-0078)', () => {
   it('keeps the whole amount as cost when no VAT applies', () => {
     expect(text(receiptLineVat('2500', '0'))).toBe('0');
     expect(text(receiptLineCost('2500', '0'))).toBe('2500');
+  });
+});
+
+describe('a costed line whose discount is income (ADR-0236)', () => {
+  const rateOf = (docAmount: string | null, discountAmount: string | null, amount: string) =>
+    receiptDiscountOutsideCost(
+      { docAmount, discountAmount, amount },
+      '10',
+    )?.vatRatePct.toString() ?? null;
+
+  it('reads the cost before the discount as a line that keeps its discount out', () => {
+    // 26,400 with VAT, 2,640 off: the cost is 24,000, not the 21,600 of the amount after it.
+    expect(rateOf('26400', '2640', '24000')).toBe('10');
+    // A product without VAT on a VAT receipt: its cost is the whole amount.
+    expect(rateOf('26400', '2640', '26400')).toBe('0');
+  });
+
+  it('leaves a line costed after its discount, or without one, as it was', () => {
+    expect(rateOf('26400', '2640', '21600')).toBeNull();
+    expect(rateOf('26400', '2640', '23760')).toBeNull();
+    expect(rateOf('26400', '0', '24000')).toBeNull();
+    expect(rateOf('26400', null, '24000')).toBeNull();
+    expect(rateOf(null, null, '24000')).toBeNull();
   });
 });
 

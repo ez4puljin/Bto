@@ -12,7 +12,13 @@ import { connectAs, createHttpApp } from '../harness/apps';
 import { idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, type InvoiceJson, salesFlow } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
-import { expectReconciled, inventoryApi, postIssue, postReceipt } from '../harness/inventory';
+import {
+  costReceiptAsTyped,
+  expectReconciled,
+  inventoryApi,
+  postIssue,
+  postReceipt,
+} from '../harness/inventory';
 import { partnersApi } from '../harness/partners';
 
 /**
@@ -425,6 +431,62 @@ describe('finance stock and cost', () => {
       .set(bearer(admin))
       .send({ accountId: marketing.id })
       .expect(422);
+  });
+
+  it('takes a discounted receipt into the stock before its discount, sold goods and all (ADR-0236)', async () => {
+    const draft = (
+      await http()
+        .post('/api/v1/receipts')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          supplierId: supplier,
+          supplierDocDate: today,
+          lines: [{ productUnitId: unitOf(flour, 'PCS').id, enteredQty: '20', docAmount: '30000' }],
+        })
+        .expect(201)
+    ).body as { id: number };
+    await http()
+      .put(`/api/v1/receipts/${draft.id}/discounts`)
+      .set(bearer(admin))
+      .send({ discounts: [{ kind: 'NOTE', pct: '15' }] })
+      .expect(200);
+    await postReceipt(app, admin, draft.id);
+    const [before] = (
+      await sql.query<{ on_hand: string }>(
+        'SELECT on_hand::text FROM warehouse_stock WHERE product_id = $1',
+        [flour.id],
+      )
+    ).rows;
+    // All but five pieces leave before the prices come, at the provisional cost.
+    await issue(
+      'INTERNAL_USE',
+      { kind: 'OTHER', name: 'Оффис ФС' },
+      String(Number.parseFloat(before?.on_hand ?? '0') - 5),
+    );
+    await costReceiptAsTyped(app, admin, draft.id);
+    const lines = Object.fromEntries(
+      (
+        await sql.query<{ code: string; amount: string }>(
+          `SELECT a.code, (sum(l.debit) - sum(l.credit))::text AS amount
+             FROM fin.documents d
+             JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+             JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+             JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+            WHERE d.source_doc_type = 'GOODS_RECEIPT' AND d.source_doc_id = $1
+            GROUP BY a.code`,
+          [String(draft.id)],
+        )
+      ).rows.map((row) => [row.code, row.amount]),
+    );
+    // 30,000 on the note, 4,500 off: 25,500 owed, the discount income, and the 30,000 split
+    // between the stock and the cost of what had left.
+    expect(lines['310101']).toBe('-25500.00');
+    expect(lines['520202']).toBe('-4500.00');
+    const stock = Number.parseFloat(lines['140101'] ?? '0');
+    const sold = Number.parseFloat(lines['610101'] ?? '0');
+    expect(sold).not.toBe(0);
+    expect(stock + sold).toBeCloseTo(30000, 2);
   });
 
   it('keeps the inventory account at the stock’s value', async () => {

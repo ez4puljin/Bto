@@ -9,6 +9,7 @@ import {
   noteAmountMatches,
   ReceiptDiscountError,
   type ReceiptDiscountKind,
+  receiptDiscountOutsideCost,
   type ReceiptOrigin,
   type ReceiptPaymentMethod,
   receiptLineCost,
@@ -202,7 +203,7 @@ export interface ReceiptLine {
   netAmount: Decimal | null;
   /** The VAT inside `netAmount` (0 for a product without VAT or a receipt without it). */
   vatAmount: Decimal | null;
-  /** `netAmount` less its VAT: the line's cost. */
+  /** The line's cost: `docAmount` without its VAT, before the discount (ADR-0236). */
   costAmount: Decimal | null;
   /** What the purchase order expected (ADR-0115); null on a line not on the order. */
   expectedQty: Decimal | null;
@@ -373,6 +374,30 @@ export interface LastReceiptPrice {
   unitPrice: Decimal;
   /** Per base unit. */
   basePrice: Decimal;
+}
+
+/** What `discountsOutOfCostInTx` did to a receipt's lines (ADR-0236). */
+export interface DiscountCostChange {
+  receiptId: number;
+  number: string;
+  /** The costing version it wrote. */
+  version: number;
+  lines: {
+    lineId: number;
+    productId: number;
+    warehouseId: number;
+    qtyBase: Decimal;
+    discountAmount: Decimal;
+    /** The line's cost with its discount inside, and before the discount. */
+    costBefore: Decimal;
+    costAfter: Decimal;
+    /** The difference by where it went: the stock on hand (the average), the goods that left. */
+    toStock: Decimal;
+    toCostOfSales: Decimal;
+    /** The product's average cost in its warehouse, before and after. */
+    avgBefore: Decimal;
+    avgAfter: Decimal;
+  }[];
 }
 
 /** The costing's discounts: given, they replace the receipt's (an empty list clears them). */
@@ -1117,8 +1142,8 @@ export class ReceiptsService implements OnModuleInit {
    * The accountant's costing (ADR-0033, ADR-0078 #4): every line at once, by the delivery note's
    * amount or price per entered unit (VAT included as printed), bonus lines at zero. Each line's cost
    * is its amount less the VAT at the receipt's frozen rate. `costingVersion` is the version the
-   * form was opened at. The receipt's discounts (ADR-0103) lower the lines' cost; discounts given
-   * here replace the receipt's. This is the accountant's price check (ADR-0115): only the arrived
+   * form was opened at. The receipt's discounts (ADR-0103) lower the payable and not the lines'
+   * cost (ADR-0236: the books take them as income); discounts given here replace the receipt's. This is the accountant's price check (ADR-0115): only the arrived
    * lines take a price, the payable must match the delivery note's total within 1₮ (the total may
    * be corrected here), and only this makes the supplier's bill.
    */
@@ -1221,7 +1246,8 @@ export class ReceiptsService implements OnModuleInit {
             productId: line.productId,
             lotId: line.lotId,
             qtyBase: line.qtyBase,
-            amount: receiptLineCost(docAmount.minus(share ?? 0), rates.get(line.id) ?? 0),
+            // The cost before the discount (ADR-0236): the discount is income in the books.
+            amount: receiptLineCost(docAmount, rates.get(line.id) ?? 0),
             docAmount,
             discountAmount: share,
             freeGoods: free(line),
@@ -1259,6 +1285,113 @@ export class ReceiptsService implements OnModuleInit {
       if (version === 1) await this.progress?.receiptCostedInTx(tx, ctx, id);
       return this.costing(id, tx);
     });
+  }
+
+  /** The receipt of a document number (`GR-…`), or null. */
+  async idOfNumber(number: string): Promise<number | null> {
+    const [row] = await this.db
+      .select({ id: goodsReceipts.id })
+      .from(goodsReceipts)
+      .where(eq(goodsReceipts.number, number.trim()));
+    return row?.id ?? null;
+  }
+
+  /**
+   * Brings a receipt costed before ADR-0236 to its method (the one-off `finance:purchase-discounts`
+   * command): a new costing version at the same delivery-note amounts and discounts, with every
+   * line's cost raised to the price before its discount. The stock takes the difference as any
+   * re-costing (the average for what is on hand, the variance for what left), and the books the
+   * discount as income against the payable. Not bound by the re-costing deadline: the prices do
+   * not change. Null when no line has its discount inside its cost.
+   */
+  async discountsOutOfCostInTx(
+    tx: Tx,
+    actor: Actor,
+    id: number,
+  ): Promise<DiscountCostChange | null> {
+    const header = await this.lockHeader(tx, id);
+    if (header.status !== 'POSTED' || header.costingVersion === 0) {
+      throw new AppError('DOC_STATE_INVALID', `receipt ${id} is not posted and costed`, {
+        status: header.status,
+      });
+    }
+    const lines = (await this.linesOf(tx, id)).filter((line) => !line.qtyBase.isZero());
+    const latest = await this.posting.costingOf(id, tx);
+    const rates = await this.lineVatRates(tx, lines, header.vatRatePct);
+    const zero = new Decimal(0);
+    const costed = lines.flatMap((line) => {
+      const valuation = latest.get(line.id);
+      if (!valuation) return [];
+      const inside =
+        !valuation.freeGoods &&
+        valuation.docAmount !== null &&
+        (valuation.discountAmount ?? zero).gt(0) &&
+        !receiptDiscountOutsideCost(valuation, header.vatRatePct);
+      return [
+        {
+          line,
+          valuation,
+          amount: inside
+            ? receiptLineCost(valuation.docAmount ?? zero, rates.get(line.id) ?? 0)
+            : valuation.amount,
+        },
+      ];
+    });
+    if (costed.every((row) => row.amount.eq(row.valuation.amount))) return null;
+    const version = header.costingVersion + 1;
+    const previous = (await this.bookFacts(id, tx, null)).totals;
+    const valuations = await this.posting.revalue(tx, actor, {
+      docId: id,
+      version,
+      lines: costed.map(({ line, valuation, amount }) => ({
+        docLineId: line.id,
+        warehouseId: line.warehouseId,
+        productId: line.productId,
+        lotId: line.lotId,
+        qtyBase: line.qtyBase,
+        amount,
+        docAmount: valuation.docAmount,
+        discountAmount: valuation.discountAmount,
+        freeGoods: valuation.freeGoods,
+      })),
+    });
+    await tx
+      .update(goodsReceipts)
+      .set({ costingVersion: version, updatedAt: sql`now()` })
+      .where(eq(goodsReceipts.id, id));
+    await this.audit.record(tx, actor, {
+      action: 'COST',
+      entity: 'goods_receipts',
+      entityId: id,
+      after: {
+        version,
+        reason: 'ADR-0236',
+        lines: costed.map(({ line, amount }) => ({ lineId: line.id, amount })),
+      },
+    });
+    await this.purchases.receiptCostedInTx(tx, actor, await this.bookFacts(id, tx, previous));
+    const byLine = new Map(valuations.map((valuation) => [valuation.docLineId, valuation]));
+    return {
+      receiptId: id,
+      number: header.number ?? '',
+      version,
+      lines: costed.map(({ line, valuation, amount }) => {
+        const now = byLine.get(line.id);
+        return {
+          lineId: line.id,
+          productId: line.productId,
+          warehouseId: line.warehouseId,
+          qtyBase: line.qtyBase,
+          discountAmount: valuation.discountAmount ?? zero,
+          costBefore: valuation.amount,
+          costAfter: amount,
+          toStock: now?.absorbed ?? zero,
+          toCostOfSales: now?.variance ?? zero,
+          avgBefore: now?.avgBefore ?? zero,
+          avgAfter: now?.avgAfter ?? zero,
+        };
+      }),
+    };
   }
 
   async costing(id: number, executor: Db | Tx = this.db): Promise<ReceiptCosting> {
@@ -1371,7 +1504,12 @@ export class ReceiptsService implements OnModuleInit {
         discountAmount,
         netAmount,
         vatAmount,
-        costAmount: netAmount === null || vatAmount === null ? null : netAmount.minus(vatAmount),
+        // The cost is the price before the discount (ADR-0236); a costed line shows its own.
+        costAmount: valuation
+          ? valuation.amount
+          : docAmount === null
+            ? null
+            : receiptLineCost(docAmount, rates.get(line.id) ?? 0),
       };
     });
     const zero = new Decimal(0);
@@ -1751,8 +1889,10 @@ export class ReceiptsService implements OnModuleInit {
 
   /**
    * A posted, costed receipt's figures for the books at its latest costing version (F3, ADR-0091):
-   * the payable Σ delivery-note amounts, the stock Σ ex-VAT costs, the VAT their difference and its
-   * base the stock of the lines that carry VAT. `previous`: the replaced version's totals.
+   * the payable Σ delivery-note amounts less the discounts, the stock Σ ex-VAT costs, the VAT inside
+   * the payable and its base. A line costed since ADR-0236 keeps its discount out of its cost, so
+   * the stock and the VAT exceed the payable by the discount's income; a line costed before it has
+   * the VAT as the payable less the stock. `previous`: the replaced version's totals.
    */
   async bookFacts(
     id: number,
@@ -1778,6 +1918,15 @@ export class ReceiptsService implements OnModuleInit {
       );
       totals.payable = totals.payable.plus(payable);
       totals.stock = totals.stock.plus(stock);
+      // A line that keeps its discount out of its cost (ADR-0236): the VAT is the payable's, and
+      // the stock exceeds the payable's base by the discount, which the bill books as income.
+      const outside = receiptDiscountOutsideCost(valuation, header.vatRatePct);
+      if (outside) {
+        const vat = receiptLineVat(payable, outside.vatRatePct);
+        totals.vat = totals.vat.plus(vat);
+        if (!outside.vatRatePct.isZero()) totals.vatBase = totals.vatBase.plus(payable.minus(vat));
+        continue;
+      }
       totals.vat = totals.vat.plus(payable.minus(stock));
       if (!(rates.get(row.id) ?? zero).isZero()) totals.vatBase = totals.vatBase.plus(stock);
     }

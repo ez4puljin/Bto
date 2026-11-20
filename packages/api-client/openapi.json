@@ -82391,7 +82391,8 @@
               "VOUCHER_CLEARING",
               "VOUCHER_BREAKAGE",
               "LOYALTY_LIABILITY",
-              "LOYALTY_EXPENSE"
+              "LOYALTY_EXPENSE",
+              "PURCHASE_DISCOUNT"
             ],
             "type": "string"
           },
@@ -82648,7 +82649,8 @@
               "VOUCHER_CLEARING",
               "VOUCHER_BREAKAGE",
               "LOYALTY_LIABILITY",
-              "LOYALTY_EXPENSE"
+              "LOYALTY_EXPENSE",
+              "PURCHASE_DISCOUNT"
             ],
             "type": "string",
             "description": "null takes the role away"

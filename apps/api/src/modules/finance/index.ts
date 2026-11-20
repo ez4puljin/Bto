@@ -57,6 +57,11 @@ export {
 } from './services/pos-voucher-billing.service';
 export { JournalRepostService, type RepostCounts } from './services/journal-repost.service';
 export {
+  describeConversion,
+  type PurchaseDiscountConversion,
+  PurchaseDiscountsService,
+} from './services/purchase-discounts.service';
+export {
   type JournalEntryDetail,
   type JournalEntryInput,
   type JournalEntrySummary,

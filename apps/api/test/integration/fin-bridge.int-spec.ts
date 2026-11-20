@@ -93,7 +93,7 @@ describe('fin-bridge', () => {
       required_control: string;
       requires_tax_code: boolean;
     }>('SELECT code, required_control, requires_tax_code FROM fin.posting_keys ORDER BY code');
-    expect(keys).toHaveLength(37);
+    expect(keys).toHaveLength(38);
     expect(keys.filter((k) => k.requires_tax_code).map((k) => k.code)).toEqual([
       'CITY_TAX_OUTPUT',
       'VAT_INPUT',
@@ -474,6 +474,63 @@ describe('fin-bridge', () => {
           `fin.posting_rules WHERE posting_key IN ('VOUCHER_CLEARING', 'VOUCHER_BREAKAGE')`,
         ),
       ).toBe(2);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+  });
+
+  it('replays the purchase discount’s account, key and rule (0120_purchase_discount data section)', async () => {
+    const file = join(__dirname, '../../src/db/migrations/0120_purchase_discount.sql');
+    const text = readFileSync(file, 'utf8');
+    const statements = text
+      .slice(
+        text.indexOf('-- purchase_discount:data:begin'),
+        text.indexOf('-- purchase_discount:data:end'),
+      )
+      .split('--> statement-breakpoint')
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
+    const forget = async (account: boolean) => {
+      await admin.query('SET LOCAL session_replication_role = replica');
+      await admin.query(`DELETE FROM fin.posting_rules WHERE posting_key = 'PURCHASE_DISCOUNT'`);
+      await admin.query(`DELETE FROM fin.posting_keys WHERE code = 'PURCHASE_DISCOUNT'`);
+      if (account) await admin.query(`DELETE FROM fin.accounts WHERE code = '520202'`);
+      await admin.query('SET LOCAL session_replication_role = origin');
+    };
+    const rules = () =>
+      one<{ n: string; code: string | null }>(
+        `SELECT count(*)::text AS n, min(a.code) AS code
+           FROM fin.posting_rules r JOIN fin.accounts a ON a.id = r.account_id
+          WHERE r.posting_key = 'PURCHASE_DISCOUNT'`,
+      );
+    await admin.query('BEGIN');
+    try {
+      // A database of before ADR-0236 without the account: it is added, twice over once.
+      await forget(true);
+      for (const statement of statements) await admin.query(statement);
+      for (const statement of statements) await admin.query(statement);
+      expect(
+        await count(
+          `fin.accounts WHERE code = '520202' AND kind = 'INCOME' AND normal_side = 'CREDIT' AND control = 'NONE'`,
+        ),
+      ).toBe(1);
+      expect(await rules()).toEqual({ n: '1', code: '520202' });
+      // The real system's: Erkhet's chart has the account, under its own name, which is kept.
+      await forget(false);
+      await admin.query(`UPDATE fin.accounts SET name = 'Эрхэтийн нэр' WHERE code = '520202'`);
+      for (const statement of statements) await admin.query(statement);
+      expect(await count(`fin.accounts WHERE code = '520202' AND name = 'Эрхэтийн нэр'`)).toBe(1);
+      expect(await rules()).toEqual({ n: '1', code: '520202' });
+      // An account that cannot take the key (switched off) stops the migration, saying why.
+      await forget(false);
+      await admin.query(`UPDATE fin.accounts SET status = 'INACTIVE' WHERE code = '520202'`);
+      await admin.query('SAVEPOINT refused');
+      await expect(
+        (async () => {
+          for (const statement of statements) await admin.query(statement);
+        })(),
+      ).rejects.toThrow(/purchase_discount: company BO/);
+      await admin.query('ROLLBACK TO SAVEPOINT refused');
     } finally {
       await admin.query('ROLLBACK');
     }

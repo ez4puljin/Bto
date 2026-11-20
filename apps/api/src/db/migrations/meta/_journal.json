@@ -827,6 +827,13 @@
       "when": 1795168020909,
       "tag": "0119_payroll",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1795171412873,
+      "tag": "0120_purchase_discount",
+      "breakpoints": true
     }
   ]
 }

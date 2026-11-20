@@ -116,6 +116,18 @@ interface ItemRow {
   openAmount: Decimal;
 }
 
+/** What a settling line pairs with: an item that exists, or a line of its own document (ADR-0236). */
+type SettlementTarget =
+  { item: ItemRow; amount: Decimal | null } | { ownLine: number; amount: Decimal | null };
+
+interface Settlement {
+  lineIndex: number;
+  path: string;
+  side: Side;
+  amount: Decimal;
+  targets: SettlementTarget[];
+}
+
 const ITEM_COLUMNS = {
   id: finOpenItems.id,
   partyId: finOpenItems.partyId,
@@ -528,7 +540,7 @@ export class FinIntakeInTx {
     );
 
     // Settled targets, locked FOR UPDATE by (due date, id) once the parties are held.
-    const settlements = await this.settleTargets(tx, scope, lines);
+    const settlements = await this.settleTargets(tx, scope, cmd.source, lines);
 
     // Numbers last (ADR-0071 #6): the document's (its own series, or the sender's), then the entry's.
     const number = await this.documentNumber(tx, scope, type, cmd, body.documentDate);
@@ -587,6 +599,8 @@ export class FinIntakeInTx {
     // An item per party-control line (ADR-0072 #5), then what it settles.
     const touched: { partyId: number; accountId: number }[] = [];
     const itemOfLine = new Map<number, number>();
+    // The document's own items as settle targets (ADR-0236), their open amounts kept as they pair.
+    const ownItems = new Map<number, ItemRow>();
     for (const [index, line] of lines.entries()) {
       if (!PARTY_CONTROLS.has(line.control) || line.partyId === null) continue;
       const debit = line.input.side === 'DEBIT';
@@ -612,6 +626,16 @@ export class FinIntakeInTx {
         .returning({ id: finOpenItems.id });
       if (!item) throw new Error('fin open item was not created');
       itemOfLine.set(index, item.id);
+      ownItems.set(index, {
+        id: item.id,
+        partyId: line.partyId,
+        accountId: line.accountId,
+        side: line.input.side,
+        documentId: document.id,
+        dueDate: null,
+        amount: line.amount,
+        openAmount: line.amount,
+      });
       touched.push({ partyId: line.partyId, accountId: line.accountId });
     }
     const allocationIds: number[] = [];
@@ -621,28 +645,30 @@ export class FinIntakeInTx {
       let remaining = settlement.amount;
       for (const target of settlement.targets) {
         if (remaining.lte(0)) break;
+        const item = 'item' in target ? target.item : ownItems.get(target.ownLine);
+        if (item === undefined) throw new Error('a settled line of the document without its item');
         const take =
-          target.amount === null ? Decimal.min(remaining, target.item.openAmount) : target.amount;
+          target.amount === null ? Decimal.min(remaining, item.openAmount) : target.amount;
         if (take.lte(0)) continue;
-        if (take.gt(target.item.openAmount) || take.gt(remaining)) {
+        if (take.gt(item.openAmount) || take.gt(remaining)) {
           throw new FinError('FIN_OVER_ALLOCATION', undefined, {
             path: settlement.path,
-            itemId: target.item.id,
+            itemId: item.id,
           });
         }
-        const debitItemId = settlement.side === 'DEBIT' ? own : target.item.id;
-        const creditItemId = settlement.side === 'DEBIT' ? target.item.id : own;
+        const debitItemId = settlement.side === 'DEBIT' ? own : item.id;
+        const creditItemId = settlement.side === 'DEBIT' ? item.id : own;
         const written = await writeAllocationInTx(tx, {
           companyId: scope.companyId,
-          partyId: target.item.partyId,
-          accountId: target.item.accountId,
+          partyId: item.partyId,
+          accountId: item.accountId,
           debitItemId,
           creditItemId,
           amount: take,
           documentId: document.id,
         });
         allocationIds.push(written.id);
-        target.item.openAmount = target.item.openAmount.minus(take);
+        item.openAmount = item.openAmount.minus(take);
         remaining = remaining.minus(take);
       }
     }
@@ -1370,8 +1396,22 @@ export class FinIntakeInTx {
         const side: Side = documentClass === 'AR_INVOICE' ? 'DEBIT' : 'CREDIT';
         // One receivable (payable) line, or none for a document that amounts to nothing owed.
         const owed = onControl(control, side).length;
-        if (owed !== controlled.length || owed > 1) throw rule(`${documentClass}_LINES`);
-        if (settling.length > 0) throw rule(`${documentClass}_SETTLES`);
+        // What the document itself takes off what is owed (a discount on the bill, ADR-0236):
+        // lines of the other side on the same control, each settling; nothing else settles.
+        const taken = onControl(control, opposite(side));
+        if (
+          owed + taken.length !== controlled.length ||
+          owed > 1 ||
+          (taken.length > 0 && owed === 0)
+        ) {
+          throw rule(`${documentClass}_LINES`);
+        }
+        if (
+          taken.some((line) => line.input.settles === undefined) ||
+          settling.some((line) => !taken.includes(line))
+        ) {
+          throw rule(`${documentClass}_SETTLES`);
+        }
         return;
       }
       case 'AR_CREDIT':
@@ -1409,23 +1449,17 @@ export class FinIntakeInTx {
   private async settleTargets(
     tx: FinTx,
     scope: Scope,
+    source: SourceKey,
     lines: readonly ResolvedLine[],
-  ): Promise<
-    {
-      lineIndex: number;
-      path: string;
-      side: Side;
-      amount: Decimal;
-      targets: { item: ItemRow; amount: Decimal | null }[];
-    }[]
-  > {
-    const result: {
-      lineIndex: number;
-      path: string;
-      side: Side;
-      amount: Decimal;
-      targets: { item: ItemRow; amount: Decimal | null }[];
-    }[] = [];
+  ): Promise<Settlement[]> {
+    const result: Settlement[] = [];
+    const self = keyOf(source);
+    const isSelf = (target: SettleTarget): boolean =>
+      'docType' in target &&
+      target.system === self.system &&
+      target.docType === self.docType &&
+      target.docId === self.docId &&
+      (target.revision ?? 1) === self.revision;
     for (const [lineIndex, line] of lines.entries()) {
       const settles = line.input.settles;
       if (!settles || line.partyId === null) continue;
@@ -1455,17 +1489,29 @@ export class FinIntakeInTx {
         });
         continue;
       }
-      const ids: { ids: number[]; amount: Decimal | null; path: string }[] = [];
+      const ids: { ids: number[]; own: number[]; amount: Decimal | null; path: string }[] = [];
       for (const [index, target] of settles.entries()) {
         const path = `${line.path}.settles.${index}`;
+        const amount = target.amount === undefined ? null : new Decimal(target.amount);
+        if (isSelf(target.target)) {
+          // The document's own lines of the other side on this party and account (ADR-0236):
+          // their items do not exist yet, so the pairs are made once they are written.
+          const own = lines.flatMap((other, at) =>
+            other.partyId === line.partyId &&
+            other.accountId === line.accountId &&
+            other.input.side === targetSide
+              ? [at]
+              : [],
+          );
+          if (own.length === 0)
+            throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
+          ids.push({ ids: [], own, amount, path });
+          continue;
+        }
         const found = await this.targetItems(tx, scope, target.target, scoped);
         if (found.length === 0)
           throw new FinError('FIN_SETTLE_TARGET_NOT_FOUND', undefined, { path });
-        ids.push({
-          ids: found,
-          amount: target.amount === undefined ? null : new Decimal(target.amount),
-          path,
-        });
+        ids.push({ ids: found, own: [], amount, path });
       }
       const locked = await this.lockItems(
         tx,
@@ -1473,15 +1519,27 @@ export class FinIntakeInTx {
         ids.flatMap((row) => row.ids),
       );
       const byId = new Map(locked.map((item) => [item.id, item]));
-      const targets: { item: ItemRow; amount: Decimal | null }[] = [];
+      const targets: SettlementTarget[] = [];
       let named = new Decimal(0);
       for (const row of ids) {
-        const items = row.ids.flatMap((id) => {
-          const item = byId.get(id);
-          return item ? [item] : [];
-        });
+        // An item to be: the own line's whole amount is open until this posting pairs it.
+        const items: (ItemRow | { ownLine: number; openAmount: Decimal })[] = [
+          ...row.own.map((ownLine) => ({
+            ownLine,
+            openAmount: lines[ownLine]?.amount ?? new Decimal(0),
+          })),
+          ...row.ids.flatMap((id) => {
+            const item = byId.get(id);
+            return item ? [item] : [];
+          }),
+        ];
+        const targetOf = (
+          item: ItemRow | { ownLine: number },
+          amount: Decimal | null,
+        ): SettlementTarget =>
+          'ownLine' in item ? { ownLine: item.ownLine, amount } : { item, amount };
         if (row.amount === null) {
-          for (const item of items) targets.push({ item, amount: null });
+          for (const item of items) targets.push(targetOf(item, null));
           continue;
         }
         // A named amount over a group or a document's items spreads oldest first within it.
@@ -1492,7 +1550,7 @@ export class FinIntakeInTx {
         for (const item of items) {
           if (left.lte(0)) break;
           const take = Decimal.min(left, item.openAmount);
-          if (take.gt(0)) targets.push({ item, amount: take });
+          if (take.gt(0)) targets.push(targetOf(item, take));
           left = left.minus(take);
         }
       }

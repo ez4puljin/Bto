@@ -373,7 +373,7 @@ describe('receipt prices and payment', () => {
     expect(JSON.stringify(seen)).not.toMatch(/docAmount|costAmount|netAmount|discount|totals/);
   });
 
-  it('spreads a percentage discount over the priced lines, lowering their cost', async () => {
+  it('spreads a percentage discount over the priced lines, leaving their cost before it', async () => {
     const draft = await drafted(
       {
         supplierId: vatSupplier,
@@ -410,7 +410,8 @@ describe('receipt prices and payment', () => {
       discountTooLarge: false,
       netTotal: '28710.00',
       vatTotal: '2610.00',
-      costTotal: '26100.00',
+      // The cost is the price before the discount, without the VAT (ADR-0236).
+      costTotal: '29000.00',
       pricedLines: 3,
     };
     expect(draft.totals).toEqual(totals);
@@ -421,10 +422,10 @@ describe('receipt prices and payment', () => {
     const done = await get(admin, draft.id);
     expect(done).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     expect(done.totals).toEqual(totals);
-    // The cost is the net amount less its VAT; the valuation keeps the gross and the share.
+    // The cost is the note's amount less its VAT; the valuation keeps the amount and the share.
     expect(await valuations(draft.id)).toEqual([
-      { version: 1, doc_amount: '26400.00', discount_amount: '2640.00', amount: '21600.00' },
-      { version: 1, doc_amount: '5500.00', discount_amount: '550.00', amount: '4500.00' },
+      { version: 1, doc_amount: '26400.00', discount_amount: '2640.00', amount: '24000.00' },
+      { version: 1, doc_amount: '5500.00', discount_amount: '550.00', amount: '5000.00' },
       { version: 1, doc_amount: '0.00', discount_amount: null, amount: '0.00' },
     ]);
     const costing = (
@@ -436,7 +437,7 @@ describe('receipt prices and payment', () => {
     };
     expect(costing).toMatchObject({
       discounts: [expect.objectContaining({ kind: 'NOTE', pct: '10', total: '3190.00' })],
-      total: '26100.00',
+      total: '29000.00',
     });
     expect(costing.lines.map((line) => line.discountAmount)).toEqual(['2640.00', '550.00', null]);
     // The list's amount is the payable, for cost holders only.
@@ -464,10 +465,11 @@ describe('receipt prices and payment', () => {
     expect(draft.totals).toMatchObject({ discountTotal: '100.00', netTotal: '2900.00' });
     await post(admin, draft.id);
     await costReceiptAsTyped(app, admin, draft.id);
-    expect((await valuations(draft.id)).map((row) => row.amount)).toEqual([
-      '966.66',
-      '966.67',
-      '966.67',
+    // The shares lower the payable; each line's cost stays its amount (ADR-0236).
+    expect((await valuations(draft.id)).map((row) => [row.discount_amount, row.amount])).toEqual([
+      ['33.34', '1000.00'],
+      ['33.33', '1000.00'],
+      ['33.33', '1000.00'],
     ]);
 
     // A percentage or an amount, never both; a percentage up to 100.
@@ -539,7 +541,8 @@ describe('receipt prices and payment', () => {
     ).body as { discounts: DiscountJson[]; total: string; docTotal: string };
     expect(costed).toMatchObject({
       discounts: [expect.objectContaining({ kind: 'NOTE', pct: '10', total: '10.00' })],
-      total: '90.00',
+      // The cost, before the discount (ADR-0236).
+      total: '100.00',
       docTotal: '100.00',
     });
   });

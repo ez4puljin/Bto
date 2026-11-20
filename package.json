@@ -57,7 +57,8 @@
     "inventory:rebuild-balances": "pnpm run build:packages && pnpm --filter @tugeel/api run inventory:rebuild-balances",
     "hr:import-timely": "pnpm --filter @tugeel/api run hr:import-timely",
     "finance:reconcile": "pnpm run build:packages && pnpm --filter @tugeel/api run finance:reconcile",
-    "finance:repost-journal": "pnpm run build:packages && pnpm --filter @tugeel/api run finance:repost-journal"
+    "finance:repost-journal": "pnpm run build:packages && pnpm --filter @tugeel/api run finance:repost-journal",
+    "finance:purchase-discounts": "pnpm run build:packages && pnpm --filter @tugeel/api run finance:purchase-discounts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

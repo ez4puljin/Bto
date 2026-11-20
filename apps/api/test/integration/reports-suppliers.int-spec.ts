@@ -3,7 +3,7 @@ import { businessDate } from '@tugeel/shared/time';
 import ExcelJS from 'exceljs';
 import request from 'supertest';
 import { FIN_DB, type FinDb, reconcileBooks } from '../../src/finance-core';
-import { createHttpApp } from '../harness/apps';
+import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, setSetting } from '../harness/finance';
 import { bearer, login, seedUser } from '../harness/identity';
@@ -187,6 +187,42 @@ describe('supplier report: discount view', () => {
       [discounted, '650.00', null],
       [null, '-5000.00', null],
     ]);
+  });
+
+  it('reads the same from books that carry the note’s amount and the discount (ADR-0236)', async () => {
+    // The bill credits the payable with 16,500 and debits it with the 1,650 discount, and the
+    // re-costing takes 650 of the discount back: neither debit nor credit is a payment or a bill
+    // of its own in the report above, and 520202 holds the discount without its VAT.
+    const sql = await connectAs('app');
+    try {
+      const { rows } = await sql.query<{
+        doc: string;
+        code: string;
+        debit: string;
+        credit: string;
+      }>(
+        `SELECT d.source_doc_type || '/' || d.source_doc_id AS doc, a.code,
+                l.debit::text, l.credit::text
+           FROM fin.documents d
+           JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+           JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+           JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+          WHERE a.code IN ('310101', '520202')
+            AND ((d.source_doc_type = 'GOODS_RECEIPT' AND d.source_doc_id = $1)
+              OR (d.source_doc_type = 'RECEIPT_RECOST' AND d.source_doc_id LIKE $2))
+          ORDER BY e.id, l.line_no`,
+        [String(discounted), `${discounted}:%`],
+      );
+      expect(rows).toEqual([
+        { doc: `GOODS_RECEIPT/${discounted}`, code: '310101', debit: '0.00', credit: '16500.00' },
+        { doc: `GOODS_RECEIPT/${discounted}`, code: '310101', debit: '1650.00', credit: '0.00' },
+        { doc: `GOODS_RECEIPT/${discounted}`, code: '520202', debit: '0.00', credit: '1500.00' },
+        { doc: `RECEIPT_RECOST/${discounted}:2`, code: '310101', debit: '0.00', credit: '650.00' },
+        { doc: `RECEIPT_RECOST/${discounted}:2`, code: '520202', debit: '590.91', credit: '0.00' },
+      ]);
+    } finally {
+      await sql.end();
+    }
   });
 
   it('splits the discounts out with the same balance, entry by entry and in Excel', async () => {

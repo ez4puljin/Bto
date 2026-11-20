@@ -13,7 +13,9 @@ export interface RoleLine {
   /** A tax line's base (the net it was taken from). */
   taxBase?: Decimal;
   /** Extra fields of the contract's line (the receivable's item, what it settles). */
-  extra?: Partial<Pick<LineV1, 'openItem' | 'settles' | 'moneyAccount' | 'accountCode' | 'party'>>;
+  extra?: Partial<
+    Pick<LineV1, 'openItem' | 'settles' | 'moneyAccount' | 'accountCode' | 'party' | 'description'>
+  >;
 }
 
 /** The tax codes Bto's lines carry (ADR-0074; the city code per activity is TODO-VERIFY). */

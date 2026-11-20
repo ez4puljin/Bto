@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { PostBody } from '@tugeel/fin-contract';
+import mn from '@tugeel/shared/i18n/mn.json';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import type { Tx } from '../../../common/db/db.types';
@@ -31,16 +32,22 @@ export const receiptGroupRef = (receiptId: number): string => `receipt:${receipt
  *   `BTO/GOODS_RECEIPT/<id>`, one entry straight from the stock to the payable (ADR-0233): Dr stock
  *   (the costed value less what had already left), Dr cost of goods sold (that part: goods sold
  *   before the prices came), Dr input VAT / Cr payable, due on the receipt's date;
- * - a later costing books only the difference of the same four `BTO/RECEIPT_RECOST/<id>:<version>`:
- *   a bill when the payable grows, a credit settling the receipt's open bill when it shrinks, a
- *   journal when only the stock, the cost of sales and the VAT move;
+ * - the delivery note's discounts are income (ADR-0236): the stock goes in at the price before
+ *   them, the payable is credited with the note's full amount and debited with the discount (the
+ *   debit settles the bill's own item, so the note's amount less the discount stays open), and
+ *   «Худалдан авалтын хөнгөлөлт» (the key PURCHASE_DISCOUNT) is credited with the discount without
+ *   its VAT; a receipt costed before that decision has them inside its cost and books none;
+ * - a later costing books only the differences of the same lines
+ *   `BTO/RECEIPT_RECOST/<id>:<version>`: a bill when the payable takes a credit (its own debit
+ *   settles it first, then the receipt's open bills), a credit settling the receipt's open bill
+ *   when it takes only a debit, a journal when only the stock, the cost of sales and the VAT move;
  * - a supplier return `BTO/SUPPLIER_RETURN/<id>`: Dr payable / Cr stock, Cr input VAT, left open
  *   for the accountant to pair (TODO-VERIFY D8).
  * Both receipt entries are dated the receipt's date, or today when that month is closed. The
  * confirmation of a receipt books nothing (its quantities only); goods received 310201 is no longer
  * used, except to clear what a receipt confirmed before ADR-0233 had credited there.
- * The accounts are the rules of the keys AP, VAT_INPUT, INVENTORY and COGS (temporary, TODO-VERIFY
- * D16).
+ * The accounts are the rules of the keys AP, VAT_INPUT, INVENTORY, COGS and PURCHASE_DISCOUNT
+ * (temporary, TODO-VERIFY D16).
  */
 @Injectable()
 export class SupplierBillsService implements PurchaseBooks {
@@ -77,8 +84,32 @@ export class SupplierBillsService implements PurchaseBooks {
       first ? undefined : facts.version,
     );
     const cleared = first ? await this.bookedAtConfirmation(tx, actor, facts.receiptId) : ZERO;
-    // A lower payable settles what is still open of the receipt's bills; the rest stays open.
-    const billsOpen = delta.payable.lt(0)
+    // The discounts the costing keeps out of the cost (ADR-0236): the payable is credited before
+    // them and debited with them, and what the stock and the VAT exceed the payable by is income.
+    const discount = (await this.stock.costingDiscount(facts.receiptId, tx, facts.version)).minus(
+      first ? ZERO : await this.stock.costingDiscount(facts.receiptId, tx, facts.version - 1),
+    );
+    const gross = delta.payable.plus(discount);
+    const income = delta.stock.plus(delta.vat).minus(delta.payable);
+    // Two movements of the payable, each on the side of its sign; equal sides are one line.
+    const credit = above(gross).plus(above(discount.negated()));
+    const debit = above(gross.negated()).plus(above(discount));
+    const source = first
+      ? {
+          docType: FIN_DOC_TYPES.SUPPLIER_BILL.docType,
+          docId: String(facts.receiptId),
+          docNo: facts.number,
+          revision,
+        }
+      : {
+          docType: FIN_DOC_TYPES.RECEIPT_RECOST.docType,
+          docId: `${facts.receiptId}:${facts.version}`,
+          docNo: `${facts.number}/${facts.version}`,
+          revision: 1,
+        };
+    // A debit first closes its own document's credit; what is left settles what is still open of
+    // the receipt's bills, and the rest stays open.
+    const billsOpen = debit.gt(credit)
       ? await this.reader.groupOpenInTx(tx, this.books.source(actor), {
           company: await this.books.company(),
           system: BTO_SOURCE,
@@ -86,45 +117,59 @@ export class SupplierBillsService implements PurchaseBooks {
           side: 'CREDIT',
         })
       : ZERO;
-    const ap: RoleLine | null = delta.payable.gt(0)
+    const settles = [
+      ...(credit.gt(0)
+        ? [
+            {
+              target: {
+                system: BTO_SOURCE,
+                docType: source.docType,
+                docId: source.docId,
+                ...(source.revision > 1 ? { revision: source.revision } : {}),
+              },
+            },
+          ]
+        : []),
+      ...(billsOpen.gt(0) ? [{ target: { groupRef } }] : []),
+    ];
+    const label = { description: mn.finance.stockBooks.purchaseDiscount };
+    const owed: RoleLine | null = credit.gt(0)
       ? {
           role: 'AP',
           ...counterKey,
           debit: ZERO,
-          credit: delta.payable,
-          extra: { openItem: { dueDate: facts.date, groupRef } },
+          credit,
+          extra: {
+            openItem: { dueDate: facts.date, groupRef },
+            // A discount taken back by a re-costing, alone on the line.
+            ...(gross.lte(0) ? label : {}),
+          },
         }
-      : delta.payable.lt(0)
-        ? {
-            role: 'AP',
-            ...counterKey,
-            debit: delta.payable.negated(),
-            credit: ZERO,
-            extra: {
-              openItem: { groupRef },
-              ...(billsOpen.gt(0) ? { settles: [{ target: { groupRef } }] } : {}),
-            },
-          }
-        : null;
+      : null;
+    const taken: RoleLine | null = debit.gt(0)
+      ? {
+          role: 'AP',
+          ...counterKey,
+          debit,
+          credit: ZERO,
+          extra: {
+            openItem: { groupRef },
+            ...(settles.length > 0 ? { settles } : {}),
+            ...(gross.gte(0) ? label : {}),
+          },
+        }
+      : null;
     const type =
-      ap === null
-        ? FIN_DOC_TYPES.RECEIPT_RECOST
-        : delta.payable.gt(0)
-          ? FIN_DOC_TYPES.SUPPLIER_BILL
-          : FIN_DOC_TYPES.SUPPLIER_BILL_CREDIT;
+      owed !== null
+        ? FIN_DOC_TYPES.SUPPLIER_BILL
+        : taken !== null
+          ? FIN_DOC_TYPES.SUPPLIER_BILL_CREDIT
+          : FIN_DOC_TYPES.RECEIPT_RECOST;
     await this.post(tx, actor, facts.supplierId, {
-      ...(first
-        ? {
-            docType: FIN_DOC_TYPES.SUPPLIER_BILL.docType,
-            docId: String(facts.receiptId),
-            docNo: facts.number,
-            revision,
-          }
-        : {
-            docType: FIN_DOC_TYPES.RECEIPT_RECOST.docType,
-            docId: `${facts.receiptId}:${facts.version}`,
-            docNo: `${facts.number}/${facts.version}`,
-          }),
+      docType: source.docType,
+      docId: source.docId,
+      docNo: source.docNo,
+      ...(source.revision > 1 ? { revision: source.revision } : {}),
       documentType: type.code,
       date: facts.date,
       warehouseIds: facts.warehouseIds,
@@ -133,7 +178,9 @@ export class SupplierBillsService implements PurchaseBooks {
         signed('COGS', variance),
         signed('GOODS_RECEIVED', cleared),
         { ...signed('VAT_INPUT', delta.vat), taxBase: delta.vatBase.abs() },
-        ...(ap === null ? [] : [ap]),
+        ...(owed === null ? [] : [owed]),
+        ...(taken === null ? [] : [taken]),
+        signed('PURCHASE_DISCOUNT', income.negated()),
       ],
     });
   }
@@ -271,6 +318,11 @@ function difference(now: ReceiptBookTotals, before: ReceiptBookTotals): ReceiptB
     vatBase: now.vatBase.minus(before.vatBase),
     stock: now.stock.minus(before.stock),
   };
+}
+
+/** The amount when it is above zero, else zero. */
+function above(amount: Decimal): Decimal {
+  return amount.gt(0) ? amount : ZERO;
 }
 
 /** A line on the side of its amount's sign (a debit when it grows). */

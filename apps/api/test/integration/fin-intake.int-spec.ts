@@ -335,6 +335,181 @@ describe('Finance Core intake (F2)', () => {
     expect(rows[0]?.open).toBe('0.00');
   });
 
+  it('lets a bill take a discount off itself in one entry, and reverses it whole (ADR-0236)', async () => {
+    const supplier = guest('supplier:2', 'Хөнгөлөлттэй нийлүүлэгч');
+    const own = (docId: string) => ({ system: 'TEST_PMS', docType: 'BILL', docId });
+    const bill = (
+      docId: string,
+      lines: Record<string, unknown>[],
+      controlTotal: string,
+      documentType = 'TEST.BILL',
+    ) =>
+      command(
+        {
+          docType: documentType === 'TEST.BILL' ? 'BILL' : 'BILL_CREDIT',
+          docId,
+          docNo: `B-${docId}`,
+        },
+        {
+          action: 'POST',
+          documentType,
+          documentDate: today(),
+          currency: 'MNT',
+          party: supplier,
+          dueDate: addDays(today(), 10),
+          description: 'Хөнгөлөлттэй падаан',
+          controlTotal,
+          lines: lines.map((line, index) => ({ lineNo: index + 1, ...line })),
+        } as Parameters<typeof command>[1],
+      );
+    const open = async () =>
+      (
+        await admin.query<{ side: string; amount: string; open: string }>(
+          `SELECT i.side, i.amount::text, i.open_amount::text AS open FROM fin.open_items i
+             JOIN fin.party_refs r ON r.party_id = i.party_id
+            WHERE r.external_id = 'supplier:2' ORDER BY i.id`,
+        )
+      ).rows;
+    // 1,000 on the note, 100 off: the payable is credited with the note and debited with the
+    // discount, which settles the bill's own item; 900 stays open.
+    const posted = await core.submit(
+      bill(
+        'd1',
+        [
+          { key: 'CLEARING', side: 'DEBIT', amount: '1000' },
+          { key: 'AP', side: 'CREDIT', amount: '1000' },
+          { key: 'AP', side: 'DEBIT', amount: '100', settles: [{ target: own('d1') }] },
+          { key: 'CLEARING', side: 'CREDIT', amount: '100' },
+        ],
+        '1100',
+      ),
+    );
+    expect(posted.outcome).toBe('POSTED');
+    expect(posted.document?.allocations).toEqual([expect.objectContaining({ amount: '100.00' })]);
+    expect(await open()).toEqual([
+      { side: 'CREDIT', amount: '1000.00', open: '900.00' },
+      { side: 'DEBIT', amount: '100.00', open: '0.00' },
+    ]);
+    // The line of the other side must settle; alone it is no bill; and a document without a line
+    // of the other side has nothing of its own to settle.
+    expect(
+      await codeOf(
+        core.submit(
+          bill(
+            'd2',
+            [
+              { key: 'CLEARING', side: 'DEBIT', amount: '1000' },
+              { key: 'AP', side: 'CREDIT', amount: '1000' },
+              { key: 'AP', side: 'DEBIT', amount: '100' },
+              { key: 'CLEARING', side: 'CREDIT', amount: '100' },
+            ],
+            '1100',
+          ),
+        ),
+      ),
+    ).toBe('FIN_CLASS_RULE');
+    expect(
+      await codeOf(
+        core.submit(
+          bill(
+            'd3',
+            [
+              { key: 'AP', side: 'DEBIT', amount: '100', settles: [{ target: own('d1') }] },
+              { key: 'CLEARING', side: 'CREDIT', amount: '100' },
+            ],
+            '100',
+          ),
+        ),
+      ),
+    ).toBe('FIN_CLASS_RULE');
+    expect(
+      await codeOf(
+        core.submit(
+          bill(
+            'c1',
+            [
+              {
+                key: 'AP',
+                side: 'DEBIT',
+                amount: '100',
+                settles: [{ target: { system: 'TEST_PMS', docType: 'BILL_CREDIT', docId: 'c1' } }],
+              },
+              { key: 'CLEARING', side: 'CREDIT', amount: '100' },
+            ],
+            '100',
+            'TEST.BILL_CREDIT',
+          ),
+        ),
+      ),
+    ).toBe('FIN_SETTLE_TARGET_NOT_FOUND');
+    // A named amount above the bill's own line is refused.
+    expect(
+      await codeOf(
+        core.submit(
+          bill(
+            'd4',
+            [
+              { key: 'CLEARING', side: 'DEBIT', amount: '50' },
+              { key: 'AP', side: 'CREDIT', amount: '50' },
+              {
+                key: 'AP',
+                side: 'DEBIT',
+                amount: '80',
+                settles: [{ target: own('d4'), amount: '80' }],
+              },
+              { key: 'CLEARING', side: 'CREDIT', amount: '80' },
+            ],
+            '130',
+          ),
+        ),
+      ),
+    ).toBe('FIN_OVER_ALLOCATION');
+    // More taken off than the bill's own line: its own first, then the open bill it names next;
+    // what is left stays an open debit.
+    await core.submit(
+      bill(
+        'd5',
+        [
+          { key: 'CLEARING', side: 'DEBIT', amount: '50' },
+          { key: 'AP', side: 'CREDIT', amount: '50' },
+          {
+            key: 'AP',
+            side: 'DEBIT',
+            amount: '1000',
+            settles: [{ target: own('d5') }, { target: own('d1') }],
+          },
+          { key: 'CLEARING', side: 'CREDIT', amount: '1000' },
+        ],
+        '1050',
+      ),
+    );
+    expect(await open()).toEqual([
+      { side: 'CREDIT', amount: '1000.00', open: '0.00' },
+      { side: 'DEBIT', amount: '100.00', open: '0.00' },
+      { side: 'CREDIT', amount: '50.00', open: '0.00' },
+      { side: 'DEBIT', amount: '1000.00', open: '50.00' },
+    ]);
+    // Reversing it gives the first bill its 900 back and leaves nothing of its own open.
+    const undone = await core.submit(reverse('BILL', 'd5'));
+    expect(undone).toMatchObject({ outcome: 'POSTED', action: 'REVERSE' });
+    expect((await open()).map((item) => item.open)).toEqual([
+      '900.00',
+      '0.00',
+      '0.00',
+      '0.00',
+      '0.00',
+      '0.00',
+    ]);
+    // And the first bill, whose only pair is its own, reverses to nothing open at all.
+    await core.submit(reverse('BILL', 'd1'));
+    expect((await open()).every((item) => item.open === '0.00')).toBe(true);
+    const { rows } = await admin.query<{ net: string }>(
+      `SELECT coalesce(sum(l.credit - l.debit), 0)::text AS net FROM fin.journal_lines l
+         JOIN fin.party_refs r ON r.party_id = l.party_id WHERE r.external_id = 'supplier:2'`,
+    );
+    expect(rows[0]?.net).toBe('0.00');
+  });
+
   it('lets the core’s screens post a journal by account code as the user, numbered once', async () => {
     const user = StaticCaller.user({ [TEST_COMPANY]: ['finance.journal.manage'] });
     const journal = (docId: string) =>

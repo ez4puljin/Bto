@@ -6,6 +6,7 @@ import {
   MOVEMENT_TYPES,
   type MovementType,
   reaverage,
+  receiptDiscountOutsideCost,
   revalue as revalueCost,
   type StockDocType,
   valueOf,
@@ -191,7 +192,10 @@ export interface CostedLine {
   amount: Decimal;
   /** What was typed, VAT included (ADR-0078); null for a costing that typed only the cost. */
   docAmount?: Decimal | null;
-  /** The line's share of the delivery note's discount (ADR-0099 #4); `amount` is already net of it. */
+  /**
+   * The line's share of the delivery note's discount (ADR-0099 #4). `amount` is the cost before it
+   * (ADR-0236: the discount is the books' income); a costing before that decision took it off.
+   */
   discountAmount?: Decimal | null;
   freeGoods: boolean;
 }
@@ -1050,6 +1054,50 @@ export class StockPostingService implements OnModuleInit {
         ),
       );
     return new Decimal(row?.variance ?? 0);
+  }
+
+  /**
+   * The discounts a receipt's costing keeps out of its cost (ADR-0236), at the latest version of
+   * each line up to `version` (the receipt's latest when none is named): the supplier's bill books
+   * them as income against the payable. Zero for a receipt costed with its discounts inside the
+   * cost (before that decision), for free goods and for a receipt without discounts.
+   */
+  async costingDiscount(
+    docId: number,
+    executor: Db | Tx = this.db,
+    version?: number,
+  ): Promise<Decimal> {
+    const [receipt] = await executor
+      .select({ vatRatePct: goodsReceipts.vatRatePct })
+      .from(goodsReceipts)
+      .where(eq(goodsReceipts.id, docId));
+    if (!receipt) return ZERO;
+    const rows = await executor
+      .select({
+        docLineId: stockValuationAdjustments.docLineId,
+        amount: stockValuationAdjustments.amount,
+        docAmount: stockValuationAdjustments.docAmount,
+        discountAmount: stockValuationAdjustments.discountAmount,
+        freeGoods: stockValuationAdjustments.freeGoods,
+      })
+      .from(stockValuationAdjustments)
+      .where(
+        and(
+          eq(stockValuationAdjustments.docType, 'GR'),
+          eq(stockValuationAdjustments.docId, docId),
+          ...(version === undefined ? [] : [lte(stockValuationAdjustments.version, version)]),
+        ),
+      )
+      .orderBy(desc(stockValuationAdjustments.version));
+    const seen = new Set<number>();
+    let discount = ZERO;
+    for (const row of rows) {
+      if (seen.has(row.docLineId)) continue;
+      seen.add(row.docLineId);
+      if (row.freeGoods || !receiptDiscountOutsideCost(row, receipt.vatRatePct)) continue;
+      discount = discount.plus(row.discountAmount ?? ZERO);
+    }
+    return discount;
   }
 
   /**

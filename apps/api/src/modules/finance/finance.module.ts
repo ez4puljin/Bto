@@ -63,6 +63,7 @@ import { IssueExpenseAccountsService } from './services/issue-expense-accounts.s
 import { InvoiceEbarimtService } from './services/invoice-ebarimt.service';
 import { InvoicingService } from './services/invoicing.service';
 import { JournalRepostService } from './services/journal-repost.service';
+import { PurchaseDiscountsService } from './services/purchase-discounts.service';
 import { JournalService } from './services/journal.service';
 import { MoneyAccountsService } from './services/money-accounts.service';
 import { PaymentsService } from './services/payments.service';
@@ -104,6 +105,7 @@ const SERVICES = [
   SupplierBillsService,
   StockBooksService,
   JournalRepostService,
+  PurchaseDiscountsService,
   PeriodsService,
   FinanceImportsService,
   ReportsService,

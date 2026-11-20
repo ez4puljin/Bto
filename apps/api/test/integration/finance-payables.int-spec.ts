@@ -3,6 +3,8 @@ import { addDays, addMonths, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { FIN_DB, type FinDb, reconcileBooks } from '../../src/finance-core';
+import { describeConversion, PurchaseDiscountsService } from '../../src/modules/finance';
+import { systemActor } from '../../src/modules/identity';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { catalogApi, idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, type ProblemJson, setSetting } from '../harness/finance';
@@ -168,6 +170,22 @@ describe('finance payables', () => {
         )
       ).rows.map((row) => [row.code, row.amount]),
     );
+  /** The payable's own lines of a Bto purchase document, in the entry's order. */
+  const payableLinesOf = async (docType: string, docId: string) =>
+    (
+      await sql.query<{ debit: string; credit: string; description: string | null }>(
+        `SELECT l.debit::text, l.credit::text, l.description
+           FROM fin.documents d
+           JOIN fin.source_systems s ON s.id = d.source_system_id AND s.code = 'BTO'
+           JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+           JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+           JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+          WHERE d.source_doc_type = $1 AND d.source_doc_id = $2 AND a.code = '310101'
+            AND d.reverses_document_id IS NULL
+          ORDER BY l.line_no`,
+        [docType, docId],
+      )
+    ).rows;
   /** Dr − Cr on goods received (310201) over every Bto document of one receipt: none (ADR-0233). */
   const goodsReceivedOf = async (receiptId: number) =>
     (
@@ -324,7 +342,7 @@ describe('finance payables', () => {
     expect((await ledger(shop)).map((entry) => entry.kind)).toEqual(['RECOST', 'RECOST', 'BILL']);
   });
 
-  it('books a discounted receipt at its net, and a re-costing’s new discount as the difference', async () => {
+  it('books a receipt’s discount as income against the payable, and a re-costing’s change of it (ADR-0236)', async () => {
     const shop = await supplier('Хөнгөлөлт АП', true);
     const posted = await billed(
       shop,
@@ -332,15 +350,51 @@ describe('finance payables', () => {
       { discounts: [{ kind: 'NOTE', pct: '10' }] },
     );
     expect(posted).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
-    // 26,400 less 10 %: 23,760 owed, 2,160 of it input VAT, 21,600 into the stock.
+    // 26,400 on the note, 10 % off: the stock at 24,000 (before the discount, without VAT), the
+    // input VAT 2,160 on the 23,760 owed, the discount without its VAT income on 520202.
     expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
       '130301': '2160.00',
-      '140101': '21600.00',
+      '140101': '24000.00',
       '310101': '-23760.00',
+      '520202': '-2400.00',
     });
+    // The payable is credited with the note and debited with the discount, in one entry.
+    expect(await payableLinesOf('GOODS_RECEIPT', String(posted.id))).toEqual([
+      { debit: '0.00', credit: '26400.00', description: null },
+      { debit: '2640.00', credit: '0.00', description: 'Падааны хөнгөлөлт' },
+    ]);
+    // The debit closed part of the bill's own item: the note less the discount stays open.
     expect(await balance(shop)).toMatchObject({ balance: '23760.00' });
+    expect(await items(shop)).toEqual([
+      expect.objectContaining({
+        side: 'CREDIT',
+        kind: 'BILL',
+        documentId: posted.id,
+        amount: '26400.00',
+        openAmount: '23760.00',
+      }),
+    ]);
+    // «Нийлүүлэгчийн тооцоо» lists both lines under the receipt, newest first.
+    expect((await ledger(shop)).slice(0, 2)).toEqual([
+      expect.objectContaining({
+        kind: 'BILL',
+        docType: 'RECEIPT',
+        docId: posted.id,
+        debit: '2640.00',
+        credit: '0.00',
+        balanceAfter: '23760.00',
+      }),
+      expect.objectContaining({
+        kind: 'BILL',
+        docType: 'RECEIPT',
+        docId: posted.id,
+        debit: '0.00',
+        credit: '26400.00',
+        balanceAfter: '26400.00',
+      }),
+    ]);
     expect(await goodsReceivedOf(posted.id)).toBe('0');
-    const recost = (version: number, discount: Record<string, unknown>) =>
+    const recost = (version: number, discount: Record<string, unknown>, amount = '26400') =>
       http()
         .put(`/api/v1/receipts/${posted.id}/costs`)
         .set(bearer(admin))
@@ -348,27 +402,235 @@ describe('finance payables', () => {
         .send({
           costingVersion: version,
           ...discount,
-          lines: [{ lineId: posted.lines[0]?.id, amount: '26400' }],
+          lines: [{ lineId: posted.lines[0]?.id, amount }],
         })
         .expect(200);
-    // The discount dropped: the difference is billed.
+    // The discount dropped: it is taken back from the income and owed again; the stock stays.
     await recost(1, { discounts: [], noteTotalAmount: '26400' });
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
       '130301': '240.00',
-      '140101': '2400.00',
       '310101': '-2640.00',
+      '520202': '2400.00',
     });
+    expect(await payableLinesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual([
+      { debit: '0.00', credit: '2640.00', description: 'Падааны хөнгөлөлт' },
+    ]);
     expect(await balance(shop)).toMatchObject({ balance: '26400.00' });
-    // An amount instead: a credit of the difference.
+    // An amount instead: a credit of the discount settling the receipt's open bill.
     await recost(2, { discounts: [{ kind: 'NOTE', amount: '1100' }], noteTotalAmount: '25300' });
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:3`)).toEqual({
       '130301': '-100.00',
-      '140101': '-1000.00',
       '310101': '1100.00',
+      '520202': '-1000.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '25300.00' });
-    // Nothing passes through goods received.
+    expect((await items(shop)).every((item) => item.side === 'CREDIT')).toBe(true);
+    // The price and the discount both change: 33,000 on the note, 10 % off, 29,700 owed. The
+    // payable takes the note's 6,600 more and the discount's 2,200 more, each on its own line.
+    await recost(
+      3,
+      { discounts: [{ kind: 'NOTE', pct: '10' }], noteTotalAmount: '29700' },
+      '33000',
+    );
+    expect(await linesOf('RECEIPT_RECOST', `${posted.id}:4`)).toEqual({
+      '130301': '400.00',
+      '140101': '6000.00',
+      '310101': '-4400.00',
+      '520202': '-2000.00',
+    });
+    expect(await payableLinesOf('RECEIPT_RECOST', `${posted.id}:4`)).toEqual([
+      { debit: '0.00', credit: '6600.00', description: null },
+      { debit: '2200.00', credit: '0.00', description: 'Падааны хөнгөлөлт' },
+    ]);
+    expect(await balance(shop)).toMatchObject({ balance: '29700.00' });
+    // Over all its entries: the stock at 30,000, the discount's income 3,000, nothing on 310201.
+    const total = async (code: string) =>
+      (
+        await sql.query<{ amount: string }>(
+          `SELECT coalesce(sum(l.debit) - sum(l.credit), 0)::text AS amount
+             FROM fin.documents d
+             JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+             JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+             JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+            WHERE a.code = $1 AND ((d.source_doc_type = 'GOODS_RECEIPT' AND d.source_doc_id = $2)
+               OR (d.source_doc_type = 'RECEIPT_RECOST' AND d.source_doc_id LIKE $3))`,
+          [code, String(posted.id), `${posted.id}:%`],
+        )
+      ).rows[0]?.amount;
+    expect(await total('140101')).toBe('30000.00');
+    expect(await total('520202')).toBe('-3000.00');
     expect(await goodsReceivedOf(posted.id)).toBe('0');
+  });
+
+  it('books a discount of a supplier without VAT whole, and line discounts with the note’s', async () => {
+    const shop = await supplier('НӨАТгүй хөнгөлөлт АП');
+    const draft = (
+      await http()
+        .post('/api/v1/receipts')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          supplierId: shop,
+          supplierDocDate: today,
+          lines: [
+            { productUnitId: unitOf(water, 'PCS').id, enteredQty: '10', docAmount: '10000' },
+            { productUnitId: unitOf(water, 'PCS').id, enteredQty: '5', docAmount: '6000' },
+            { productUnitId: unitOf(water, 'PCS').id, enteredQty: '1', freeGoods: true },
+          ],
+        })
+        .expect(201)
+    ).body as ReceiptJson;
+    // 1,000 off the first line, then 10 % off what the note keeps: 1,500; 13,500 owed.
+    await http()
+      .put(`/api/v1/receipts/${draft.id}/discounts`)
+      .set(bearer(admin))
+      .send({
+        discounts: [
+          { kind: 'LINES', amount: '1000', lineIds: [draft.lines[0]?.id] },
+          { kind: 'NOTE', pct: '10' },
+        ],
+      })
+      .expect(200);
+    await postReceipt(app, worker, draft.id);
+    await costReceiptAsTyped(app, accountant, draft.id);
+    expect(await linesOf('GOODS_RECEIPT', String(draft.id))).toEqual({
+      '140101': '16000.00',
+      '310101': '-13500.00',
+      '520202': '-2500.00',
+    });
+    expect(await payableLinesOf('GOODS_RECEIPT', String(draft.id))).toEqual([
+      { debit: '0.00', credit: '16000.00', description: null },
+      { debit: '2500.00', credit: '0.00', description: 'Падааны хөнгөлөлт' },
+    ]);
+    expect(await balance(shop)).toMatchObject({ balance: '13500.00' });
+  });
+
+  it('brings a receipt costed with its discount inside the cost to income: a dry run, then the run', async () => {
+    // Shaped like the real system's only such receipt: a supplier without VAT, 43,812,000 on the
+    // note, a note discount of 9,446,666, so 34,365,334 owed and in the stock.
+    const shop = await supplier('Хуучин аргын АП');
+    const catalog = catalogApi(app, admin);
+    const goods = await catalog.product({
+      sku: '7903',
+      name: 'Хуучин өртөгтэй бараа АП',
+      categoryId: await catalog.category('Хуучин АП'),
+      baseUomId: await catalog.uomId('PCS'),
+    });
+    await inventoryApi(app, admin).setHome(goods.id, wh.id);
+    const posted = await billed(shop, [
+      { productUnitId: unitOf(goods, 'PCS').id, enteredQty: '1000', docAmount: '34365334' },
+    ]);
+    // As the costing before ADR-0236 left it: the note's amount and the discount on the costing
+    // row, the cost after the discount. Only the table's owner can rewrite history.
+    const owner = await connectAs('admin');
+    try {
+      await owner.query(
+        'ALTER TABLE stock_valuation_adjustments DISABLE TRIGGER stock_valuation_adjustments_no_update_delete',
+      );
+      await owner.query(
+        `UPDATE stock_valuation_adjustments SET doc_amount = 43812000, discount_amount = 9446666
+          WHERE doc_type = 'GR' AND doc_id = $1`,
+        [posted.id],
+      );
+      await owner.query(
+        'ALTER TABLE stock_valuation_adjustments ENABLE TRIGGER stock_valuation_adjustments_no_update_delete',
+      );
+      await owner.query(
+        `INSERT INTO goods_receipt_discounts (receipt_id, kind, amount) VALUES ($1, 'NOTE', 9446666)`,
+        [posted.id],
+      );
+    } finally {
+      await owner.end();
+    }
+    expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
+      '140101': '34365334.00',
+      '310101': '-34365334.00',
+    });
+    // A quarter of it leaves before the conversion: its share of the discount is cost of sales.
+    const types = (await http().get('/api/v1/issues/expense-types').set(bearer(worker)).expect(200))
+      .body as { id: number; code: string | null }[];
+    const issue = (
+      await http()
+        .post('/api/v1/issues')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          warehouseId: wh.id,
+          expenseTypeId: types.find((type) => type.code === 'INTERNAL_USE')?.id,
+          recipient: { kind: 'OTHER', name: 'Төв оффис АП' },
+          lines: [{ productUnitId: unitOf(goods, 'PCS').id, enteredQty: '250' }],
+        })
+        .expect(201)
+    ).body as { id: number };
+    await postIssue(app, admin, issue.id);
+    const average = async () =>
+      (
+        await sql.query<{ avg: string }>(
+          'SELECT avg_cost::text AS avg FROM warehouse_stock WHERE product_id = $1',
+          [goods.id],
+        )
+      ).rows[0]?.avg;
+    expect(await average()).toBe('34365.3340');
+
+    const service = app.get(PurchaseDiscountsService);
+    const actor = systemActor('test:purchase-discounts');
+    const dry = await service.convert(actor, posted.id, { dryRun: true });
+    expect(dry).toMatchObject({ applied: false, version: 2 });
+    expect(
+      dry?.entry?.lines.map((line) => [
+        line.accountCode,
+        line.debit.toFixed(2),
+        line.credit.toFixed(2),
+      ]),
+    ).toEqual([
+      ['140101', '7084999.50', '0.00'],
+      ['610101', '2361666.50', '0.00'],
+      ['310101', '0.00', '9446666.00'],
+      ['310101', '9446666.00', '0.00'],
+      ['520202', '0.00', '9446666.00'],
+    ]);
+    expect(dry?.lines).toEqual([
+      expect.objectContaining({ productName: 'Хуучин өртөгтэй бараа АП' }),
+    ]);
+    expect(dry?.lines[0]?.costBefore.toFixed(2)).toBe('34365334.00');
+    expect(dry?.lines[0]?.costAfter.toFixed(2)).toBe('43812000.00');
+    expect(dry?.lines[0]?.avgAfter.toFixed(4)).toBe('43812.0000');
+    // What the command prints.
+    expect(describeConversion(dry as NonNullable<typeof dry>)).toEqual([
+      `${posted.number} (receipt ${posted.id}): costing version 2, DRY RUN, nothing written.`,
+      'Product costs (cost before → after; of the difference: to the stock on hand, to the cost of goods sold; average before → after):',
+      '  Хуучин өртөгтэй бараа АП × 1000: discount 9446666.00; cost 34365334.00 → 43812000.00; stock +7084999.50, cost of sales +2361666.50; average 34365.3340 → 43812.0000',
+      `Entry (not numbered: dry run) dated ${today}:`,
+      '  Dr 140101 Бараа материал 7084999.50',
+      '  Dr 610101 Борлуулсан барааны өртөг 2361666.50',
+      '  Cr 310101 Дансны өглөг 9446666.00',
+      '  Dr 310101 Дансны өглөг 9446666.00 (Падааны хөнгөлөлт)',
+      '  Cr 520202 Худалдан авалтын хөнгөлөлт 9446666.00',
+    ]);
+    // Nothing was written.
+    expect(await average()).toBe('34365.3340');
+    expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({});
+    expect(
+      (await http().get(`/api/v1/receipts/${posted.id}`).set(bearer(admin)).expect(200)).body,
+    ).toMatchObject({ costingVersion: 1 });
+
+    const done = await service.convert(actor, posted.id, { dryRun: false });
+    expect(done).toMatchObject({ applied: true, version: 2 });
+    expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
+      '140101': '7084999.50',
+      '310101': '0.00',
+      '520202': '-9446666.00',
+      '610101': '2361666.50',
+    });
+    expect(await average()).toBe('43812.0000');
+    // The supplier is owed the same, on the bill's item; the new credit closed with its debit.
+    expect(await balance(shop)).toMatchObject({ balance: '34365334.00' });
+    expect(await items(shop)).toEqual([
+      expect.objectContaining({ kind: 'BILL', amount: '34365334.00', openAmount: '34365334.00' }),
+    ]);
+    // Once only: the receipt now keeps its discount out of its cost.
+    expect(await service.convert(actor, posted.id, { dryRun: false })).toBeNull();
+    expect(await service.convert(actor, posted.id, { dryRun: true })).toBeNull();
   });
 
   it('pays a supplier by a manual entry and lets the accountant pair it with the bill', async () => {

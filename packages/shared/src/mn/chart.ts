@@ -55,6 +55,8 @@ export const CHART_ROLES = [
   // cost when earned. Temporary codes until D16.
   'LOYALTY_LIABILITY',
   'LOYALTY_EXPENSE',
+  // A goods receipt's delivery-note discounts (ADR-0236): income, booked against the payable.
+  'PURCHASE_DISCOUNT',
 ] as const;
 export type ChartRole = (typeof CHART_ROLES)[number];
 
@@ -110,4 +112,6 @@ export const CHART_TEMPLATE: readonly ChartTemplateAccount[] = [
   // The bonus card (ADR-0112; temporary codes, TODO-VERIFY D16).
   { code: '320301', kind: 'LIABILITY', role: 'LOYALTY_LIABILITY' },
   { code: '730301', kind: 'EXPENSE', role: 'LOYALTY_EXPENSE' },
+  // Purchase discounts (ADR-0236): the code Erkhet's chart gives «Худалдан авалтын хөнгөлөлт».
+  { code: '520202', kind: 'INCOME', role: 'PURCHASE_DISCOUNT' },
 ];
