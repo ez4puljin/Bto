@@ -9,6 +9,9 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -53,7 +56,8 @@ object BridgeLink {
     private val watchdog = object : Runnable {
         override fun run() {
             if (machine.isStale(now())) {
-                drop("no ping for ${Protocol.LINK_DEAD_AFTER_MS / 1000} s")
+                val secs = Protocol.LINK_DEAD_AFTER_MS / 1000
+                drop(if (machine.phase == LinkMachine.Phase.UP) "no ping for $secs s" else "no answer for $secs s")
             } else if (socket != null) {
                 handler.postDelayed(this, 1000)
             }
@@ -75,23 +79,26 @@ object BridgeLink {
         if (!started) {
             started = true
             machine = LinkMachine(LineStore.address(app), LineStore.token(app))
+            log("service start (${machine.phase})")
         }
         if (socket == null && !handler.hasCallbacks(retryTask)) connect()
     }
 
     fun stop() {
         handler.removeCallbacks(retryTask)
+        if (started) log("service stopped")
         closeSocket()
         started = false
         changed()
     }
 
-    /** «Холбох»: pair with the code the PC shows. */
+    /** «Компьютер холбох»: pair with the code the PC shows, on the next socket only. */
     fun pair(context: Context, address: PcAddress, code: String) {
         app = context.applicationContext
         started = true
         machine.startPairing(address, code)
         LineStore.saveLink(app, address, machine.token)
+        log("pair with a new code (${address.text})")
         handler.removeCallbacks(retryTask)
         closeSocket()
         connect()
@@ -102,19 +109,34 @@ object BridgeLink {
      * may keep mobile data as the default network, and the PC is reached only over the Wi-Fi.
      */
     private var wifi: Network? = null
+    /** The network the current socket was opened on (null: the default one). */
+    private var socketNet: Network? = null
 
+    /** A Wi-Fi network went away: a socket opened on it is dead, reconnect (over another). */
     fun networkLost(network: Network) {
         if (wifi == network) wifi = null
+        if (started && socket != null && socketNet == network) drop("Wi-Fi lost")
     }
 
-    /** A Wi-Fi network came up: a waiting reconnect happens now, over it. */
+    /**
+     * A Wi-Fi network came up: a waiting reconnect happens now, over it, and a connect still
+     * hanging on another network starts again over this one.
+     */
     fun networkAvailable(network: Network) {
+        val isNew = wifi != network
         wifi = network
-        if (!started || socket != null) return
-        if (machine.phase == LinkMachine.Phase.RETRY) {
+        if (!started) return
+        if (socket == null && machine.phase == LinkMachine.Phase.RETRY) {
+            log("Wi-Fi back: reconnect now")
             machine.resetBackoff()
             handler.removeCallbacks(retryTask)
             handler.post(retryTask)
+        } else if (socket != null && isNew && socketNet != network &&
+            machine.phase == LinkMachine.Phase.CONNECTING
+        ) {
+            log("Wi-Fi back: connect again over it")
+            closeSocket()
+            connect()
         }
     }
 
@@ -127,6 +149,8 @@ object BridgeLink {
 
     private fun connect() {
         handler.removeCallbacks(retryTask)
+        // Never two sockets: an old one left open would pair or say hello on its own.
+        if (socket != null) closeSocket()
         if (!machine.onConnecting()) {
             changed()
             return
@@ -137,12 +161,14 @@ object BridgeLink {
             Request.Builder().url(address.url).build()
         } catch (e: IllegalArgumentException) {
             lastDrop = "bad address"
-            machine.onClosed()
-            scheduleRetry()
+            log("bad address ${address.text}")
+            if (machine.onClosed()) scheduleRetry()
+            changed()
             return
         }
         val net = wifi
         val c = if (net != null) client.newBuilder().socketFactory(net.socketFactory).build() else client
+        socketNet = net
         socket = c.newWebSocket(request, Listener(gen))
         handler.removeCallbacks(watchdog)
         handler.postDelayed(watchdog, 1000)
@@ -153,6 +179,7 @@ object BridgeLink {
         generation++
         socket?.cancel()
         socket = null
+        socketNet = null
         handler.removeCallbacks(watchdog)
     }
 
@@ -161,7 +188,12 @@ object BridgeLink {
         val wasUp = machine.phase == LinkMachine.Phase.UP
         lastDrop = why
         closeSocket()
-        if (machine.onClosed()) scheduleRetry()
+        if (machine.onClosed()) {
+            scheduleRetry()
+            log("down: $why; retry in ${machine.retryDelayMs() / 1000} s")
+        } else {
+            log("down: $why; no retry (${machine.phase})")
+        }
         if (wasUp) callControl?.onLinkDown()
         changed()
     }
@@ -173,20 +205,33 @@ object BridgeLink {
 
     private fun openOn(ws: WebSocket) {
         val first = machine.onOpen(now(), device(), BuildConfig.VERSION_NAME)
-        if (first == null || !ws.send(first)) drop("could not send hello")
+        when {
+            first == null -> drop("nothing to send")
+            !ws.send(first) -> drop("could not send ${machine.phase.firstFrame()}")
+            else -> log("open: ${machine.phase.firstFrame()} sent")
+        }
         changed()
     }
+
+    private fun LinkMachine.Phase.firstFrame() = if (this == LinkMachine.Phase.PAIRING) "pair" else "hello"
 
     private fun onText(ws: WebSocket, text: String) {
         when (val m = Protocol.parse(text)) {
             is Protocol.Inbound.Paired -> if (machine.onPaired(now(), m.token)) {
-                LineStore.saveLink(app, machine.address, machine.token)
+                val saved = LineStore.saveLink(app, machine.address, machine.token)
+                log(if (saved) "paired: token saved" else "paired: TOKEN NOT SAVED")
             }
-            Protocol.Inbound.Welcome -> machine.onWelcome(now())
-            is Protocol.Inbound.Error -> if (machine.onError(m.code)) {
-                LineStore.saveLink(app, machine.address, machine.token)
-                drop("PC: ${m.code}")
-                return
+            Protocol.Inbound.Welcome -> {
+                val wasHello = machine.phase == LinkMachine.Phase.HELLO
+                if (machine.onWelcome(now()) && wasHello) log("welcome")
+            }
+            is Protocol.Inbound.Error -> {
+                log("PC error ${m.code.ifEmpty { "-" }} (${machine.phase})")
+                if (machine.onError(m.code)) {
+                    LineStore.saveLink(app, machine.address, machine.token)
+                    drop("PC: ${m.code}")
+                    return
+                }
             }
             is Protocol.Inbound.Ping -> {
                 machine.onPing(now())
@@ -216,14 +261,28 @@ object BridgeLink {
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             webSocket.close(1000, null)
-            onMain { drop("closed by PC ($code)") }
+            onMain { drop("closed by PC ($code${reason.short()})") }
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) =
-            onMain { drop("closed ($code)") }
+            onMain { drop("closed ($code${reason.short()})") }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) =
-            onMain { drop(t.javaClass.simpleName) }
+            onMain {
+                val http = response?.let { " HTTP ${it.code}" }.orEmpty()
+                drop("${t.javaClass.simpleName}${t.message.short()}$http")
+            }
+
+        private fun String?.short(): String =
+            if (isNullOrBlank()) "" else " " + take(80)
+    }
+
+    private val clock = SimpleDateFormat("HH:mm:ss", Locale.US)
+
+    /** One line in the phone's link log (shown on the main screen and sent with «Илгээх»). */
+    private fun log(text: String) {
+        if (!::app.isInitialized) return
+        LineStore.addLinkEvent(app, "${clock.format(Date())} $text")
     }
 
     private fun now() = SystemClock.elapsedRealtime()

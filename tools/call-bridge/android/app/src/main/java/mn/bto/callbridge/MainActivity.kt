@@ -24,13 +24,14 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The main screen: the link to the PC (status, address, «Холбох» with the code), «AI хариулах»
- * and the fallback seconds, the default-phone-app role, and the last 20 calls, which the owner
- * sends back with «Илгээх».
+ * The main screen: the link to the PC (status, address, «Компьютер холбох» with the code, the
+ * link log), «AI хариулах» and the fallback seconds, the default-phone-app role, and the last 20
+ * calls, which the owner sends back with «Илгээх».
  */
 class MainActivity : Activity() {
     private lateinit var linkText: TextView
     private lateinit var wifiText: TextView
+    private lateinit var linkLogText: TextView
     private lateinit var addressField: EditText
     private lateinit var codeField: EditText
     private lateinit var aiSwitch: Switch
@@ -67,6 +68,9 @@ class MainActivity : Activity() {
         }
         root.add(codeField)
         root.add(button(getString(R.string.btn_pair)) { pair() })
+        root.add(text(getString(R.string.link_log_title), 14f, bold = true))
+        linkLogText = text(sizeSp = 12f)
+        root.add(linkLogText)
 
         // The AI.
         root.add(text(getString(R.string.settings_title), 20f, bold = true))
@@ -170,6 +174,7 @@ class MainActivity : Activity() {
         val error = BridgeLink.lastError?.let { " ($it)" }.orEmpty()
         linkText.text = getString(R.string.link_line, status + error) + (where?.let { "\n$it" } ?: "")
         wifiText.visibility = if (LinkService.onWifi(this)) android.view.View.GONE else android.view.View.VISIBLE
+        linkLogText.text = LineStore.linkLog(this).take(LINK_LOG_SHOWN).joinToString("\n").ifEmpty { "-" }
     }
 
     // --- The dialer role and the battery ----------------------------------------------------
@@ -252,6 +257,9 @@ class MainActivity : Activity() {
             appendLine("link: ${BridgeLink.phase} up=${BridgeLink.isUp()} pc=${BridgeLink.address?.text ?: "-"} error=${BridgeLink.lastError ?: "-"} lastDrop=${BridgeLink.lastDrop ?: "-"}")
             appendLine("settings: ai=${s.aiAnswer} fallback=${s.fallbackMs}ms")
             appendLine()
+            appendLine("link log (newest first):")
+            LineStore.linkLog(this@MainActivity).forEach { appendLine(it) }
+            appendLine()
             LineStore.calls(this@MainActivity).forEach {
                 appendLine(describe(it))
                 appendLine()
@@ -306,5 +314,6 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_ROLE = 1
         private const val REQUEST_PERMISSIONS = 2
+        private const val LINK_LOG_SHOWN = 5
     }
 }

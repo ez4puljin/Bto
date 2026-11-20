@@ -38,12 +38,15 @@ class PairingTest {
     }
 
     @Test
-    fun backoffGrowsTo30Seconds() {
+    fun backoffIs1_2_5_10_30ThenEvery30Seconds() {
         assertEquals(1000, Pairing.backoffMs(0))
         assertEquals(2000, Pairing.backoffMs(1))
-        assertEquals(16000, Pairing.backoffMs(4))
+        assertEquals(5000, Pairing.backoffMs(2))
+        assertEquals(10000, Pairing.backoffMs(3))
+        assertEquals(30000, Pairing.backoffMs(4))
         assertEquals(30000, Pairing.backoffMs(5))
-        assertEquals(30000, Pairing.backoffMs(50))
+        assertEquals(30000, Pairing.backoffMs(500))
+        assertEquals(1000, Pairing.backoffMs(-1))
     }
 
     @Test
@@ -103,15 +106,111 @@ class PairingTest {
     }
 
     @Test
-    fun aWrongCodeNeedsANewOne() {
+    fun aWrongCodeWithoutATokenAsksForANewCode() {
         val m = LinkMachine()
         m.startPairing(pc, "111111")
         m.onConnecting()
         m.onOpen(0, "dev", "0.2.0")
-        assertTrue(m.onError("BAD_CODE"))
+        assertTrue(m.onError(Protocol.ERROR_BAD_CODE))
         assertNull(m.code)
-        assertEquals(Phase.NEED_PAIR, m.phase)
+        assertEquals(Phase.NEED_CODE, m.phase)
         assertFalse(m.onClosed())
+        assertEquals(Phase.NEED_CODE, m.phase)
+        assertFalse(m.onConnecting())
+        assertEquals(Phase.NEED_CODE, m.phase)
+    }
+
+    /** The drop of 2026-11-20: paired, the socket dropped, the reconnect must say hello. */
+    @Test
+    fun aDropAfterPairingReconnectsWithHelloNotTheUsedCode() {
+        val m = LinkMachine()
+        m.startPairing(pc, "123456")
+        assertTrue(m.onConnecting())
+        assertEquals("pair", JSONObject(m.onOpen(0, "dev", "0.2.1")!!).getString("type"))
+        assertTrue(m.onPaired(100, token))
+        m.onPing(5_000)
+        assertTrue(m.onClosed())
+        assertEquals(Phase.RETRY, m.phase)
+        assertEquals(1000, m.retryDelayMs())
+        // Every later connection: hello with the token, never the code again.
+        repeat(3) {
+            assertTrue(m.onConnecting())
+            val again = JSONObject(m.onOpen(30_000, "dev", "0.2.1")!!)
+            assertEquals("hello", again.getString("type"))
+            assertEquals(token, again.getString("token"))
+            assertTrue(m.onClosed())
+        }
+        assertTrue(m.onConnecting())
+        m.onOpen(40_000, "dev", "0.2.1")
+        assertTrue(m.onWelcome(40_010))
+        assertTrue(m.isUp(40_010))
+    }
+
+    @Test
+    fun theCodeGoesOutOnceEvenWhenThePairIsNotAnswered() {
+        val m = LinkMachine(pc, token)
+        m.startPairing(pc, "123456")
+        m.onConnecting()
+        assertEquals("pair", JSONObject(m.onOpen(0, "dev", "0.2.1")!!).getString("type"))
+        assertNull(m.code)
+        // No answer, the socket closes: the older token says hello next.
+        assertTrue(m.onClosed())
+        m.onConnecting()
+        assertEquals("hello", JSONObject(m.onOpen(1_000, "dev", "0.2.1")!!).getString("type"))
+
+        // Without a token an unanswered code needs a new one.
+        val n = LinkMachine()
+        n.startPairing(pc, "123456")
+        n.onConnecting()
+        n.onOpen(0, "dev", "0.2.1")
+        assertTrue(n.isStale(12_001))
+        assertFalse(n.onClosed())
+        assertEquals(Phase.NEED_CODE, n.phase)
+    }
+
+    @Test
+    fun noPairingOrBadCodeWithATokenFallsBackToHello() {
+        for (refusal in listOf(Protocol.ERROR_NO_PAIRING, Protocol.ERROR_BAD_CODE)) {
+            val m = LinkMachine(pc, token)
+            m.startPairing(pc, "123456")
+            m.onConnecting()
+            m.onOpen(0, "dev", "0.2.1")
+            assertTrue(m.onError(refusal))
+            assertEquals(refusal, m.lastError)
+            assertEquals(token, m.token)
+            assertTrue(m.onClosed())
+            assertEquals(Phase.RETRY, m.phase)
+            assertTrue(m.onConnecting())
+            val next = JSONObject(m.onOpen(1_000, "dev", "0.2.1")!!)
+            assertEquals("hello", next.getString("type"))
+            assertEquals(token, next.getString("token"))
+            assertTrue(m.onWelcome(1_010))
+            assertEquals(Phase.UP, m.phase)
+            assertNull(m.lastError)
+        }
+    }
+
+    @Test
+    fun anyOtherCloseRetriesForever() {
+        val m = LinkMachine(pc, token)
+        val waits = (1..8).map {
+            assertTrue(m.onConnecting())
+            assertTrue(m.onClosed())
+            m.retryDelayMs()
+        }
+        assertEquals(listOf(1000L, 2000L, 5000L, 10000L, 30000L, 30000L, 30000L, 30000L), waits)
+        // An error other than BAD_TOKEN after hello reconnects too.
+        m.onConnecting()
+        m.onOpen(0, "dev", "0.2.1")
+        assertTrue(m.onError("BAD_MESSAGE"))
+        assertEquals(token, m.token)
+        assertTrue(m.onClosed())
+        assertEquals(Phase.RETRY, m.phase)
+        // The Wi-Fi came back: at once.
+        m.resetBackoff()
+        m.onConnecting()
+        assertTrue(m.onClosed())
+        assertEquals(1000, m.retryDelayMs())
     }
 
     @Test

@@ -31,6 +31,8 @@ object Protocol {
     const val STATE_ENDED = "ended"
 
     const val ERROR_BAD_TOKEN = "BAD_TOKEN"
+    const val ERROR_BAD_CODE = "BAD_CODE"
+    const val ERROR_NO_PAIRING = "NO_PAIRING"
 
     // --- PC -> phone ----------------------------------------------------------------------
 

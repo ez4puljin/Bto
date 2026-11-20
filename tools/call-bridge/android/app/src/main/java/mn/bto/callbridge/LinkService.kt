@@ -176,6 +176,7 @@ class LinkService : Service() {
                 LinkMachine.Phase.CONNECTING, LinkMachine.Phase.HELLO -> R.string.link_connecting
                 LinkMachine.Phase.PAIRING -> R.string.link_pairing
                 LinkMachine.Phase.NEED_PAIR -> R.string.link_need_pair
+                LinkMachine.Phase.NEED_CODE -> R.string.link_need_code
                 LinkMachine.Phase.UNPAIRED -> R.string.link_unpaired
                 LinkMachine.Phase.RETRY -> R.string.link_down
             }

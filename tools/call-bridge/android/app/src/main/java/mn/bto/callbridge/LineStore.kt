@@ -121,6 +121,8 @@ object LineStore {
     private const val KEY_PORT = "pcPort"
     private const val KEY_TOKEN = "pcToken"
     private const val KEY_CALLS = "calls"
+    private const val KEY_LINK_LOG = "linkLog"
+    private const val LINK_LOG_SIZE = 40
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -149,13 +151,33 @@ object LineStore {
 
     fun token(context: Context): String? = prefs(context).getString(KEY_TOKEN, null)
 
-    /** The address and token as the link machine now holds them (null removes). */
-    fun saveLink(context: Context, address: PcAddress?, token: String?) {
+    /**
+     * The address and token as the link machine now holds them (null removes), written to disk
+     * before it returns: a token the PC gave is the only way back after a drop or a restart.
+     * False: the write failed.
+     */
+    fun saveLink(context: Context, address: PcAddress?, token: String?): Boolean {
         val e = prefs(context).edit()
         if (address == null) e.remove(KEY_HOST).remove(KEY_PORT)
         else e.putString(KEY_HOST, address.host).putInt(KEY_PORT, address.port)
         if (token == null) e.remove(KEY_TOKEN) else e.putString(KEY_TOKEN, token)
-        e.apply()
+        return e.commit()
+    }
+
+    /** The link's last events, newest first: «HH:mm:ss text». Never a token or a code. */
+    fun linkLog(context: Context): List<String> {
+        val raw = prefs(context).getString(KEY_LINK_LOG, null) ?: return emptyList()
+        return try {
+            val a = JSONArray(raw)
+            (0 until a.length()).map { a.getString(it) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun addLinkEvent(context: Context, line: String) {
+        val next = (listOf(line) + linkLog(context)).take(LINK_LOG_SIZE)
+        prefs(context).edit().putString(KEY_LINK_LOG, JSONArray(next).toString()).apply()
     }
 
     fun calls(context: Context): List<CallRecord> {

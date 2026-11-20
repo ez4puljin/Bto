@@ -21,6 +21,7 @@
     <string name="link_connecting">холбогдож байна</string>
     <string name="link_pairing">кодоор холбож байна</string>
     <string name="link_need_pair">Дахин холбох: PC-ийн шинэ код оруулна уу</string>
+    <string name="link_need_code">Кодоо дахин авна уу: PC-ийн шинэ код оруулна уу</string>
     <string name="link_unpaired">холбоогүй: PC-ийн хаяг, код оруулна уу</string>
     <string name="no_wifi">Wi-Fi-д холбогдоогүй</string>
     <string name="no_wifi_long">Wi-Fi-д холбогдоогүй: PC зөвхөн оффисын Wi-Fi-аар холбогдоно</string>
@@ -28,7 +29,7 @@
     <string name="pc_address_hint">192.168.1.20</string>
     <string name="pair_code">PC дээр гарсан 6 оронтой код</string>
     <string name="pair_code_hint">123456</string>
-    <string name="btn_pair">Холбох</string>
+    <string name="btn_pair">Компьютер холбох</string>
     <string name="bad_address">PC-ийн хаяг буруу байна</string>
     <string name="bad_code">Код 6 оронтой тоо байна</string>
 
@@ -38,6 +39,7 @@
     <string name="btn_save">Хадгалах</string>
     <string name="saved">Хадгаллаа</string>
 
+    <string name="link_log_title">Холболтын сүүлийн үйл явдал</string>
     <string name="log_title">Сүүлийн 20 дуудлага</string>
     <string name="log_empty">Дуудлага алга</string>
     <string name="btn_share">Илгээх</string>

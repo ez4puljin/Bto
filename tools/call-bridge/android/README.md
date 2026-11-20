@@ -1,7 +1,7 @@
 # «Bto дуудлага»: the Android side of the call bridge
 
-Stage 3 of ADR-0232: the phone of the AI order line. Package `mn.bto.callbridge`, version 0.2.0
-(versionCode 2), Kotlin, plain Android views, no AndroidX; OkHttp 4.12.0 for the WebSocket. minSdk
+Stage 3 of ADR-0232: the phone of the AI order line. Package `mn.bto.callbridge`, version 0.2.1
+(versionCode 3), Kotlin, plain Android views, no AndroidX; OkHttp 4.12.0 for the WebSocket. minSdk
 29 (RoleManager), compileSdk/targetSdk 36. It replaces the stage-0 probe (0.1) in place.
 
 What it does: it is the phone's default phone app (dialer role, dialpad, in-call screen, so the
@@ -19,7 +19,7 @@ the client. The Windows side speaks the same frames; neither side changes them a
 | Direction | Frame |
 |---|---|
 | phone → PC | `{"type":"pair","code":"123456","device":"<model>","app":"0.2.0"}` once, with the code the PC shows |
-| PC → phone | `{"type":"paired","token":"<32+ chars>"}` (kept on the phone) or `{"type":"error","code":…}` |
+| PC → phone | `{"type":"paired","token":"<32+ chars>"}` (written to disk at once; the same socket stays open) or `{"type":"error","code":…}` |
 | phone → PC | `{"type":"hello","token":…,"device":…,"app":…}` on every later connection |
 | PC → phone | `{"type":"welcome"}` or `{"type":"error","code":"BAD_TOKEN"}` (the phone drops the token and shows «Дахин холбох») |
 | PC → phone | `{"type":"ping","id":n}` every 5 s; the phone answers `{"type":"pong","id":n}` and counts the link down after 12 s without a ping |
@@ -30,10 +30,19 @@ the client. The Windows side speaks the same frames; neither side changes them a
 
 How the phone uses them:
 
-- `paired` puts the link up at once (the phone does not wait for a `welcome` after pairing).
-- Any `error` while pairing (a wrong or old code) or `BAD_TOKEN` after `hello` stops the
-  reconnects until the owner enters a new code. Other errors close the socket and it reconnects
-  (1, 2, 4, 8, 16, then every 30 s; at once when the Wi-Fi comes back).
+- `paired` puts the link up at once (the phone does not wait for a `welcome` after pairing) and the
+  token is written to disk before anything else (0.2.1).
+- A code goes out in one `pair` frame only, on the first socket that opens after «Компьютер
+  холбох» (a connect that fails before opening keeps it). Every later connection says `hello`
+  (0.2.1; 0.2.0 could send the used code again and be refused with `NO_PAIRING`).
+- `BAD_CODE` / `NO_PAIRING` (or no answer) on a pair attempt: with an older token the phone says
+  `hello` next; without one it stops and shows «Кодоо дахин авна уу». `BAD_TOKEN` after `hello`
+  drops the token, stops the reconnects and shows «Дахин холбох». Any other close reconnects
+  (1, 2, 5, 10, 30 s, then every 30 s for as long as the service runs; at once when the Wi-Fi
+  comes back, and at once over another network when the Wi-Fi the socket was on is lost).
+- The link log (the last 40 events: opens, `paired`, `welcome`, the PC's errors, every close with
+  its code and reason or the failure, the retry wait) is on the main screen (last 5) and in
+  «Илгээх». It never holds a token or a code.
 - `state answered` is sent when the phone carries out the PC's `answer`; `active` when any call the
   PC was told of connects (an `active` without `answered` means a person took it); `ended` with the
   cause's name (`REMOTE` = the caller hung up, `LOCAL` = this phone).
@@ -59,9 +68,9 @@ moves the audio back to the earpiece. `hangup` disconnects the call.
 | `BridgeLink.kt` | the WebSocket (OkHttp), bound to the Wi-Fi network, driven by `LinkMachine` |
 | `LinkService.kt` | the foreground service with «Bto AI шугам: холбогдсон / салсан», the Wi-Fi lock, the start on boot and after an update |
 | `LineInCallService.kt` | the InCallService Telecom binds: reports calls, answers, routes, hangs up, writes the call record |
-| `MainActivity.kt` | status, PC address and «Холбох», «AI хариулах», fallback seconds, the dialer role, the battery exemption, the last 20 calls, «Илгээх» |
+| `MainActivity.kt` | status, PC address and «Компьютер холбох», the link log, «AI хариулах», fallback seconds, the dialer role, the battery exemption, the last 20 calls, «Илгээх» |
 | `InCallActivity.kt`, `DialerActivity.kt` | the in-call screen and the dialpad (from the probe) |
-| `LineRules.kt`, `LineStore.kt` | pure rules (settings, endpoints, names) / settings, the PC's address and token, the call list in SharedPreferences |
+| `LineRules.kt`, `LineStore.kt` | pure rules (settings, endpoints, names) / settings, the PC's address and token, the call list and the link log in SharedPreferences |
 
 The JVM unit tests (`app/src/test`) cover the protocol, the decision and its timer, the pairing
 state and the rules. The phone keeps its data in the probe's SharedPreferences file, so the
@@ -106,9 +115,10 @@ without uninstalling. Neither the APK nor any key is ever committed (`.gitignore
    датаар байвал дээд талд «Wi-Fi-д холбогдоогүй» гэж улаанаар бичнэ. Дэлгэц унтарсан үед ч
    апп Wi-Fi-г асаалттай байлгадаг; утсыг цэнэглэгчид залгаатай байлгана.
 5. **PC-тэй холбох (нэг удаа).** «PC-ийн хаяг»-т PC дээр гарсан хаягийг (жишээ нь
-   `192.168.1.20`), «6 оронтой код»-д PC дээрх кодыг бичээд «Холбох» дарна. Дээд талд
-   «PC: холбогдсон» гарвал болсон. Дараа нь утас, PC унтарч асахад өөрөө холбогдоно.
-   «Дахин холбох: PC-ийн шинэ код оруулна уу» гарвал PC дээр шинэ код гаргаж дахин «Холбох».
+   `192.168.1.20`), «6 оронтой код»-д PC дээрх кодыг бичээд «Компьютер холбох» дарна. Дээд талд
+   «PC: холбогдсон» гарвал болсон. Дараа нь холболт тасрах, утас, PC унтарч асахад өөрөө
+   холбогдоно (кодыг дахин оруулах хэрэггүй). «Дахин холбох: …» эсвэл «Кодоо дахин авна уу: …»
+   гарвал PC дээр шинэ код гаргаж дахин «Компьютер холбох».
 6. **Bluetooth (Phone Link).** PC дээр Phone Link (Утасны холбоос) аппыг нээж утсаа холбоно: утасны
    Bluetooth асаалттай, PC-тэй хослосон (pair) байх ёстой, Phone Link дуудлага хийх боломжтой
    («Calls») болсон байна. Шалгах: Phone Link-ээр PC-ээс нэг удаа гадагш залгаж, яриа PC-ийн
