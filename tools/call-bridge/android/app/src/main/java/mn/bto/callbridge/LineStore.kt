@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * One call as the probe saw it: the evidence the owner sends back. Times are wall-clock
+ * One call as the phone saw it: the evidence the owner sends back. Times are wall-clock
  * milliseconds for [startedAt] and elapsed milliseconds from the first ring for the rest.
  */
 class CallRecord(
@@ -14,16 +14,30 @@ class CallRecord(
     val number: String,
     val incoming: Boolean,
 ) {
-    /** "auto" when the probe was set to answer it, "manual" when the in-call screen took it. */
+    /** "ai" when the PC was asked about it, "manual" otherwise ("auto" in the probe's records). */
     var mode: String = "manual"
+    /** The protocol's callRef, null for calls the PC never heard of. */
+    var callRef: String? = null
+    /** Was the link to the PC up when it started to ring (incoming calls only). */
+    var linkUpAtRing: Boolean? = null
+    /** What the PC said ("answer BLUETOOTH", "ignore", "late answer …") or null. */
+    var pcSaid: String? = null
+    /** Elapsed ms from the ring to the PC's answer or ignore. */
+    var pcReplyMs: Long? = null
+    /** Why it rang for staff, when it did: RingDecision.Reason's text. */
+    var fallback: String? = null
+    /** The route the PC asked for. */
+    var routeAsked: String? = null
     var answerRequestedMs: Long? = null
     var ringToAnswerMs: Long? = null
-    /** "probe", "user" or null (not answered). */
+    /** "ai" ("probe" in old records), "user" or null (not answered). */
     var answeredBy: String? = null
     val endpointsAvailable: MutableList<String> = mutableListOf()
     var endpointUsed: String? = null
     var routeResult: String? = null
     var ended: String? = null
+    /** Who ended it: "pc" (hangup), "user" (a button), or null (the caller or the network). */
+    var endedBy: String? = null
     var talkMs: Long? = null
     val errors: MutableList<String> = mutableListOf()
 
@@ -37,6 +51,13 @@ class CallRecord(
         put("number", number)
         put("incoming", incoming)
         put("mode", mode)
+        put("callRef", callRef ?: JSONObject.NULL)
+        put("linkUpAtRing", linkUpAtRing ?: JSONObject.NULL)
+        put("pcSaid", pcSaid ?: JSONObject.NULL)
+        put("pcReplyMs", pcReplyMs ?: JSONObject.NULL)
+        put("fallback", fallback ?: JSONObject.NULL)
+        put("routeAsked", routeAsked ?: JSONObject.NULL)
+        put("endedBy", endedBy ?: JSONObject.NULL)
         put("answerRequestedMs", answerRequestedMs ?: JSONObject.NULL)
         put("ringToAnswerMs", ringToAnswerMs ?: JSONObject.NULL)
         put("answeredBy", answeredBy ?: JSONObject.NULL)
@@ -57,6 +78,13 @@ class CallRecord(
                 incoming = o.optBoolean("incoming"),
             ).apply {
                 mode = o.optString("mode", "manual")
+                callRef = o.stringOrNull("callRef")
+                linkUpAtRing = if (o.isNull("linkUpAtRing")) null else o.optBoolean("linkUpAtRing")
+                pcSaid = o.stringOrNull("pcSaid")
+                pcReplyMs = o.longOrNull("pcReplyMs")
+                fallback = o.stringOrNull("fallback")
+                routeAsked = o.stringOrNull("routeAsked")
+                endedBy = o.stringOrNull("endedBy")
                 answerRequestedMs = o.longOrNull("answerRequestedMs")
                 ringToAnswerMs = o.longOrNull("ringToAnswerMs")
                 answeredBy = o.stringOrNull("answeredBy")
@@ -80,32 +108,54 @@ class CallRecord(
     }
 }
 
-/** The settings and the last calls, in the app's own SharedPreferences: nothing leaves the phone. */
-object ProbeStore {
+/**
+ * The settings, the PC's address and token, and the last calls, in the app's own
+ * SharedPreferences (the probe's file, so its call list survives the update). Nothing leaves the
+ * phone except what the owner shares; `allowBackup` is off, so the token is not backed up.
+ */
+object LineStore {
     private const val PREFS = "probe"
-    private const val KEY_AUTO = "autoAnswer"
-    private const val KEY_DELAY = "answerDelaySec"
-    private const val KEY_HANGUP = "hangupAfterSec"
+    private const val KEY_AI = "autoAnswer"
+    private const val KEY_FALLBACK = "fallbackMs"
+    private const val KEY_HOST = "pcHost"
+    private const val KEY_PORT = "pcPort"
+    private const val KEY_TOKEN = "pcToken"
     private const val KEY_CALLS = "calls"
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun settings(context: Context): ProbeSettings {
+    fun settings(context: Context): LineSettings {
         val p = prefs(context)
-        return ProbeSettings(
-            autoAnswer = p.getBoolean(KEY_AUTO, false),
-            answerDelaySec = p.getInt(KEY_DELAY, ProbeSettings.DEFAULT_DELAY_SEC),
-            hangupAfterSec = p.getInt(KEY_HANGUP, ProbeSettings.DEFAULT_HANGUP_SEC),
+        return LineSettings(
+            aiAnswer = p.getBoolean(KEY_AI, false),
+            fallbackMs = p.getInt(KEY_FALLBACK, LineSettings.DEFAULT_FALLBACK_MS)
+                .coerceIn(LineSettings.MIN_FALLBACK_MS, LineSettings.MAX_FALLBACK_MS),
         )
     }
 
-    fun saveSettings(context: Context, s: ProbeSettings) {
+    fun saveSettings(context: Context, s: LineSettings) {
         prefs(context).edit()
-            .putBoolean(KEY_AUTO, s.autoAnswer)
-            .putInt(KEY_DELAY, s.answerDelaySec)
-            .putInt(KEY_HANGUP, s.hangupAfterSec)
+            .putBoolean(KEY_AI, s.aiAnswer)
+            .putInt(KEY_FALLBACK, s.fallbackMs)
             .apply()
+    }
+
+    fun address(context: Context): PcAddress? {
+        val p = prefs(context)
+        val host = p.getString(KEY_HOST, null) ?: return null
+        return PcAddress(host, p.getInt(KEY_PORT, Protocol.DEFAULT_PORT))
+    }
+
+    fun token(context: Context): String? = prefs(context).getString(KEY_TOKEN, null)
+
+    /** The address and token as the link machine now holds them (null removes). */
+    fun saveLink(context: Context, address: PcAddress?, token: String?) {
+        val e = prefs(context).edit()
+        if (address == null) e.remove(KEY_HOST).remove(KEY_PORT)
+        else e.putString(KEY_HOST, address.host).putInt(KEY_PORT, address.port)
+        if (token == null) e.remove(KEY_TOKEN) else e.putString(KEY_TOKEN, token)
+        e.apply()
     }
 
     fun calls(context: Context): List<CallRecord> {
@@ -120,7 +170,7 @@ object ProbeStore {
 
     /** Saved on every change of a call, so a crash still leaves what was seen up to then. */
     fun saveCall(context: Context, record: CallRecord) {
-        val next = ProbeRules.upsertNewestFirst(calls(context), record) { it.id }
+        val next = LineRules.upsertNewestFirst(calls(context), record) { it.id }
         val a = JSONArray()
         next.forEach { a.put(it.toJson()) }
         prefs(context).edit().putString(KEY_CALLS, a.toString()).apply()

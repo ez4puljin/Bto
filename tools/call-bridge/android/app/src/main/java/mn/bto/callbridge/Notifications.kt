@@ -9,7 +9,7 @@ import android.content.Intent
 import android.telecom.Call
 
 /**
- * The call's notification. An incoming call the probe does not take opens the in-call screen
+ * The call's notification. An incoming call the AI does not take opens the in-call screen
  * full screen (also over the lock screen); the ringtone itself is the phone's (Telecom).
  */
 object Notifications {
@@ -34,7 +34,8 @@ object Notifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val title = when {
-            t.record.mode == "auto" -> R.string.notif_ai
+            t.aiAnswered -> R.string.notif_ai
+            t.decision?.waiting == true -> R.string.notif_ai_waiting
             stateOf(t.call) == Call.STATE_RINGING -> R.string.notif_incoming
             else -> R.string.notif_ongoing
         }

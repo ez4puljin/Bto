@@ -15,5 +15,10 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // OkHttp 4.12.0 and Okio 3.6.0 sit in ~/Android/gradle's cache under the Plugin Portal
+        // (the staff app's build tools fetched them there), so the build stays offline.
+        gradlePluginPortal {
+            content { includeGroup("com.squareup.okhttp3"); includeGroup("com.squareup.okio") }
+        }
     }
 }

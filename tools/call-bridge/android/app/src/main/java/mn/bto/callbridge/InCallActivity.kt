@@ -3,7 +3,6 @@ package mn.bto.callbridge
 import android.app.Activity
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
 import android.telecom.Call
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
@@ -12,7 +11,7 @@ import android.widget.ScrollView
 
 /**
  * The minimal in-call screen: number, state, answer, reject or hang up, speaker. It is there so
- * that a call the probe does not take can always be taken by hand.
+ * that a call the AI does not take can always be taken by hand.
  */
 class InCallActivity : Activity() {
     private lateinit var list: LinearLayout
@@ -51,7 +50,7 @@ class InCallActivity : Activity() {
             return
         }
         calls.forEach { list.add(callView(it)) }
-        val speaker = ProbeInCallService.instance
+        val speaker = LineInCallService.instance
         if (speaker != null && calls.any { stateOf(it.call) == Call.STATE_ACTIVE }) {
             val on = speaker.isSpeakerOn()
             list.add(button(getString(R.string.btn_speaker) + if (on) " ✓" else "") { speaker.toggleSpeaker() })
@@ -63,16 +62,8 @@ class InCallActivity : Activity() {
         val state = stateOf(t.call)
         box.add(text(t.record.number.ifBlank { getString(R.string.unknown_number) }, 28f, bold = true))
         box.add(text(stateText(state), 18f))
-        val settings = ProbeStore.settings(this)
-        if (t.answerTask != null) {
-            val left = settings.answerDelaySec - ((SystemClock.elapsedRealtime() - t.addedAt) / 1000).toInt()
-            box.add(text(getString(R.string.ai_will_answer, left.coerceAtLeast(0))))
-        }
-        val activeAt = t.activeAt
-        if (t.hangupTask != null && activeAt != null) {
-            val left = settings.hangupAfterSec - ((SystemClock.elapsedRealtime() - activeAt) / 1000).toInt()
-            box.add(text(getString(R.string.ai_answered, left.coerceAtLeast(0))))
-        }
+        if (t.decision?.waiting == true) box.add(text(getString(R.string.ai_deciding)))
+        if (t.aiAnswered) box.add(text(getString(R.string.ai_talking)))
         t.record.endpointUsed?.let { box.add(text(it, 14f)) }
 
         val buttons = row()

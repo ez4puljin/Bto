@@ -11,10 +11,30 @@
     <string name="btn_default_apps">Үндсэн аппуудын тохиргоо</string>
     <string name="btn_dialpad">Дугаар залгах</string>
 
+    <string name="btn_battery">Батарей хэмнэлтээс чөлөөлөх</string>
+
+    <string name="link_line">PC: %1$s</string>
+    <string name="link_title">Bto AI шугам: %1$s</string>
+    <string name="link_channel">AI шугамын холболт</string>
+    <string name="link_up">холбогдсон</string>
+    <string name="link_down">салсан</string>
+    <string name="link_connecting">холбогдож байна</string>
+    <string name="link_pairing">кодоор холбож байна</string>
+    <string name="link_need_pair">Дахин холбох: PC-ийн шинэ код оруулна уу</string>
+    <string name="link_unpaired">холбоогүй: PC-ийн хаяг, код оруулна уу</string>
+    <string name="no_wifi">Wi-Fi-д холбогдоогүй</string>
+    <string name="no_wifi_long">Wi-Fi-д холбогдоогүй: PC зөвхөн оффисын Wi-Fi-аар холбогдоно</string>
+    <string name="pc_address">PC-ийн хаяг</string>
+    <string name="pc_address_hint">192.168.1.20</string>
+    <string name="pair_code">PC дээр гарсан 6 оронтой код</string>
+    <string name="pair_code_hint">123456</string>
+    <string name="btn_pair">Холбох</string>
+    <string name="bad_address">PC-ийн хаяг буруу байна</string>
+    <string name="bad_code">Код 6 оронтой тоо байна</string>
+
     <string name="settings_title">Тохиргоо</string>
     <string name="ai_answer">AI хариулах</string>
-    <string name="answer_delay">Хариулах хүртэл, секунд</string>
-    <string name="hangup_after">Хариулснаас хойш таслах, секунд</string>
+    <string name="fallback_secs">PC хариу өгөхийг хүлээх, секунд (1.5–5)</string>
     <string name="btn_save">Хадгалах</string>
     <string name="saved">Хадгаллаа</string>
 
@@ -43,12 +63,13 @@
     <string name="state_disconnected">Тасарсан</string>
     <string name="state_select_sim">SIM сонгох</string>
     <string name="state_other">Төлөв %1$d</string>
-    <string name="ai_will_answer">AI %1$d секундэд хариулна</string>
-    <string name="ai_answered">AI хариулсан, %1$d секундэд таслана</string>
+    <string name="ai_deciding">AI хариулах эсэхийг PC шийдэж байна</string>
+    <string name="ai_talking">AI ярьж байна</string>
 
     <string name="notif_channel">Дуудлага</string>
     <string name="notif_incoming">Ирж буй дуудлага</string>
     <string name="notif_ongoing">Дуудлага явагдаж байна</string>
     <string name="notif_ai">AI дуудлага авч байна</string>
+    <string name="notif_ai_waiting">Ирж буй дуудлага: PC шийдэж байна</string>
     <string name="unknown_number">Нууц дугаар</string>
 </resources>
