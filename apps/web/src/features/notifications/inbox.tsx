@@ -1,4 +1,4 @@
-import { Bell, Megaphone, PackageCheck } from 'lucide-react';
+import { Bell, Megaphone, PackageCheck, PhoneCall } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -61,6 +61,33 @@ function EntryText({ entry }: { entry: Entry }) {
     );
   }
   const { item } = entry;
+  if (item.kind === 'PHONE_ORDER') {
+    return (
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">
+          {t('notifications.staffKinds.PHONE_ORDER')}
+        </span>
+        <span className="block truncate text-[0.8125rem] text-muted-foreground">
+          {t('notifications.phoneOrderLine', {
+            number: item.orderNumber,
+            customer: item.customerName,
+          })}
+        </span>
+      </span>
+    );
+  }
+  if (item.kind === 'PHONE_CALLBACK') {
+    return (
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">
+          {t('notifications.staffKinds.PHONE_CALLBACK')}
+        </span>
+        <span className="block truncate text-[0.8125rem] text-muted-foreground">
+          {item.customerName || item.phone || t('notifications.phoneUnknown')}
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="min-w-0 flex-1">
       <span className="block truncate font-medium">
@@ -77,7 +104,12 @@ function EntryText({ entry }: { entry: Entry }) {
 }
 
 function EntryIcon({ entry }: { entry: Entry }) {
-  const Icon = entry.kind === 'notice' ? Megaphone : PackageCheck;
+  const Icon =
+    entry.kind === 'notice'
+      ? Megaphone
+      : entry.item.kind === 'ORDER_SOLD'
+        ? PackageCheck
+        : PhoneCall;
   return (
     <span className="relative grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-link">
       <Icon aria-hidden className="size-4" />
@@ -88,10 +120,14 @@ function EntryIcon({ entry }: { entry: Entry }) {
   );
 }
 
-const orderLink = (entry: Entry) =>
-  entry.kind === 'own' && entry.item.orderId !== null
-    ? `/sales/orders/${entry.item.orderId}`
-    : null;
+const orderLink = (entry: Entry) => {
+  if (entry.kind !== 'own') return null;
+  const { item } = entry;
+  if (item.kind === 'PHONE_CALLBACK') {
+    return item.callId !== null ? `/sales/phone-calls/${item.callId}` : null;
+  }
+  return item.orderId !== null ? `/sales/orders/${item.orderId}` : null;
+};
 
 /**
  * The top bar's 🔔 (ADR-0114): the unread count of the user's inbox (the notices an admin sends and

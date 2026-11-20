@@ -65,6 +65,7 @@ import {
   Palette,
   Percent,
   Phone,
+  PhoneCall,
   Printer,
   ReceiptText,
   Ruler,
@@ -166,6 +167,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'nav.repVisits',
         icon: MapPinned,
         permission: 'sales.orders.read',
+      },
+      // ADR-0232: what the phone AI line answered, and the searches it found nothing for.
+      {
+        to: '/sales/phone-calls',
+        label: 'nav.phoneCalls',
+        icon: PhoneCall,
+        permission: 'phone.calls.read',
       },
       {
         to: '/sales/document-templates',
@@ -774,6 +782,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
       // ADR-0226: the printers price labels go to (a LAN printer or a PC's bridge).
       { to: '/system/printers', label: 'nav.printers', icon: Printer, permission: 'pos.manage' },
+      // ADR-0232: the phone lines the AI answers outside working hours.
+      {
+        to: '/system/phone-lines',
+        label: 'nav.phoneLines',
+        icon: Phone,
+        permission: 'phone.lines.manage',
+      },
       { to: '/system/status', label: 'nav.systemStatus', icon: Activity },
       // ADR-0197: which screens are opened, and which nobody opens.
       {

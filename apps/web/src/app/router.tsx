@@ -163,6 +163,9 @@ import { PosVoidsPage } from '@/features/pos/voids-page';
 import { PosVoucherPrintPage } from '@/features/pos/voucher-print-page';
 import { PosVouchersPage } from '@/features/pos/vouchers-page';
 import { GuideArticlePage, GuidePage } from '@/features/guide/guide-pages';
+import { PhoneCallPage } from '@/features/phone-agent/phone-call-page';
+import { PhoneCallsPage } from '@/features/phone-agent/phone-calls-page';
+import { PhoneLinesPage } from '@/features/phone-agent/phone-lines-page';
 import { PrintersPage } from '@/features/printing/printers-page';
 import { SystemStatusPage } from '@/features/system/system-status-page';
 import { UsagePage } from '@/features/system/usage-page';
@@ -399,6 +402,15 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="pos.manage">
                 <PrintersPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'system/phone-lines',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="phone.lines.manage">
+                <PhoneLinesPage />
               </RequirePermission>
             ),
           },
@@ -684,6 +696,24 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="sales.orders.read">
                 <RepVisitsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'sales/phone-calls',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="phone.calls.read">
+                <PhoneCallsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: 'sales/phone-calls/:id',
+            handle: { width: 'wide' },
+            element: (
+              <RequirePermission permission="phone.calls.read">
+                <PhoneCallPage />
               </RequirePermission>
             ),
           },
