@@ -122,6 +122,12 @@ export const PERMISSIONS = [
   // office's corrections only with the second code.
   'hr.attendance.view',
   'hr.attendance.manage',
+  // Payroll with KPI (ADR-0235): every run and payslip; the pay terms, templates, rates, runs,
+  // advances, approval and reopening; scoring the work-evaluation KPI items (a manager, who sees
+  // no amounts with this code alone). Everybody reads their own approved payslip without a code.
+  'hr.payroll.view',
+  'hr.payroll.manage',
+  'hr.payroll.score',
   // Management reports (ADR-0108): the dashboard and the reports; costs, profit, margins and stock
   // values in them only with the second code.
   'reports.view',
@@ -306,7 +312,16 @@ export const SYSTEM_ROLE_PERMISSIONS: Readonly<Record<SystemRole, readonly Permi
   ],
   // Attendance (ADR-0131): the dashboard, the work sites, the schedule and the corrections. Liability
   // on the expiry register reads as pay (ADR-0172 #4).
-  HR: ['hr.attendance.view', 'hr.attendance.manage', 'expiry.liability.manage'],
+  // Payroll (ADR-0235): HR keeps the terms and the runs and scores; a manager gets the score code
+  // alone through a custom role or an admin's tick.
+  HR: [
+    'hr.attendance.view',
+    'hr.attendance.manage',
+    'hr.payroll.view',
+    'hr.payroll.manage',
+    'hr.payroll.score',
+    'expiry.liability.manage',
+  ],
   // Store staff request and receive transfers within the supermarket's write scope (ADR-0035).
   POS_CASHIER: ['inventory.transfers.manage', 'pos.till.operate'],
   // The senior cashier approves returns and drawer opens at the till (owner 2026-10-16).

@@ -5446,6 +5446,390 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payroll/me/payslips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_myPayslips"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/me/payslips/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_myPayslip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/me/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_myTerms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_getSettings"];
+        put: operations["Payroll_updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_templates"];
+        put?: never;
+        post: operations["Payroll_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Payroll_updateTemplate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/templates/{id}/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Payroll_archiveTemplate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/templates/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payroll_applyTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_listTerms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/terms/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_oneTerms"];
+        put: operations["Payroll_saveTerms"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/advances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_listAdvances"];
+        put?: never;
+        post: operations["Payroll_createAdvance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/advances/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payroll_voidAdvance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/scoring/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_scoringRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/scoring/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_scoring"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/scoring/runs/{id}/scores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Payroll_score"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_listRuns"];
+        put?: never;
+        post: operations["Payroll_createRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_getRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}/export.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_runXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}/lines/{lineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_getLine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payroll_recompute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payroll_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payroll_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}/lines/{lineId}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Payroll_addAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/runs/{id}/lines/{lineId}/adjustments/{adjustmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["Payroll_removeAdjustment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/segments": {
         parameters: {
             query?: never;
@@ -13076,7 +13460,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage" | "problems.read" | "problems.count" | "problems.manage" | "phone.calls.read" | "phone.lines.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "hr.payroll.view" | "hr.payroll.manage" | "hr.payroll.score" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage" | "problems.read" | "problems.count" | "problems.manage" | "phone.calls.read" | "phone.lines.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -18849,6 +19233,598 @@ export interface components {
             /** @description Not kept yet: always null */
             email: string | null;
             photoUrl: string | null;
+        };
+        /** @enum {string} */
+        PayrollRunStatus: "DRAFT" | "APPROVED";
+        /** @enum {string} */
+        KpiSource: "ATTENDANCE" | "MANUAL";
+        PayrollPayslipItem: {
+            id: number;
+            key: string;
+            name: string;
+            source: components["schemas"]["KpiSource"];
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            /** @description null: not scored yet */
+            scorePercent: string | null;
+            /** @description ATTENDANCE: attended ÷ workdays as a percent */
+            basePercent: string | null;
+            /** @description ATTENDANCE: taken off for late days */
+            penaltyPercent: string | null;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            earned: string;
+            note: string | null;
+            scoredByName: string | null;
+            /** Format: date-time */
+            scoredAt: string | null;
+        };
+        /** @enum {string} */
+        PayrollAdjustmentKind: "ADDITION" | "DEDUCTION";
+        PayrollPayslipAdjustment: {
+            id: number;
+            kind: components["schemas"]["PayrollAdjustmentKind"];
+            name: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            /** @description An addition that is part of gross */
+            taxable: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PayrollPayslipAdvance: {
+            id: number;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            paidOn: string;
+            note: string | null;
+        };
+        PayrollPayslip: {
+            id: number;
+            runId: number;
+            /** @example 2026-10 */
+            month: string;
+            runStatus: components["schemas"]["PayrollRunStatus"];
+            /** Format: date-time */
+            approvedAt: string | null;
+            userId: number;
+            fullName: string;
+            position: string | null;
+            divisionName: string | null;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            baseSalary: string;
+            paysSocialInsurance: boolean;
+            /** @description False: attendance is not tracked, the attendance item is full */
+            attendanceMeasured: boolean;
+            workdays: number | null;
+            attendedDays: number | null;
+            lateDays: number | null;
+            items: components["schemas"]["PayrollPayslipItem"][];
+            adjustments: components["schemas"]["PayrollPayslipAdjustment"][];
+            advances: components["schemas"]["PayrollPayslipAdvance"][];
+            unscoredCount: number;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            kpiTotal: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            taxableAdditions: string;
+            /**
+             * @description Salary + KPI + taxable additions
+             * @example 300000.00
+             */
+            gross: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            siBase: string;
+            /**
+             * @description НДШ, the employee’s share
+             * @example 300000.00
+             */
+            employeeSi: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            pitCredit: string;
+            /**
+             * @description ХХОАТ after the credit
+             * @example 300000.00
+             */
+            pit: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            advance: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            otherAdditions: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            deductions: string;
+            /**
+             * @description Paid out; negative when advances exceed the pay
+             * @example 300000.00
+             */
+            net: string;
+        };
+        PayrollKpiItem: {
+            key: string;
+            name: string;
+            source: components["schemas"]["KpiSource"];
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            sort: number;
+        };
+        PayrollMyTerms: {
+            /** @description False: no pay terms are set for the caller */
+            hasTerms: boolean;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            baseSalary: string;
+            paysSocialInsurance: boolean;
+            items: components["schemas"]["PayrollKpiItem"][];
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            kpiTotal: string;
+        };
+        PayrollTaxCreditBracket: {
+            /** @description Monthly taxable income up to this amount (inclusive); null = everything above */
+            upTo: string | null;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            credit: string;
+        };
+        PayrollSettings: {
+            /**
+             * @description A percent 0–100 as text, at most two decimals
+             * @example 86.9
+             */
+            latePenaltyPercent: string;
+            /**
+             * @description A percent 0–100 as text, at most two decimals
+             * @example 86.9
+             */
+            employeeSiPercent: string;
+            /**
+             * @description A percent 0–100 as text, at most two decimals
+             * @example 86.9
+             */
+            employerSiPercent: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            minimumWage: string;
+            /** @description The insurance base is capped at this many minimum wages */
+            siCapMultiplier: string;
+            /**
+             * @description A percent 0–100 as text, at most two decimals
+             * @example 86.9
+             */
+            pitPercent: string;
+            pitCredits: components["schemas"]["PayrollTaxCreditBracket"][];
+        };
+        PayrollKpiTemplate: {
+            id: number;
+            name: string;
+            items: components["schemas"]["PayrollKpiItem"][];
+            /**
+             * @description The sum of the items: what a full score pays
+             * @example 300000.00
+             */
+            total: string;
+            /** Format: date-time */
+            archivedAt: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PayrollKpiItemRequest: {
+            /** @description Send the key of an existing item back so its score survives; omit for a new item */
+            key?: string | null;
+            name: string;
+            source: components["schemas"]["KpiSource"];
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            sort?: number | null;
+        };
+        PayrollKpiTemplateRequest: {
+            name: string;
+            items: components["schemas"]["PayrollKpiItemRequest"][];
+        };
+        PayrollArchiveRequest: {
+            archived: boolean;
+        };
+        PayrollTemplateApplyRequest: {
+            userIds: number[];
+        };
+        PayrollTerms: {
+            userId: number;
+            fullName: string;
+            position: string | null;
+            divisionId: number | null;
+            divisionName: string | null;
+            /** @description The employee has left (a closed account or a leaving date) */
+            left: boolean;
+            /** @description False: HR has not set terms yet (zero salary, no items) */
+            hasTerms: boolean;
+            /** @description Only active terms put the person on a payroll run */
+            active: boolean;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            baseSalary: string;
+            paysSocialInsurance: boolean;
+            templateId: number | null;
+            templateName: string | null;
+            items: components["schemas"]["PayrollKpiItem"][];
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            kpiTotal: string;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        PayrollTermsRequest: {
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            baseSalary: string;
+            paysSocialInsurance: boolean;
+            /** @description The template the sheet came from */
+            templateId?: number | null;
+            items: components["schemas"]["PayrollKpiItemRequest"][];
+            active: boolean;
+        };
+        PayrollAdvance: {
+            id: number;
+            userId: number;
+            fullName: string;
+            /** @example 2026-10 */
+            month: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            /** @example 2026-10-15 */
+            paidOn: string;
+            note: string | null;
+            createdByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            voidedAt: string | null;
+            voidedByName: string | null;
+            voidReason: string | null;
+        };
+        PayrollAdvanceRequest: {
+            userId: number;
+            /**
+             * @description The month whose payslip deducts it
+             * @example 2026-10
+             */
+            month: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            /** @example 2026-10-15 */
+            paidOn: string;
+            note?: string | null;
+        };
+        PayrollReasonRequest: {
+            reason: string;
+        };
+        PayrollScoringRun: {
+            runId: number;
+            /** @example 2026-10 */
+            month: string;
+            status: components["schemas"]["PayrollRunStatus"];
+            manualCount: number;
+            unscoredCount: number;
+        };
+        PayrollScoringItem: {
+            itemId: number;
+            name: string;
+            scorePercent: string | null;
+            note: string | null;
+            scoredByName: string | null;
+            /** Format: date-time */
+            scoredAt: string | null;
+        };
+        PayrollScoringLine: {
+            lineId: number;
+            userId: number;
+            fullName: string;
+            position: string | null;
+            divisionName: string | null;
+            items: components["schemas"]["PayrollScoringItem"][];
+        };
+        PayrollScoring: {
+            runId: number;
+            /** @example 2026-10 */
+            month: string;
+            status: components["schemas"]["PayrollRunStatus"];
+            lines: components["schemas"]["PayrollScoringLine"][];
+        };
+        PayrollScoreEntry: {
+            itemId: number;
+            /**
+             * @description null takes the score back
+             * @example 86.9
+             */
+            scorePercent: string | null;
+            note?: string | null;
+        };
+        PayrollScoresRequest: {
+            scores: components["schemas"]["PayrollScoreEntry"][];
+        };
+        PayrollRunTotals: {
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            baseSalary: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            kpiTotal: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            gross: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            employeeSi: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            employerSi: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            pit: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            advance: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            otherAdditions: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            deductions: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            net: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            totalCost: string;
+        };
+        PayrollRun: {
+            id: number;
+            /** @example 2026-10 */
+            month: string;
+            status: components["schemas"]["PayrollRunStatus"];
+            note: string | null;
+            /** @description The rates the lines were computed with */
+            settings: components["schemas"]["PayrollSettings"];
+            /** @description The last day of attendance read */
+            attendanceTo: string | null;
+            /** Format: date-time */
+            computedAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            /** Format: date-time */
+            approvedAt: string | null;
+            approvedByName: string | null;
+            /** Format: date-time */
+            reopenedAt: string | null;
+            reopenedByName: string | null;
+            reopenReason: string | null;
+            lineCount: number;
+            /** @description MANUAL items without a score; approval needs 0 */
+            unscoredCount: number;
+            totals: components["schemas"]["PayrollRunTotals"];
+        };
+        PayrollRunCreateRequest: {
+            /** @example 2026-10 */
+            month: string;
+            note?: string | null;
+        };
+        PayrollLine: {
+            id: number;
+            runId: number;
+            /** @example 2026-10 */
+            month: string;
+            runStatus: components["schemas"]["PayrollRunStatus"];
+            /** Format: date-time */
+            approvedAt: string | null;
+            userId: number;
+            fullName: string;
+            position: string | null;
+            divisionName: string | null;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            baseSalary: string;
+            paysSocialInsurance: boolean;
+            /** @description False: attendance is not tracked, the attendance item is full */
+            attendanceMeasured: boolean;
+            workdays: number | null;
+            attendedDays: number | null;
+            lateDays: number | null;
+            items: components["schemas"]["PayrollPayslipItem"][];
+            adjustments: components["schemas"]["PayrollPayslipAdjustment"][];
+            advances: components["schemas"]["PayrollPayslipAdvance"][];
+            unscoredCount: number;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            kpiTotal: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            taxableAdditions: string;
+            /**
+             * @description Salary + KPI + taxable additions
+             * @example 300000.00
+             */
+            gross: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            siBase: string;
+            /**
+             * @description НДШ, the employee’s share
+             * @example 300000.00
+             */
+            employeeSi: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            pitCredit: string;
+            /**
+             * @description ХХОАТ after the credit
+             * @example 300000.00
+             */
+            pit: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            advance: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            otherAdditions: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            deductions: string;
+            /**
+             * @description Paid out; negative when advances exceed the pay
+             * @example 300000.00
+             */
+            net: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            employerSi: string;
+            /**
+             * @description Gross + untaxed additions + the employer’s insurance
+             * @example 300000.00
+             */
+            totalCost: string;
+        };
+        PayrollRunDetail: {
+            id: number;
+            /** @example 2026-10 */
+            month: string;
+            status: components["schemas"]["PayrollRunStatus"];
+            note: string | null;
+            /** @description The rates the lines were computed with */
+            settings: components["schemas"]["PayrollSettings"];
+            /** @description The last day of attendance read */
+            attendanceTo: string | null;
+            /** Format: date-time */
+            computedAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            /** Format: date-time */
+            approvedAt: string | null;
+            approvedByName: string | null;
+            /** Format: date-time */
+            reopenedAt: string | null;
+            reopenedByName: string | null;
+            reopenReason: string | null;
+            lineCount: number;
+            /** @description MANUAL items without a score; approval needs 0 */
+            unscoredCount: number;
+            totals: components["schemas"]["PayrollRunTotals"];
+            lines: components["schemas"]["PayrollLine"][];
+        };
+        PayrollRecomputeRequest: {
+            /** @description Also bring the snapshot to the terms as they are now: salaries, items, who is on the run */
+            refreshTerms?: boolean;
+        };
+        PayrollAdjustmentRequest: {
+            kind: components["schemas"]["PayrollAdjustmentKind"];
+            name: string;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            /** @description ADDITION only: taxed with the pay (part of gross) */
+            taxable?: boolean;
         };
         Segment: {
             id: number;
@@ -41436,6 +42412,926 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HrDirectoryEntry"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_myPayslips: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollPayslip"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_myPayslip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollPayslip"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_myTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollMyTerms"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollSettings"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_templates: {
+        parameters: {
+            query?: {
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollKpiTemplate"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_createTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollKpiTemplateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollKpiTemplate"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollKpiTemplateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollKpiTemplate"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_archiveTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollArchiveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollKpiTemplate"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_applyTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollTemplateApplyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollTerms"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_listTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollTerms"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_oneTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollTerms"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_saveTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollTermsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollTerms"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_listAdvances: {
+        parameters: {
+            query?: {
+                month?: string;
+                userId?: number;
+                includeVoided?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollAdvance"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_createAdvance: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollAdvanceRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollAdvance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_voidAdvance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollReasonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollAdvance"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_scoringRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollScoringRun"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_scoring: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollScoring"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_score: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollScoresRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollScoring"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_listRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollRun"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_createRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollRunCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollRunDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_getRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollRunDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_runXlsx: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_getLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                lineId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollLine"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_recompute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollRecomputeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollRunDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollRunDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollReasonRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollRunDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_addAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+                lineId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollAdjustmentRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollLine"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_removeAdjustment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                lineId: number;
+                adjustmentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollLine"];
                 };
             };
             /** @description RFC 9457 problem details */

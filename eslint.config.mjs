@@ -117,6 +117,9 @@ const MODULE_DEPS = {
   // customers' parties) import fin-bridge.
   'fin-bridge': ['identity', 'partners'],
   hr: ['identity'],
+  // Payroll with KPI (ADR-0235): the staff list and the time report's days through hr's services
+  // (WorkforceService, HrReportsService), read only; nobody imports it.
+  payroll: ['identity', 'hr'],
   reporting: ['identity'], // plus every schema.ts (rule 4); nobody imports reporting
   ai: ['identity'], // other modules' data only through its views in schema ai (ADR-0045); nobody imports ai
   // ADR-0049: evaluates segments through the owners' index.ts; nobody imports segments (hooks reach it)

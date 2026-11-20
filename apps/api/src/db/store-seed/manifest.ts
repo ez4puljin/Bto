@@ -259,6 +259,16 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.hr_events': undecided(
     'the calendar carried from the old system (tools/hr-calendar-carry carries it again)',
   ),
+  // Payroll (ADR-0235): the rates, templates and each person's terms are master data; advances
+  // and runs are documents.
+  'public.payroll_settings': copy(),
+  'public.payroll_kpi_templates': copy(),
+  'public.payroll_terms': copy(),
+  'public.payroll_advances': empty(DOCUMENT),
+  'public.payroll_runs': empty(DOCUMENT),
+  'public.payroll_lines': empty(DOCUMENT),
+  'public.payroll_line_items': empty(DOCUMENT),
+  'public.payroll_line_adjustments': empty(DOCUMENT),
   'public.hr_attendance_events': empty(DOCUMENT),
   'public.hr_requests': empty(DOCUMENT),
   'public.hr_feedback': empty(HISTORY),

@@ -172,6 +172,11 @@
       "types": "./dist/hr/index.d.ts",
       "default": "./dist/hr/index.js"
     },
+    "./payroll": {
+      "@tugeel/source": "./src/payroll/index.ts",
+      "types": "./dist/payroll/index.d.ts",
+      "default": "./dist/payroll/index.js"
+    },
     "./mn": {
       "@tugeel/source": "./src/mn/index.ts",
       "types": "./dist/mn/index.d.ts",

@@ -21720,6 +21720,1452 @@
         ]
       }
     },
+    "/api/v1/payroll/me/payslips": {
+      "get": {
+        "operationId": "Payroll_myPayslips",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollPayslip"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/me/payslips/{month}": {
+      "get": {
+        "operationId": "Payroll_myPayslip",
+        "parameters": [
+          {
+            "name": "month",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollPayslip"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/me/terms": {
+      "get": {
+        "operationId": "Payroll_myTerms",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollMyTerms"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/settings": {
+      "get": {
+        "operationId": "Payroll_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      },
+      "put": {
+        "operationId": "Payroll_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/templates": {
+      "get": {
+        "operationId": "Payroll_templates",
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollKpiTemplate"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      },
+      "post": {
+        "operationId": "Payroll_createTemplate",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollKpiTemplateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollKpiTemplate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/templates/{id}": {
+      "put": {
+        "operationId": "Payroll_updateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollKpiTemplateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollKpiTemplate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/templates/{id}/archived": {
+      "put": {
+        "operationId": "Payroll_archiveTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollArchiveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollKpiTemplate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/templates/{id}/apply": {
+      "post": {
+        "operationId": "Payroll_applyTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollTemplateApplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollTerms"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/terms": {
+      "get": {
+        "operationId": "Payroll_listTerms",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollTerms"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/terms/{userId}": {
+      "get": {
+        "operationId": "Payroll_oneTerms",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollTerms"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      },
+      "put": {
+        "operationId": "Payroll_saveTerms",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollTermsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollTerms"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/advances": {
+      "get": {
+        "operationId": "Payroll_listAdvances",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "includeVoided",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollAdvance"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      },
+      "post": {
+        "operationId": "Payroll_createAdvance",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollAdvanceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollAdvance"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/advances/{id}/void": {
+      "post": {
+        "operationId": "Payroll_voidAdvance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollAdvance"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/scoring/runs": {
+      "get": {
+        "operationId": "Payroll_scoringRuns",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollScoringRun"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/scoring/runs/{id}": {
+      "get": {
+        "operationId": "Payroll_scoring",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollScoring"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/scoring/runs/{id}/scores": {
+      "put": {
+        "operationId": "Payroll_score",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollScoresRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollScoring"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs": {
+      "get": {
+        "operationId": "Payroll_listRuns",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollRun"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      },
+      "post": {
+        "operationId": "Payroll_createRun",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollRunCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollRunDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}": {
+      "get": {
+        "operationId": "Payroll_getRun",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollRunDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}/export.xlsx": {
+      "get": {
+        "operationId": "Payroll_runXlsx",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}/lines/{lineId}": {
+      "get": {
+        "operationId": "Payroll_getLine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollLine"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}/recompute": {
+      "post": {
+        "operationId": "Payroll_recompute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollRecomputeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollRunDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}/approve": {
+      "post": {
+        "operationId": "Payroll_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollRunDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}/reopen": {
+      "post": {
+        "operationId": "Payroll_reopen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollRunDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}/lines/{lineId}/adjustments": {
+      "post": {
+        "operationId": "Payroll_addAdjustment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollAdjustmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollLine"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/runs/{id}/lines/{lineId}/adjustments/{adjustmentId}": {
+      "delete": {
+        "operationId": "Payroll_removeAdjustment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lineId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "adjustmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayrollLine"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
     "/api/v1/segments": {
       "get": {
         "operationId": "Segments_list",
@@ -51748,6 +53194,9 @@
           "customer.home.manage",
           "hr.attendance.view",
           "hr.attendance.manage",
+          "hr.payroll.view",
+          "hr.payroll.manage",
+          "hr.payroll.score",
           "reports.view",
           "reports.margins.view",
           "expiry.items.manage",
@@ -71923,6 +73372,1521 @@
           "phone",
           "email",
           "photoUrl"
+        ]
+      },
+      "PayrollRunStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "APPROVED"
+        ]
+      },
+      "KpiSource": {
+        "type": "string",
+        "enum": [
+          "ATTENDANCE",
+          "MANUAL"
+        ]
+      },
+      "PayrollPayslipItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/KpiSource"
+              }
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "scorePercent": {
+            "type": "string",
+            "nullable": true,
+            "description": "null: not scored yet"
+          },
+          "basePercent": {
+            "type": "string",
+            "nullable": true,
+            "description": "ATTENDANCE: attended ÷ workdays as a percent"
+          },
+          "penaltyPercent": {
+            "type": "string",
+            "nullable": true,
+            "description": "ATTENDANCE: taken off for late days"
+          },
+          "earned": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "scoredByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "scoredAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "source",
+          "amount",
+          "scorePercent",
+          "basePercent",
+          "penaltyPercent",
+          "earned",
+          "note",
+          "scoredByName",
+          "scoredAt"
+        ]
+      },
+      "PayrollAdjustmentKind": {
+        "type": "string",
+        "enum": [
+          "ADDITION",
+          "DEDUCTION"
+        ]
+      },
+      "PayrollPayslipAdjustment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollAdjustmentKind"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "taxable": {
+            "type": "boolean",
+            "description": "An addition that is part of gross"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "amount",
+          "taxable",
+          "createdAt"
+        ]
+      },
+      "PayrollPayslipAdvance": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paidOn": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "paidOn",
+          "note"
+        ]
+      },
+      "PayrollPayslip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "runId": {
+            "type": "number"
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "runStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollRunStatus"
+              }
+            ]
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string",
+            "nullable": true
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "baseSalary": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paysSocialInsurance": {
+            "type": "boolean"
+          },
+          "attendanceMeasured": {
+            "type": "boolean",
+            "description": "False: attendance is not tracked, the attendance item is full"
+          },
+          "workdays": {
+            "type": "number",
+            "nullable": true
+          },
+          "attendedDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "lateDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollPayslipItem"
+            }
+          },
+          "adjustments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollPayslipAdjustment"
+            }
+          },
+          "advances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollPayslipAdvance"
+            }
+          },
+          "unscoredCount": {
+            "type": "number"
+          },
+          "kpiTotal": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "taxableAdditions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "gross": {
+            "type": "string",
+            "description": "Salary + KPI + taxable additions",
+            "example": "300000.00"
+          },
+          "siBase": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "employeeSi": {
+            "type": "string",
+            "description": "НДШ, the employee’s share",
+            "example": "300000.00"
+          },
+          "pitCredit": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "pit": {
+            "type": "string",
+            "description": "ХХОАТ after the credit",
+            "example": "300000.00"
+          },
+          "advance": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "otherAdditions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "deductions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "net": {
+            "type": "string",
+            "description": "Paid out; negative when advances exceed the pay",
+            "example": "300000.00"
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "month",
+          "runStatus",
+          "approvedAt",
+          "userId",
+          "fullName",
+          "position",
+          "divisionName",
+          "baseSalary",
+          "paysSocialInsurance",
+          "attendanceMeasured",
+          "workdays",
+          "attendedDays",
+          "lateDays",
+          "items",
+          "adjustments",
+          "advances",
+          "unscoredCount",
+          "kpiTotal",
+          "taxableAdditions",
+          "gross",
+          "siBase",
+          "employeeSi",
+          "pitCredit",
+          "pit",
+          "advance",
+          "otherAdditions",
+          "deductions",
+          "net"
+        ]
+      },
+      "PayrollKpiItem": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/KpiSource"
+              }
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "sort": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "source",
+          "amount",
+          "sort"
+        ]
+      },
+      "PayrollMyTerms": {
+        "type": "object",
+        "properties": {
+          "hasTerms": {
+            "type": "boolean",
+            "description": "False: no pay terms are set for the caller"
+          },
+          "baseSalary": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paysSocialInsurance": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollKpiItem"
+            }
+          },
+          "kpiTotal": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          }
+        },
+        "required": [
+          "hasTerms",
+          "baseSalary",
+          "paysSocialInsurance",
+          "items",
+          "kpiTotal"
+        ]
+      },
+      "PayrollTaxCreditBracket": {
+        "type": "object",
+        "properties": {
+          "upTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Monthly taxable income up to this amount (inclusive); null = everything above"
+          },
+          "credit": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          }
+        },
+        "required": [
+          "upTo",
+          "credit"
+        ]
+      },
+      "PayrollSettings": {
+        "type": "object",
+        "properties": {
+          "latePenaltyPercent": {
+            "type": "string",
+            "description": "A percent 0–100 as text, at most two decimals",
+            "example": "86.9"
+          },
+          "employeeSiPercent": {
+            "type": "string",
+            "description": "A percent 0–100 as text, at most two decimals",
+            "example": "86.9"
+          },
+          "employerSiPercent": {
+            "type": "string",
+            "description": "A percent 0–100 as text, at most two decimals",
+            "example": "86.9"
+          },
+          "minimumWage": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "siCapMultiplier": {
+            "type": "string",
+            "description": "The insurance base is capped at this many minimum wages"
+          },
+          "pitPercent": {
+            "type": "string",
+            "description": "A percent 0–100 as text, at most two decimals",
+            "example": "86.9"
+          },
+          "pitCredits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollTaxCreditBracket"
+            }
+          }
+        },
+        "required": [
+          "latePenaltyPercent",
+          "employeeSiPercent",
+          "employerSiPercent",
+          "minimumWage",
+          "siCapMultiplier",
+          "pitPercent",
+          "pitCredits"
+        ]
+      },
+      "PayrollKpiTemplate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollKpiItem"
+            }
+          },
+          "total": {
+            "type": "string",
+            "description": "The sum of the items: what a full score pays",
+            "example": "300000.00"
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "items",
+          "total",
+          "archivedAt",
+          "updatedAt"
+        ]
+      },
+      "PayrollKpiItemRequest": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 64,
+            "description": "Send the key of an existing item back so its score survives; omit for a new item"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/KpiSource"
+              }
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "sort": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 9999
+          }
+        },
+        "required": [
+          "name",
+          "source",
+          "amount"
+        ]
+      },
+      "PayrollKpiTemplateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollKpiItemRequest"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "items"
+        ]
+      },
+      "PayrollArchiveRequest": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archived"
+        ]
+      },
+      "PayrollTemplateApplyRequest": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "userIds"
+        ]
+      },
+      "PayrollTerms": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string",
+            "nullable": true
+          },
+          "divisionId": {
+            "type": "number",
+            "nullable": true
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "left": {
+            "type": "boolean",
+            "description": "The employee has left (a closed account or a leaving date)"
+          },
+          "hasTerms": {
+            "type": "boolean",
+            "description": "False: HR has not set terms yet (zero salary, no items)"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Only active terms put the person on a payroll run"
+          },
+          "baseSalary": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paysSocialInsurance": {
+            "type": "boolean"
+          },
+          "templateId": {
+            "type": "number",
+            "nullable": true
+          },
+          "templateName": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollKpiItem"
+            }
+          },
+          "kpiTotal": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "userId",
+          "fullName",
+          "position",
+          "divisionId",
+          "divisionName",
+          "left",
+          "hasTerms",
+          "active",
+          "baseSalary",
+          "paysSocialInsurance",
+          "templateId",
+          "templateName",
+          "items",
+          "kpiTotal",
+          "updatedAt"
+        ]
+      },
+      "PayrollTermsRequest": {
+        "type": "object",
+        "properties": {
+          "baseSalary": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paysSocialInsurance": {
+            "type": "boolean"
+          },
+          "templateId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "The template the sheet came from"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollKpiItemRequest"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "baseSalary",
+          "paysSocialInsurance",
+          "items",
+          "active"
+        ]
+      },
+      "PayrollAdvance": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paidOn": {
+            "type": "string",
+            "example": "2026-10-15"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "voidedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "fullName",
+          "month",
+          "amount",
+          "paidOn",
+          "note",
+          "createdByName",
+          "createdAt",
+          "voidedAt",
+          "voidedByName",
+          "voidReason"
+        ]
+      },
+      "PayrollAdvanceRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10",
+            "description": "The month whose payslip deducts it"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paidOn": {
+            "type": "string",
+            "example": "2026-10-15"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "userId",
+          "month",
+          "amount",
+          "paidOn"
+        ]
+      },
+      "PayrollReasonRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "PayrollScoringRun": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "number"
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollRunStatus"
+              }
+            ]
+          },
+          "manualCount": {
+            "type": "number"
+          },
+          "unscoredCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "runId",
+          "month",
+          "status",
+          "manualCount",
+          "unscoredCount"
+        ]
+      },
+      "PayrollScoringItem": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scorePercent": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "scoredByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "scoredAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "itemId",
+          "name",
+          "scorePercent",
+          "note",
+          "scoredByName",
+          "scoredAt"
+        ]
+      },
+      "PayrollScoringLine": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string",
+            "nullable": true
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollScoringItem"
+            }
+          }
+        },
+        "required": [
+          "lineId",
+          "userId",
+          "fullName",
+          "position",
+          "divisionName",
+          "items"
+        ]
+      },
+      "PayrollScoring": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "number"
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollRunStatus"
+              }
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollScoringLine"
+            }
+          }
+        },
+        "required": [
+          "runId",
+          "month",
+          "status",
+          "lines"
+        ]
+      },
+      "PayrollScoreEntry": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "number",
+            "minimum": 1
+          },
+          "scorePercent": {
+            "type": "string",
+            "nullable": true,
+            "description": "null takes the score back",
+            "example": "86.9"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "itemId",
+          "scorePercent"
+        ]
+      },
+      "PayrollScoresRequest": {
+        "type": "object",
+        "properties": {
+          "scores": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollScoreEntry"
+            }
+          }
+        },
+        "required": [
+          "scores"
+        ]
+      },
+      "PayrollRunTotals": {
+        "type": "object",
+        "properties": {
+          "baseSalary": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "kpiTotal": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "gross": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "employeeSi": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "employerSi": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "pit": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "advance": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "otherAdditions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "deductions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "net": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "totalCost": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          }
+        },
+        "required": [
+          "baseSalary",
+          "kpiTotal",
+          "gross",
+          "employeeSi",
+          "employerSi",
+          "pit",
+          "advance",
+          "otherAdditions",
+          "deductions",
+          "net",
+          "totalCost"
+        ]
+      },
+      "PayrollRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollRunStatus"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "settings": {
+            "description": "The rates the lines were computed with",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollSettings"
+              }
+            ]
+          },
+          "attendanceTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "The last day of attendance read"
+          },
+          "computedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reopenedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reopenedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reopenReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "unscoredCount": {
+            "type": "number",
+            "description": "MANUAL items without a score; approval needs 0"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PayrollRunTotals"
+          }
+        },
+        "required": [
+          "id",
+          "month",
+          "status",
+          "note",
+          "settings",
+          "attendanceTo",
+          "computedAt",
+          "createdAt",
+          "createdByName",
+          "approvedAt",
+          "approvedByName",
+          "reopenedAt",
+          "reopenedByName",
+          "reopenReason",
+          "lineCount",
+          "unscoredCount",
+          "totals"
+        ]
+      },
+      "PayrollRunCreateRequest": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "month"
+        ]
+      },
+      "PayrollLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "runId": {
+            "type": "number"
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "runStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollRunStatus"
+              }
+            ]
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "position": {
+            "type": "string",
+            "nullable": true
+          },
+          "divisionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "baseSalary": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "paysSocialInsurance": {
+            "type": "boolean"
+          },
+          "attendanceMeasured": {
+            "type": "boolean",
+            "description": "False: attendance is not tracked, the attendance item is full"
+          },
+          "workdays": {
+            "type": "number",
+            "nullable": true
+          },
+          "attendedDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "lateDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollPayslipItem"
+            }
+          },
+          "adjustments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollPayslipAdjustment"
+            }
+          },
+          "advances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollPayslipAdvance"
+            }
+          },
+          "unscoredCount": {
+            "type": "number"
+          },
+          "kpiTotal": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "taxableAdditions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "gross": {
+            "type": "string",
+            "description": "Salary + KPI + taxable additions",
+            "example": "300000.00"
+          },
+          "siBase": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "employeeSi": {
+            "type": "string",
+            "description": "НДШ, the employee’s share",
+            "example": "300000.00"
+          },
+          "pitCredit": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "pit": {
+            "type": "string",
+            "description": "ХХОАТ after the credit",
+            "example": "300000.00"
+          },
+          "advance": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "otherAdditions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "deductions": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "net": {
+            "type": "string",
+            "description": "Paid out; negative when advances exceed the pay",
+            "example": "300000.00"
+          },
+          "employerSi": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "totalCost": {
+            "type": "string",
+            "description": "Gross + untaxed additions + the employer’s insurance",
+            "example": "300000.00"
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "month",
+          "runStatus",
+          "approvedAt",
+          "userId",
+          "fullName",
+          "position",
+          "divisionName",
+          "baseSalary",
+          "paysSocialInsurance",
+          "attendanceMeasured",
+          "workdays",
+          "attendedDays",
+          "lateDays",
+          "items",
+          "adjustments",
+          "advances",
+          "unscoredCount",
+          "kpiTotal",
+          "taxableAdditions",
+          "gross",
+          "siBase",
+          "employeeSi",
+          "pitCredit",
+          "pit",
+          "advance",
+          "otherAdditions",
+          "deductions",
+          "net",
+          "employerSi",
+          "totalCost"
+        ]
+      },
+      "PayrollRunDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "month": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollRunStatus"
+              }
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "settings": {
+            "description": "The rates the lines were computed with",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollSettings"
+              }
+            ]
+          },
+          "attendanceTo": {
+            "type": "string",
+            "nullable": true,
+            "description": "The last day of attendance read"
+          },
+          "computedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "approvedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reopenedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reopenedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reopenReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "unscoredCount": {
+            "type": "number",
+            "description": "MANUAL items without a score; approval needs 0"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PayrollRunTotals"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "month",
+          "status",
+          "note",
+          "settings",
+          "attendanceTo",
+          "computedAt",
+          "createdAt",
+          "createdByName",
+          "approvedAt",
+          "approvedByName",
+          "reopenedAt",
+          "reopenedByName",
+          "reopenReason",
+          "lineCount",
+          "unscoredCount",
+          "totals",
+          "lines"
+        ]
+      },
+      "PayrollRecomputeRequest": {
+        "type": "object",
+        "properties": {
+          "refreshTerms": {
+            "type": "boolean",
+            "description": "Also bring the snapshot to the terms as they are now: salaries, items, who is on the run"
+          }
+        }
+      },
+      "PayrollAdjustmentRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayrollAdjustmentKind"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "taxable": {
+            "type": "boolean",
+            "description": "ADDITION only: taxed with the pay (part of gross)"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "amount"
         ]
       },
       "Segment": {

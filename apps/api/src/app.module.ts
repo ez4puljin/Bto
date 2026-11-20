@@ -30,6 +30,7 @@ import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
 import { NotificationsHttpModule } from './modules/notifications';
 import { PartnersHttpModule } from './modules/partners';
+import { PayrollHttpModule } from './modules/payroll';
 import { PhoneAgentHttpModule } from './modules/phone-agent';
 import { PosHttpModule } from './modules/pos';
 import { PricingHttpModule } from './modules/pricing';
@@ -66,6 +67,7 @@ import { StockProblemsHttpModule } from './modules/stock-problems';
     PricingHttpModule,
     AiHttpModule,
     HrHttpModule,
+    PayrollHttpModule,
     SegmentsHttpModule,
     SalesHttpModule,
     FinanceHttpModule,

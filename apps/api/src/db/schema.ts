@@ -221,6 +221,16 @@ export {
   hrThanks,
 } from '../modules/hr/schema';
 export {
+  payrollAdvances,
+  payrollKpiTemplates,
+  payrollLineAdjustments,
+  payrollLineItems,
+  payrollLines,
+  payrollRuns,
+  payrollSettings,
+  payrollTerms,
+} from '../modules/payroll/schema';
+export {
   finAccountGroups,
   finAccounts,
   finAllocations,

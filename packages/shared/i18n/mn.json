@@ -444,6 +444,11 @@
       "attendance": {
         "view": "Ирцийн самбар, бүртгэл харах",
         "manage": "Ирцийн тохиргоо, засвар хийх"
+      },
+      "payroll": {
+        "view": "Цалингийн бодолт, хуудас харах",
+        "manage": "Цалин бодох, батлах, тохируулах",
+        "score": "Ажлын үнэлгээний KPI оноо өгөх"
       }
     },
     "catalog": {
@@ -15403,6 +15408,33 @@
       "callback": "Эргэж залгах",
       "noMessages": "Яриа хадгалагдаагүй",
       "noHit": "олдсонгүй"
+    }
+  },
+  "payroll": {
+    "title": "Цалин",
+    "excel": {
+      "sheet": "Цалин {{month}}",
+      "employee": "Ажилтан",
+      "division": "Алба хэлтэс",
+      "position": "Албан тушаал",
+      "baseSalary": "Үндсэн цалин",
+      "workdays": "Ажлын өдөр",
+      "attendedDays": "Ирсэн өдөр",
+      "lateDays": "Хоцорсон өдөр",
+      "attendancePercent": "Ирцийн оноо %",
+      "attendanceKpi": "Ирцийн KPI",
+      "workKpi": "Ажлын үнэлгээний KPI",
+      "taxableAdditions": "Нэмэгдэл (татвартай)",
+      "gross": "Нийт цалин",
+      "paysSocialInsurance": "НДШ төлдөг",
+      "employeeSi": "НДШ (ажилтан)",
+      "pit": "ХХОАТ",
+      "advance": "Урьдчилгаа",
+      "otherAdditions": "Бусад нэмэгдэл",
+      "deductions": "Бусад суутгал",
+      "net": "Гарт олгох",
+      "employerSi": "НДШ (ажил олгогч)",
+      "totalCost": "Нийт зардал"
     }
   }
 }
