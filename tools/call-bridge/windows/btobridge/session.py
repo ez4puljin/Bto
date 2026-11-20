@@ -1,9 +1,13 @@
 """One call, from the ring to the stored transcript (ADR-0232 #3, #7, #12).
 
-1. `POST /calls` decides. `answer: false` (working hours, the line off, no stage for PHONE_AI
-   orders, no agent): the phone rings for staff and nothing else happens.
-2. The signed URL opens the ElevenLabs conversation; the first message carries the call's dynamic
-   variables (and the line's own greeting, when it has one).
+1. `POST /calls` decides, within `start_timeout_s` with a phone (the phone rings for staff by
+   itself 3 s after the ring). `answer: false` (working hours, the line off, no stage for PHONE_AI
+   orders, no agent), no answer in time, or the audio devices missing: the phone is told `ignore`
+   and rings for staff.
+2. The phone is told to answer and, at the same time, the signed URL opens the ElevenLabs
+   conversation; the first message carries the call's dynamic variables (and the line's own
+   greeting, when it has one). The agent's audio is held until the phone says the call is
+   connected (and `audio_ready_s` more), so the greeting is not played into a line still opening.
 3. The caller's microphone goes out as 16-bit mono PCM chunks; the agent's audio is played,
    dropped from the interrupted point on when the caller talks over it.
 4. Every transcript turn gets the next sequence number in the order the WebSocket delivers it and
@@ -32,7 +36,7 @@ import numpy as np
 from . import protocol
 from .audio import AudioPort
 from .bto import BtoError, BtoUnreachable, StationApi, new_key
-from .dsp import VoiceDetector
+from .dsp import EchoGate, VoiceDetector
 from .metrics import CallMetrics, append_csv
 from .phone import PhoneLink, Ring
 
@@ -79,6 +83,12 @@ class Limits:
     broken_after_s: float = 20.0
     flush_every_s: float = 1.0
     tick_s: float = 0.1
+    #: POST /calls must answer within this (None: the HTTP client's own timeout, the console).
+    start_timeout_s: float | None = None
+    #: After `answer`, the phone must say the call is connected within this.
+    answer_timeout_s: float = 6.0
+    #: After it is connected, the agent's audio waits this long more (Phone Link's audio opening).
+    audio_ready_s: float = 0.0
 
 
 @dataclass
@@ -135,6 +145,7 @@ class CallSession:
         metrics_path: Path | None = None,
         say: Callable[[str], None] = print,
         clock: Callable[[], float] = time.monotonic,
+        echo_gate: EchoGate | None = None,
     ) -> None:
         self.bto = bto
         self.connect = connect
@@ -168,32 +179,45 @@ class CallSession:
         self._ending_at: float | None = None
         self._broken_at: float | None = None
         self._flush_failures = 0
+        self.echo_gate = echo_gate
+        #: The agent's audio that came before the phone's line was ready.
+        self._held: list[bytes] | None = []
+        self._late_tasks: set[asyncio.Task[Any]] = set()
 
     # -- the call -----------------------------------------------------------------------------
 
     async def run(self) -> CallResult:
         ring = await self.phone.next_ring()
-        started = await self._start(ring)
+        self.metrics.rang(ring.received_at)
+        started, audio_problem = await asyncio.gather(self._start(ring), self._prepare_audio())
         if isinstance(started, CallResult):
             await self.phone.decline(ring)
             return started
         self.call_id = int(started["callId"])
         signed_url = started.get("signedUrl")
-        if not signed_url:
-            # A replayed answer carries no URL: do not pick up, and close the call as failed.
-            self.say(f"Дуудлага {self.call_id}: Bto ярианы хаяг өгсөнгүй, хариулахгүй.")
+        if not signed_url or audio_problem:
+            # A replayed answer carries no URL; a missing device would be a silent call. Do not
+            # pick up, and close the call as failed.
+            if audio_problem:
+                self.say(f"Дуудлага {self.call_id}: дууны төхөөрөмж олдсонгүй, хариулахгүй.")
+            else:
+                self.say(f"Дуудлага {self.call_id}: Bto ярианы хаяг өгсөнгүй, хариулахгүй.")
             await self.phone.decline(ring)
             await self._post_end("ERROR", duration_s=0)
-            return CallResult(answered=False, call_id=self.call_id, reason="NO_SIGNED_URL")
+            reason = "AUDIO_DEVICE" if audio_problem else "NO_SIGNED_URL"
+            return CallResult(answered=False, call_id=self.call_id, reason=reason)
 
         self.metrics.answered()
         self._t0 = self._last_user_at = self.clock()
+        # The conversation opens while the phone picks up: the greeting is ready sooner.
+        connecting = asyncio.create_task(
+            asyncio.wait_for(self.connect(str(signed_url)), self.limits.connect_timeout_s)
+        )
         await self.phone.answer(ring)
+        self.metrics.answer_sent()
         self.say(f"Дуудлага {self.call_id}: хариуллаа, AI-тай холбогдож байна...")
         try:
-            self._ws = await asyncio.wait_for(
-                self.connect(str(signed_url)), self.limits.connect_timeout_s
-            )
+            self._ws = await connecting
         except Exception as error:  # noqa: BLE001 - a timeout, DNS, TLS, a refused handshake
             log.warning("call %s: agent not reached (%s)", self.call_id, type(error).__name__)
             self.say("ElevenLabs хариу өгсөнгүй (интернэтээ шалгана уу). Дуудлагыг амжилтгүй гэж хаалаа.")
@@ -210,13 +234,57 @@ class CallSession:
             asyncio.create_task(self._tool_worker(), name="tools"),
             asyncio.create_task(self._flusher(), name="flusher"),
             asyncio.create_task(self._watchdog(), name="watchdog"),
+            asyncio.create_task(self._line_ready(), name="line"),
         ]
         await self._done.wait()
         return await self._close(ring, tasks)
 
-    async def _start(self, ring: Ring) -> dict[str, Any] | CallResult:
+    async def _prepare_audio(self) -> bool:
+        """Find the devices before the call is answered; True when they are missing."""
+        prepare = getattr(self.audio, "prepare", None)
+        if prepare is None:
+            return False
         try:
-            started = await self.bto.start_call(ring.call_ref, ring.caller)
+            await asyncio.to_thread(prepare)
+        except Exception as error:  # noqa: BLE001 - LookupError, a driver error
+            log.warning("audio devices not ready (%s: %s)", type(error).__name__, str(error)[:120])
+            return True
+        return False
+
+    async def _line_ready(self) -> None:
+        """Release the held agent audio once the phone's line carries sound."""
+        try:
+            await asyncio.wait_for(self.phone.connected.wait(), self.limits.answer_timeout_s)
+        except asyncio.TimeoutError:
+            log.warning("call %s: the phone never said the call is connected", self.call_id)
+            self.finish("ERROR")
+            return
+        if self.metrics.connected_at is None:
+            self.metrics.connected()
+        if self.limits.audio_ready_s > 0:
+            await asyncio.sleep(self.limits.audio_ready_s)
+        self._release()
+
+    def _release(self) -> None:
+        if self._held is None:
+            return
+        held, self._held = self._held, None
+        for pcm in held:
+            self.metrics.agent_audio()
+            self.audio.play(pcm, self._out_rate)
+
+    async def _start(self, ring: Ring) -> dict[str, Any] | CallResult:
+        timeout = self.limits.start_timeout_s
+        asking = asyncio.ensure_future(
+            self.bto.start_call(ring.call_ref, ring.caller, timeout=timeout)
+        )
+        try:
+            started = await asyncio.wait_for(asyncio.shield(asking), timeout)
+        except asyncio.TimeoutError:
+            log.warning("start: Bto did not decide within %.1fs", timeout or 0)
+            self.say("Bto цагтаа хариулсангүй: утас ажилтанд дуугарна.")
+            asking.add_done_callback(self._late_start)
+            return CallResult(answered=False, reason="BTO_TIMEOUT")
         except BtoUnreachable as error:
             log.warning("start: Bto unreachable (%s)", error.why)
             self.say("Bto хариу өгөхгүй байна: сүлжээ, серверийн хаягаа шалгана уу.")
@@ -235,9 +303,27 @@ class CallSession:
             return CallResult(answered=False, call_id=started.get("callId"), reason=reason)
         return started
 
+    def _late_start(self, asking: asyncio.Future[dict[str, Any]]) -> None:
+        """Bto answered after the phone was told to ring for staff: a call it opened is closed."""
+        if asking.cancelled() or asking.exception() is not None:
+            return
+        late = asking.result()
+        if late.get("answer") and late.get("callId") is not None:
+            task = asyncio.ensure_future(
+                self.bto.end(int(late["callId"]), {"reason": "ERROR", "durationS": 0}, new_key())
+            )
+            self._late_tasks.add(task)
+            task.add_done_callback(self._late_done)
+
+    def _late_done(self, task: asyncio.Task[Any]) -> None:
+        self._late_tasks.discard(task)
+        error = None if task.cancelled() else task.exception()
+        if error is not None:
+            log.warning("a late call was not closed (%s)", _code(error))
+
     async def _close(self, ring: Ring, tasks: list[asyncio.Task[None]]) -> CallResult:
         reason = self.end_reason or "ERROR"
-        if reason == "CALLER_HANGUP":
+        if reason == "CALLER_HANGUP" or self.phone.hung_up.is_set():
             self.audio.flush()
         else:
             await self._drain(3.0)
@@ -341,8 +427,16 @@ class CallSession:
             event_id, pcm = protocol.audio(message)
             if event_id <= self._interrupted_id or not pcm:
                 return
-            self.metrics.agent_audio()
             self._last_agent_audio_at = now
+            if self._held is not None:
+                if self.phone.connected.is_set() and self.limits.audio_ready_s <= 0:
+                    if self.metrics.connected_at is None:
+                        self.metrics.connected()
+                    self._release()
+                else:
+                    self._held.append(pcm)
+                    return
+            self.metrics.agent_audio()
             self.audio.play(pcm, self._out_rate)
         elif kind == "user_transcript":
             text = protocol.user_transcript(message)
@@ -361,6 +455,8 @@ class CallSession:
             await self._tools.put(_ToolJob(call=call, seq=seq, at_ms=self._at_ms()))
         elif kind == "interruption":
             self._interrupted_id = max(self._interrupted_id, protocol.interruption(message))
+            if self._held:
+                self._held.clear()
             self.audio.flush()
         elif kind == "ping":
             await self._send(protocol.pong(protocol.ping(message)))
@@ -372,7 +468,13 @@ class CallSession:
             self._vad = VoiceDetector(rate=self._mic_rate)
             if not self._audio_started:
                 self._audio_started = True
-                await self.audio.start(self._on_mic, self._mic_rate)
+                try:
+                    await self.audio.start(self._on_mic, self._mic_rate)
+                except Exception as error:  # noqa: BLE001 - a device gone or busy
+                    log.warning(
+                        "call %s: audio did not open (%s)", self.call_id, type(error).__name__
+                    )
+                    self.finish("ERROR")
         elif kind == "client_error":
             log.warning("call %s: provider error %s", self.call_id, protocol.client_error(message))
         elif kind in ("vad_score", "agent_response_correction", "agent_response_complete"):
@@ -406,6 +508,10 @@ class CallSession:
     def _on_mic(self, block: np.ndarray) -> None:
         if self._done.is_set():
             return
+        if self.echo_gate is not None:
+            now = self.clock()
+            self.echo_gate.agent_playing(self.audio.pending_ms(), now)
+            block = self.echo_gate.apply(block, now)
         if self._vad.feed(block) > 0:
             self.metrics.user_voice()
             self._last_user_at = self.clock()
@@ -520,7 +626,7 @@ class CallSession:
             await asyncio.sleep(self.limits.tick_s)
             now = self.clock()
             if hung_up.is_set():
-                self.finish("CALLER_HANGUP")
+                self.finish(getattr(self.phone, "end_reason", "CALLER_HANGUP"))
             elif self._ending_at is not None:
                 quiet_since = max(self._ending_at, self._last_agent_audio_at or 0.0)
                 drained = self.audio.pending_ms() <= 0

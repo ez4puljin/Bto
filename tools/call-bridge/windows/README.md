@@ -1,11 +1,13 @@
-# The Windows call bridge (stage 2)
+# The Windows call bridge (stages 2 and 3)
 
 The PC side of the phone AI order line (ADR-0232). For one call it asks Bto whether to answer,
 holds the ElevenLabs conversation over the signed URL Bto hands it, carries the audio between the
 conversation and the PC's sound devices, forwards each of the agent's client tools to Bto over the
-LAN and stores the transcript in Bto. Stage 2 needs no phone: a test call starts at the console
-with the caller's number given by hand, and the owner talks through a headset. The owner's steps,
-in Mongolian: [README.mn.md](README.mn.md).
+LAN and stores the transcript in Bto. Stage 2 (`mode: local`) needs no phone: a test call starts at the console
+with the caller's number given by hand, and the owner talks through a headset. Stage 3
+(`mode: bluetooth`, below) takes real calls from the line's Android app «Bto дуудлага» over the
+LAN and carries their audio through Windows Phone Link. The owner's steps, in Mongolian:
+[README.mn.md](README.mn.md) (E: the bluetooth mode).
 
 ## Install (Windows 10/11, 64-bit, no administrator needed)
 
@@ -20,9 +22,11 @@ An ordinary PowerShell window, the line Bto's station page shows:
 | Path | What |
 |---|---|
 | `python\` | Python 3.12.10, the official embeddable zip from python.org (SHA-256 pinned in the script). Chosen over the python.org installer because it needs no administrator, registers nothing in Windows and cannot collide with another Python on the PC. `python312._pth` turns on `import site` and adds `..\app` |
-| `python\Lib\site-packages\` | `requirements.txt`, installed by pip (its zipapp, SHA-256 pinned) with `--require-hashes --only-binary=:all:`: websockets 17.4, numpy 2.5.4, sounddevice 0.5.6 (with its own PortAudio DLL), soxr 1.1.0, cffi, pycparser |
+| `python\Lib\site-packages\` | `requirements.txt`, installed by pip (its zipapp, SHA-256 pinned) with `--require-hashes --only-binary=:all:`: websockets 17.4, numpy 2.5.4, sounddevice 0.5.6 (with its own PortAudio DLL), soxr 1.1.0, PyAudioWPatch 0.2.12.9 (PortAudio with WASAPI loopback, the bluetooth mode's capture), cffi, pycparser |
 | `app\btobridge\` | the bridge |
-| `config.json` | `server`, `key`, `mode` (`local`), `input_device`, `output_device` (an index or a part of the name, null = Windows' default), `chunk_ms` (100), `max_call_s` (600), `silence_s` (40), `grace_s` (15) |
+| `config.json` | `server`, `key`, `mode` (`local` / `bluetooth`; `cable` is refused), `input_device`, `output_device` (the console's test call: an index or a part of the name, null = Windows' default), `chunk_ms` (100), `max_call_s` (600), `silence_s` (40), `grace_s` (15); stage 3: `phone_port` (8766), `phone_token_hash` / `phone_ip` / `phone_device` (the paired phone; only the token's sha-256), `call_output_device` (null = the default output), `agent_output_device` (`CABLE Input`), `echo_gate` (false), `echo_gate_hangover_ms` (250), `decide_s` (2.0), `audio_ready_ms` (300), `cable_input_device` / `cable_output_device` (not used: the cable mode is not built) |
+| `pairing.json` | an open pairing code's sha-256, its expiry and tries (gone once used) |
+| `link.json` | what the background task sees, for the menu: the station, the phone's link, a call on |
 | `metrics.csv` | one row per call, numbers only (below) |
 | `bridge.log` | ids, milliseconds, counts and error codes only; rotated at 1 MB |
 
@@ -50,7 +54,12 @@ uv pip compile requirements.in --python-platform x86_64-pc-windows-msvc --python
 | `report --last 20` | response time median and p90, greeting, searches and no-hit searches over the last N calls |
 | `devices` | the WASAPI microphones and speakers with their numbers |
 | `check` | `GET /phone-agent/station`: the line, on or off, working hours now, the agent on the server |
-| `serve` | the background task (heartbeat every 60 s) |
+| `serve` | the background task: the station's heartbeat every 60 s; in the bluetooth mode also the phone's link and its calls |
+| `pair` | a 6-digit pairing code (10 min, 5 tries) and this PC's LAN address for the phone app; listens itself when the background task does not |
+| `status` | the station and the phone's link as the background task last saw them |
+| `doctor` | Bluetooth radio, Bluetooth service, Phone Link, a phone paired as a hands-free gateway, VB-Cable; plain Mongolian lines, exit 1 when something is missing |
+| `find-call-device [--no-wait]` | during a test call: every output's loopback level for 4 s; the clearly loudest (6 dB above the next, above −55 dBFS, never VB-Cable) is saved as `call_output_device` |
+| `calibrate` | during a test call: the echo leak of a 1 kHz tone and the caller's level (below) |
 
 ## One call (`btobridge/session.py`)
 
@@ -100,13 +109,85 @@ ERROR. `serve` never crash-loops: a failure waits a minute.
   tool_median_ms, latencies_ms` (the samples, `;`-separated). `report` takes the median and p90
   over every sample of the last N calls.
 
-## Seams for stage 3
+## Stage 3: the phone link (`btobridge/link.py`, protocol v1)
 
-- `audio.AudioPort`: `LocalAudio` now; `cable` (the USB sound card wired to the phone) and
-  `bluetooth` (Phone Link: WASAPI loopback of the call, the agent into a VB-Cable input) are modes
-  of `config.json` that raise «stage 3» until built.
-- `phone.PhoneLink`: `LocalPhone` now; `AndroidLanPhone` will hold the LAN WebSocket to the line's
-  Android app (`ringing {callRef, caller}` → `answer` / `decline` within 3 s, `hangup`, `ended`).
+JSON text frames over a plain WebSocket; the PC is the server on `phone_port` (8766), path
+`/phone` (any other path 404); the phone is the client.
+
+- **Pairing.** `bridge pair` (menu 6) writes a 6-digit code to `pairing.json` (sha-256, 10 min,
+  5 wrong tries end it) and prints the PC's LAN address. Phone → `{"type":"pair","code","device",
+  "app"}`; PC → `{"type":"paired","token"}` (43 url-safe chars from `secrets`); the token's sha-256,
+  the phone's address and its name go to config.json. A new pairing replaces the old phone.
+- **Hello.** `{"type":"hello","token"}` → `{"type":"welcome"}`, or `{"type":"error","code":
+  "BAD_TOKEN"}` and the socket closed. Once paired, any other address is refused at the handshake
+  (403), except while a code is open, when it may only `pair`. A second hello replaces the first
+  connection.
+- **Errors before closing:** `BAD_TOKEN`, `BAD_CODE`, `NO_PAIRING` (no code open, or used up),
+  `BAD_MESSAGE` (the first frame is neither).
+- **Phone → PC:** `ringing {callRef, number, at}`, `state {callRef, state answered|active|ended,
+  cause, at}`, `route {callRef, endpoint, available}`, `pong {id}`.
+- **PC → phone:** `answer {callRef, route BLUETOOTH|WIRED_HEADSET}`, `ignore {callRef}`,
+  `hangup {callRef}`, `ping {id}` every 5 s; no pong for 16 s closes the link (the phone reconnects).
+
+`serve.CallDesk` takes one call at a time: a ring during a call is told `ignore` at once (the same
+`callRef` told twice is one ring). Each ring reads config.json again.
+
+## Stage 3: one phone call (`session.py` with `phone.AndroidLanPhone`)
+
+1. On `ringing`: `POST /calls {callRef, callerPhone: number}` (`decide_s` = 2 s for the whole
+   request; the api's own signed-URL fetch is 1.5 s) and, at the same time, the audio devices are
+   found (`DeviceAudio.prepare`). `answer: false`, Bto unreachable or refusing, no answer within
+   `decide_s`, no signed URL, or a device missing → `ignore` (the phone rings for staff well within
+   its 3 s). A `POST /calls` that answers `answer: true` after the deadline gets `POST /end ERROR`.
+2. `answer {callRef, route: BLUETOOTH}` and the ElevenLabs WebSocket open at the same time; the
+   initiation is sent as soon as the socket is open, so the greeting is ready when the line is.
+3. The agent's audio is held until the phone says `state answered|active` and `audio_ready_ms`
+   more (Phone Link's Bluetooth audio needs a moment), then played. No `answered`/`active` within
+   6 s ends the call as ERROR with `hangup`.
+4. `state ended` (the caller hung up) ends the call as `CALLER_HANGUP`. The agent's `end_call`
+   (after its goodbye drained) and every other end send `hangup`. A lost link does not end a call
+   (the audio still flows through Bluetooth); the silence limit does, if the caller is gone.
+5. `route` with an endpoint other than the one asked is logged.
+
+## Stage 3: audio (`audio.py`)
+
+| Mode | Caller's voice (to ElevenLabs, 16 kHz mono) | Agent's voice (resampled to the device) |
+|---|---|---|
+| `local` | `input_device` (sounddevice) | `output_device` |
+| `bluetooth` | WASAPI loopback of `call_output_device` (PyAudioWPatch; null = the default output), plus zero samples while the loopback delivers nothing (`SilenceFiller`: loopback is silent when nothing plays, and ElevenLabs needs the silence to hear the end of a turn) | `agent_output_device` = «CABLE Input» (sounddevice); «CABLE Output» is Phone Link's microphone |
+| `cable` | not built (the owner bought no parts, 2026-11-20): `open_audio` refuses it; it would be `DeviceAudio(_InputCapture(cable_input_device), _Playback(cable_output_device))` | |
+
+`check_roles` refuses (the phone keeps ringing) an agent output that is the call device itself or
+not VB-Cable: the agent must never play where the loopback listens. A loopback device is found by
+the output's name (`<name> [Loopback]`), whole or in part. The Windows sound settings the owner
+sets (README.mn.md E3): Recording «CABLE Output» as the default and default communication device,
+«Listen to this device» off; Playback: the call device as the default communication device, never
+«CABLE Input».
+
+**Echo.** No echo cancellation (ADR-0232 #12). `calibrate` (menu 9), during a test call: 2.5 s of
+the line's level, a 1 kHz tone at −12 dBFS for 2 s into the agent's output, its level on the call's
+side by Goertzel from 0.4 s on (the echo leak, dB below the tone); not 6 dB above the line's level
+at 1 kHz → «none»; above −35 dB → «high», and the owner is offered `echo_gate: true`. Then 5 s of
+the owner talking into the calling phone: the share of voiced 20 ms frames (above −45 dBFS), the
+voiced level, the peak and the clipped samples → silent / quiet (below −35) / good / loud (above
+−8) / clipping (more than 10 clipped samples). The console shows words; the numbers go to
+`bridge.log` only. `echo_gate` sends the caller's side as zeros (same length) while the agent's
+audio is queued and `echo_gate_hangover_ms` after: half duplex, the caller cannot barge in.
+
+**Metrics** add `ring_answer_ms` (ring → `answer` sent; the phone's limit is 3000) and
+`answer_greeting_ms` (the phone's «connected» → the first agent audio played; the bar is 1500) to
+`metrics.csv` (an older file is rewritten with the new header, its rows kept) and to `report`.
+
+**Firewall.** `install.ps1 -Mode bluetooth` adds the inbound rule «Bto call bridge (phone link)»
+(TCP 8766, `-RemoteAddress LocalSubnet`, every profile) when its window is an administrator's;
+otherwise it prints that one command for an administrator's PowerShell. Nothing else needs one.
+`uninstall.ps1` removes the rule when it can.
+
+**`doctor`** (also run by the installer in the bluetooth mode): one PowerShell call reads
+`Get-PnpDevice -Class Bluetooth` (a radio is one on a bus: USB, PCI, ACPI, SD), the `bthserv`
+service, `BTHENUM` devices with the hands-free UUIDs 111E/111F (a phone paired for calls),
+`Get-AppxPackage Microsoft.YourPhone` (Phone Link); VB-Cable is both «CABLE Input» and
+«CABLE Output» in sounddevice's list.
 
 ## Tests (Linux, no sound hardware)
 
@@ -118,10 +199,21 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python websocke
 
 `tests/fakes.py` scripts the ElevenLabs conversation and records Bto's requests: the order of turns
 and tools, the flush before a tool, interruption, ping, the limits, the declines, the failures,
-the metrics, and that no word of a call reaches the log or the console.
+the metrics, and that no word of a call reaches the log or the console. `tests/test_phone_link.py`
+runs the link over a real local WebSocket with a fake phone: pairing, the code's tries and expiry,
+hello and `BAD_TOKEN`, another address refused, ping/pong, ringing → `POST /calls` → `answer`
+well inside the deadline, the greeting held until «connected», declines, a slow or unreachable Bto
+→ `ignore` in time (and the late call closed), a second ring ignored, the caller hanging up,
+`hangup` after `end_call`, no number or token in the log. `tests/test_stage3_parts.py`: device
+roles, the loopback match, the call device detection, resampling, the silence filler, the echo
+gate (also inside the session), calibrate's analysis, the Windows checks' words, metrics, config.
 
 ## Not verified here
 
-The sound devices on a real Windows PC (WASAPI defaults, the device's own sample rate and channel
-count) and the install script itself were not run on Windows in this stage's build; the first
-installation on the owner's PC is that test.
+Built and tested on Linux without sound hardware. Not run on Windows yet: PyAudioWPatch's
+loopback on the owner's devices, two PortAudio libraries in one process (sounddevice's and
+PyAudioWPatch's), whether Phone Link takes «CABLE Output» as its microphone through the default
+communication device (Microsoft does not document a virtual microphone for calls, ADR-0232 #13),
+the delay Phone Link needs after a call connects (`audio_ready_ms` 300 is a guess), whether a
+muted call device still gives loopback audio, the `doctor` PowerShell probe on that PC, the
+firewall rule and the installer's new prompts.

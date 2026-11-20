@@ -34,12 +34,17 @@ class FakeBto:
         self.unreachable = False
         self.events_fail = 0
         self.tool_delay = 0.0
+        self.start_delay = 0.0
 
     async def station(self) -> dict[str, Any]:
         return {"lineId": 1, "name": "x", "active": True, "workingHours": False}
 
-    async def start_call(self, call_ref: str, caller: str | None) -> dict[str, Any]:
+    async def start_call(
+        self, call_ref: str, caller: str | None, *, timeout: float | None = None
+    ) -> dict[str, Any]:
         self.log.append(("start", caller))
+        if self.start_delay:
+            await asyncio.sleep(self.start_delay)
         if self.unreachable:
             raise BtoUnreachable("down")
         return self.start

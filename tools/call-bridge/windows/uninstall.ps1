@@ -22,5 +22,7 @@ foreach ($link in @(
   if (Test-Path $link) { Remove-Item -Force $link }
 }
 if (Test-Path $Folder) { Remove-Item -Recurse -Force $Folder }
+# The phone link's firewall rule goes only from an administrator's window; otherwise it stays (harmless).
+Remove-NetFirewallRule -DisplayName 'Bto call bridge (phone link)' -ErrorAction SilentlyContinue
 
 Write-Host 'REMOVED. In Bto, make a new key for the line if this PC should no longer use the old one.' -ForegroundColor Green

@@ -47,7 +47,9 @@ class StationApi(Protocol):
 
     async def station(self) -> dict[str, Any]: ...
 
-    async def start_call(self, call_ref: str, caller: str | None) -> dict[str, Any]: ...
+    async def start_call(
+        self, call_ref: str, caller: str | None, *, timeout: float | None = None
+    ) -> dict[str, Any]: ...
 
     async def post_events(
         self, call_id: int, events: list[dict[str, Any]], conversation_id: str | None, key: str
@@ -76,16 +78,19 @@ class BtoClient:
     async def station(self) -> dict[str, Any]:
         return await self._request("GET", "/station", retries=1)
 
-    async def start_call(self, call_ref: str, caller: str | None) -> dict[str, Any]:
+    async def start_call(
+        self, call_ref: str, caller: str | None, *, timeout: float | None = None
+    ) -> dict[str, Any]:
         # No retry: a replayed answer carries no signed URL (the line does not pick up), and the
-        # phone's three seconds would be gone anyway.
+        # phone's three seconds would be gone anyway. With a phone the caller of this keeps it
+        # under two seconds (`decide_s`).
         return await self._request(
             "POST",
             "/calls",
             {"callRef": call_ref, "callerPhone": caller},
             idempotency=new_key(),
             retries=0,
-            timeout=4.0,
+            timeout=timeout or 4.0,
         )
 
     async def post_events(

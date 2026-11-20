@@ -6,6 +6,10 @@
   the transcript's arrival. The time from the transcript alone is kept too (`asr_ms`): it leaves
   out ElevenLabs' end-of-turn wait, so the two together show where the time goes.
 - **Greeting**: from the moment Bto answered `POST /calls` to the first agent audio.
+- **Ring -> answer** (stage 3): from the phone's `ringing` to the bridge telling it `answer`; the
+  phone's limit is 3000 ms.
+- **Answer -> greeting** (stage 3): from the phone saying the call is connected to the first agent
+  audio played into it (the owner's bar: 1500 ms).
 - **Searches**: `search_products` calls Bto answered, and how many found nothing.
 
 A call's numbers are appended to metrics.csv as one row; nothing in it is a word of the call.
@@ -39,6 +43,8 @@ COLUMNS = (
     "tool_errors",
     "tool_median_ms",
     "latencies_ms",
+    "ring_answer_ms",
+    "answer_greeting_ms",
 )
 
 
@@ -73,9 +79,33 @@ class CallMetrics:
     _last_agent_audio_at: float | None = None
     _turn_end: float | None = None
     _transcript_at: float | None = None
+    rang_at: float | None = None
+    answer_sent_at: float | None = None
+    connected_at: float | None = None
+
+    def rang(self, at: float | None = None) -> None:
+        self.rang_at = self.clock() if at is None else at
 
     def answered(self) -> None:
         self.answered_at = self.clock()
+
+    def answer_sent(self) -> None:
+        self.answer_sent_at = self.clock()
+
+    def connected(self) -> None:
+        self.connected_at = self.clock()
+
+    @property
+    def ring_answer_ms(self) -> float | None:
+        if self.rang_at is None or self.answer_sent_at is None:
+            return None
+        return (self.answer_sent_at - self.rang_at) * 1000
+
+    @property
+    def answer_greeting_ms(self) -> float | None:
+        if self.connected_at is None or self.first_audio_at is None:
+            return None
+        return max(0.0, (self.first_audio_at - self.connected_at) * 1000)
 
     def user_voice(self, at: float | None = None) -> None:
         """A voiced frame of the caller's microphone."""
@@ -138,6 +168,8 @@ class CallMetrics:
             "tool_errors": str(self.tool_errors),
             "tool_median_ms": _ms(percentile(self.tool_ms, 0.5)),
             "latencies_ms": ";".join(str(round(value)) for value in self.latencies_ms),
+            "ring_answer_ms": _ms(self.ring_answer_ms),
+            "answer_greeting_ms": _ms(self.answer_greeting_ms),
         }
 
     def summary_lines(self) -> list[str]:
@@ -147,7 +179,9 @@ class CallMetrics:
             f"  хариулах хугацаа: медиан {_ms(median) or '-'} мс, p90 {_ms(p90) or '-'} мс"
             f" ({len(self.latencies_ms)} хариулт; бичвэр ирснээс: медиан"
             f" {_ms(percentile(self.asr_ms, 0.5)) or '-'} мс)",
-            f"  мэндчилгээ: Bto хариулснаас {_ms(self.greeting_ms) or '-'} мс",
+            f"  мэндчилгээ: Bto хариулснаас {_ms(self.greeting_ms) or '-'} мс;"
+            f" дуугарснаас авах хүртэл {_ms(self.ring_answer_ms) or '-'} мс,"
+            f" холбогдсоноос мэндлэх хүртэл {_ms(self.answer_greeting_ms) or '-'} мс",
             f"  хайлт: {self.searches}, олдоогүй: {self.no_hits};"
             f" хэрэгсэл: {self.tools}, татгалзсан/алдаа: {self.tool_errors},"
             f" медиан {_ms(percentile(self.tool_ms, 0.5)) or '-'} мс",
@@ -157,12 +191,31 @@ class CallMetrics:
 
 def append_csv(path: Path, row: dict[str, str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    _upgrade_header(path)
     new = not path.exists() or path.stat().st_size == 0
     with path.open("a", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS)
         if new:
             writer.writeheader()
         writer.writerow(row)
+
+
+def _upgrade_header(path: Path) -> None:
+    """An older metrics.csv has fewer columns: rewrite it with today's, the old rows kept."""
+    if not path.exists() or path.stat().st_size == 0:
+        return
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) == COLUMNS:
+            return
+        rows = list(reader)
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        for old in rows:
+            writer.writerow({name: old.get(name) or "" for name in COLUMNS})
+    tmp.replace(path)
 
 
 @dataclass
@@ -174,6 +227,8 @@ class Report:
     greeting_median_ms: float | None
     searches: int
     no_hits: int
+    ring_answer_median_ms: float | None = None
+    answer_greeting_median_ms: float | None = None
 
     def lines(self) -> list[str]:
         share = f"{round(100 * self.no_hits / self.searches)}%" if self.searches else "-"
@@ -184,6 +239,9 @@ class Report:
             f"мэндчилгээ: медиан {_ms(self.greeting_median_ms) or '-'} мс"
             " (зорилт: 1500 мс-ээс бага)",
             f"хайлт: {self.searches}, олдоогүй: {self.no_hits} ({share})",
+            f"утас: дуугарснаас авах хүртэл медиан {_ms(self.ring_answer_median_ms) or '-'} мс"
+            " (3000 мс-ээс бага байх ёстой), холбогдсоноос мэндлэх хүртэл медиан"
+            f" {_ms(self.answer_greeting_median_ms) or '-'} мс (зорилт: 1500 мс-ээс бага)",
         ]
 
 
@@ -196,7 +254,13 @@ def report(path: Path, last: int = 20) -> Report:
     latencies: list[float] = []
     greetings: list[float] = []
     searches = no_hits = 0
+    ring_answer: list[float] = []
+    answer_greeting: list[float] = []
     for row in rows:
+        if row.get("ring_answer_ms"):
+            ring_answer.append(float(row["ring_answer_ms"]))
+        if row.get("answer_greeting_ms"):
+            answer_greeting.append(float(row["answer_greeting_ms"]))
         latencies.extend(float(v) for v in (row.get("latencies_ms") or "").split(";") if v)
         if row.get("greeting_ms"):
             greetings.append(float(row["greeting_ms"]))
@@ -210,4 +274,6 @@ def report(path: Path, last: int = 20) -> Report:
         greeting_median_ms=percentile(greetings, 0.5),
         searches=searches,
         no_hits=no_hits,
+        ring_answer_median_ms=percentile(ring_answer, 0.5),
+        answer_greeting_median_ms=percentile(answer_greeting, 0.5),
     )

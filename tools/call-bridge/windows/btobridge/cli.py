@@ -1,11 +1,16 @@
 """`python -m btobridge <command>`; without a command, a small menu (the desktop shortcut).
 
-  call [--caller +976XXXXXXXX] [--no-audio]   a test call, as if the phone rang from that number
+  call [--caller +976XXXXXXXX] [--no-audio]   a test call through the PC's headset (no phone)
   report [--last N]                            response times and searches over the last N calls
   devices                                      the microphones and speakers (WASAPI)
   check                                        does Bto know this station, would the AI answer now
-  serve                                        the background task: the station's heartbeat
-                                               (stage 3 adds the Android phone's link here)
+  serve                                        the background task: the station's heartbeat and,
+                                               in the bluetooth mode, the Android phone's link
+  pair                                         a 6-digit code for the phone app «Bto дуудлага»
+  status                                       what the background task sees (the phone's link)
+  doctor                                       Bluetooth, Phone Link, VB-Cable on this PC
+  find-call-device                             during a call: which output Phone Link plays it on
+  calibrate                                    during a call: echo and the caller's level
 """
 
 from __future__ import annotations
@@ -21,16 +26,25 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .audio import NullAudio, StageThree, list_devices, open_audio
+from .audio import (
+    NullAudio,
+    StageThree,
+    list_devices,
+    measure_outputs,
+    open_audio,
+    open_local_audio,
+    pick_call_output,
+)
 from .bto import BtoClient, BtoError, BtoUnreachable
-from .config import Config, home, load, save
+from .config import PHONE_MODES, VB_CABLE_INPUT, Config, home, load, update
+from .link import Pairing, PhoneServer, lan_address, port_in_use
 from .metrics import report
 from .phone import LocalPhone
+from .serve import PAIRING_FILE, ConfigCredentials, read_status
+from .serve import serve as serve_phone
 from .session import CallSession, Limits
 
 log = logging.getLogger("btobridge")
-
-HEARTBEAT_S = 60
 
 
 def setup_logging(folder: Path, console: bool) -> None:
@@ -67,11 +81,8 @@ async def run_call(config: Config, caller: str | None, no_audio: bool) -> int:
         loop.call_soon_threadsafe(phone.hung_up.set)
 
     previous = signal.signal(signal.SIGINT, hang_up)
-    try:
-        audio = NullAudio() if no_audio else open_audio(config)
-    except StageThree as error:
-        print(error)
-        return 2
+    # Always the PC's own headset: a test call without the phone, whatever the mode.
+    audio = NullAudio() if no_audio else open_local_audio(config)
     session = CallSession(
         BtoClient(config.server, config.key),
         WsConnection.open,
@@ -122,50 +133,218 @@ async def check(config: Config) -> int:
     return 0
 
 
-async def serve(config: Config) -> int:
-    """The background task at sign-in. Stage 2 only keeps the station's heartbeat (the station
-    page shows «Холбогдсон»); stage 3 listens here for the Android phone."""
-    client = BtoClient(config.server, config.key)
-    last: str | None = None
-    while True:
+async def pair(config: Config) -> int:
+    if config.mode not in PHONE_MODES:
+        print("Утас холбохын өмнө Bluetooth горимд суулгана уу (install.ps1 -Mode bluetooth).")
+        return 2
+    pairing = Pairing(home() / PAIRING_FILE)
+    code = pairing.new()
+    before = config.phone_token_hash
+    address = lan_address(config.server) or "?"
+    print()
+    print(f"  Холбох код:        {code[:3]} {code[3:]}")
+    print(f"  Компьютерийн хаяг: {address}   порт {config.phone_port}")
+    print("  «Bto дуудлага» апп → «Компьютер холбох» дээр энэ хаяг, кодыг оруулна.")
+    print("  Код 10 минут хүчинтэй.")
+    own: PhoneServer | None = None
+    if not port_in_use(int(config.phone_port)):
+        # The background task is not listening: listen here until the phone pairs.
+        own = PhoneServer(
+            ConfigCredentials(), pairing, lambda _ring: None, port=int(config.phone_port)
+        )
         try:
-            station = await client.station()
-            state = (
-                f"active={station.get('active')} working={station.get('workingHours')}"
-                f" agent={station.get('agentConfigured')}"
+            await own.start()
+        except OSError as error:
+            print(f"Порт {config.phone_port} нээгдсэнгүй ({type(error).__name__}).")
+            return 1
+    try:
+        while True:
+            await asyncio.sleep(1)
+            try:
+                now = load()
+            except (OSError, ValueError):
+                continue
+            if now.phone_token_hash and now.phone_token_hash != before:
+                print(f"Холбогдлоо: {now.phone_device or 'утас'} ({now.phone_ip}).")
+                log.info("paired")
+                return 0
+            if not pairing.active():
+                print("Код хугацаа нь дууссан эсвэл 5 удаа буруу оруулсан. Дахин «холбох» сонгоно уу.")
+                return 1
+    finally:
+        if own is not None:
+            await own.stop()
+
+
+def status_lines(config: Config, status: dict[str, Any] | None, now: float) -> list[str]:
+    lines = [f"  горим: {MODE_WORDS.get(config.mode, config.mode)}"]
+    if status is None or now - float(status.get("updated") or 0) > 120:
+        lines.append("  арын програм: АЖИЛЛАХГҮЙ байна (компьютерээ дахин асаах эсвэл дахин суулгах)")
+        return lines
+    station = status.get("station") or {}
+    if station.get("error"):
+        lines.append(f"  Bto: холбогдохгүй ({station.get('error')})")
+    else:
+        lines.append(
+            "  Bto: холбогдсон; "
+            + ("ажлын цаг (ажилтан авна)" if station.get("workingHours") else "ажлын бус цаг (AI авна)")
+            + ("" if station.get("active") else "; шугам УНТРААЛТТАЙ")
+        )
+    link = status.get("link")
+    if config.mode in PHONE_MODES:
+        if not link:
+            lines.append("  утас: арын програм утсыг хүлээгээгүй (дахин эхлүүлнэ үү)")
+        elif not link.get("paired"):
+            lines.append("  утас: холбоогүй (цэс → утас холбох)")
+        elif link.get("connected"):
+            lines.append(
+                f"  утас: ХОЛБОГДСОН ({link.get('pairedDevice') or '-'})"
+                + ("; яг одоо ярьж байна" if status.get("inCall") else "")
             )
-        except BtoUnreachable as error:
-            state = f"unreachable:{error.why}"
-        except BtoError as error:
-            state = f"refused:{error.code}"
-        if state != last:
-            log.info("station %s", state)
-            last = state
-        await asyncio.sleep(HEARTBEAT_S)
+        else:
+            lines.append(f"  утас: холбогдоогүй байна ({link.get('pairedDevice') or '-'}): апп, Wi-Fi-г шалгана уу")
+    return lines
 
 
-def pick_devices(config: Config) -> None:
+MODE_WORDS = {"local": "компьютерийн чихэвч (туршилт)", "bluetooth": "Bluetooth (Phone Link)", "cable": "кабель"}
+
+
+async def doctor(config: Config) -> int:
+    from . import checks  # noqa: PLC0415
+
+    facts = checks.windows_facts()
+    if facts is None:
+        print("Windows-ийн шалгалт хийгдсэнгүй (Windows биш эсвэл PowerShell хариулсангүй).")
+        return 1
+    try:
+        import sounddevice as sd  # noqa: PLC0415
+
+        devices = sd.query_devices()
+        outs = [str(d["name"]) for d in devices if d["max_output_channels"] > 0]
+        ins = [str(d["name"]) for d in devices if d["max_input_channels"] > 0]
+        facts.vb_cable = checks.has_vb_cable(outs, ins)
+    except Exception:  # noqa: BLE001
+        facts.vb_cable = False
+    bad = 0
+    for finding in checks.findings(facts):
+        print(("  OK   " if finding.ok else "  ДУТУУ ") + finding.text)
+        bad += 0 if finding.ok else 1
+    log.info(
+        "doctor radios=%s ok=%s handsfree=%s service=%s phoneLink=%s cable=%s",
+        facts.radios,
+        facts.radios_ok,
+        facts.handsfree,
+        facts.service,
+        facts.phone_link,
+        facts.vb_cable,
+    )
+    return 0 if bad == 0 else 1
+
+
+def find_call_device(interactive: bool = True) -> int:
+    print("Өөр утаснаас шугамын утас руу залгаж, Phone Link дээр дуудлагыг аваарай.")
+    print("Залгасан утсаараа тасралтгүй ярь (эсвэл хөгжим тавь).")
+    if interactive:
+        input("Дуудлага холбогдсон бол Enter дарна уу...")
+    print("4 секунд сонсож байна...")
+    try:
+        levels = measure_outputs(4.0)
+    except Exception as error:  # noqa: BLE001
+        print(f"Хэмжиж чадсангүй ({type(error).__name__}).")
+        return 1
+    log.info("find-call-device %s", ";".join(f"{n[:40]}={db:.1f}" for n, db in levels))
+    found = pick_call_output(levels)
+    if found is None:
+        print("Дуудлагын дуу аль төхөөрөмж дээр гарч байгааг тодорхойлж чадсангүй.")
+        print("Дуудлага Phone Link дээр холбогдсон эсэхийг шалгаад дахин оролдоно уу, эсвэл дугаараар сонгоно.")
+        return 1
+    update({"call_output_device": found})
+    print(f"Дуудлагын дуу: «{found}». Хадгаллаа.")
+    return 0
+
+
+async def calibrate(config: Config) -> int:
+    from . import calibrate as cal  # noqa: PLC0415
+
+    try:
+        audio = open_audio(config)
+    except StageThree as error:
+        print(error)
+        return 2
+
+    async def ask(prompt: str) -> str:
+        return await asyncio.to_thread(input, prompt)
+
+    try:
+        echo, _voice = await cal.run(audio, print, ask)
+    except LookupError as error:
+        print(f"Төхөөрөмж олдсонгүй: {error}")
+        return 1
+    if echo.verdict == "high" and not config.echo_gate:
+        answer = (await ask("echo_gate-г асаах уу? (т/ү): ")).strip().lower()
+        if answer in ("т", "t", "y", "тийм"):
+            update({"echo_gate": True})
+            print("Асаалаа: AI ярьж байхад залгагчийн тал чимээгүй болно (AI-г яриан дунд нь таслах боломжгүй).")
+    elif echo.verdict != "high" and config.echo_gate:
+        print("Цуурай бага байна: echo_gate-г унтрааж болно (config.json → echo_gate: false).")
+    return 0
+
+
+async def serve(config: Config) -> int:
+    """The background task at sign-in."""
+    return await serve_phone(config)
+
+
+def _ask_device(label: str) -> int | str | None:
+    answer = input(f"{label} (Enter: өмнөх хэвээр): ").strip()
+    if answer.isdigit():
+        return int(answer)
+    return answer or None
+
+
+def pick_devices(config: Config) -> Config:
     try:
         lines = list_devices()
     except Exception as error:  # noqa: BLE001
         print(f"Дууны төхөөрөмж олдсонгүй ({type(error).__name__}).")
-        return
+        return config
     print("\n".join(lines))
-    for field, label in (("input_device", "микрофоны"), ("output_device", "чихэвч/чанга яригчийн")):
-        answer = input(f"{label} дугаар (Enter: Windows-ийн үндсэн): ").strip()
-        setattr(config, field, int(answer) if answer.isdigit() else None)
-    print(f"Хадгаллаа: {save(config)}")
+    changes: dict[str, Any] = {}
+    if config.mode == "bluetooth":
+        print("Дуудлагын дуу гарч буй төхөөрөмж (Phone Link тоглуулдаг, ихэвчлэн чихэвч).")
+        print("Мэдэхгүй бол цэсний «дуудлагын төхөөрөмж олох»-ыг ашиглана.")
+        call = _ask_device("  дуудлагын (speaker) дугаар")
+        if call is not None:
+            changes["call_output_device"] = call
+        agent = _ask_device(f"  AI-гийн дуу орох төхөөрөмж (ихэвчлэн «{VB_CABLE_INPUT}»)")
+        if agent is not None:
+            changes["agent_output_device"] = agent
+    for field, label in (("input_device", "  туршилтын микрофоны дугаар"), ("output_device", "  туршилтын чихэвчийн дугаар")):
+        value = _ask_device(label)
+        if value is not None:
+            changes[field] = value
+    if not changes:
+        return config
+    config = update(changes)
+    print("Хадгаллаа.")
+    return config
 
 
 def menu(config: Config) -> int:
     while True:
         print()
         print(f"Bto AI дуудлага {__version__}  ({config.server})")
-        print("  1  туршилтын дуудлага (дэлгүүрийн дугаараас)")
-        print("  2  туршилтын дуудлага (нууцалсан дугаараас)")
+        for line in status_lines(config, read_status(), time.time()):
+            print(line)
+        print("  1  туршилтын дуудлага, компьютерийн чихэвчээр (дэлгүүрийн дугаараас)")
+        print("  2  туршилтын дуудлага, компьютерийн чихэвчээр (нууцалсан дугаараас)")
         print("  3  сүүлийн 20 дуудлагын хэмжилт")
-        print("  4  холболт шалгах")
-        print("  5  микрофон, чихэвч сонгох")
+        print("  4  Bto-той холболт шалгах")
+        print("  5  дууны төхөөрөмж сонгох")
+        print("  6  утас холбох («Bto дуудлага» апп)")
+        print("  7  Bluetooth, Phone Link, VB-Cable шалгах")
+        print("  8  дуудлагын төхөөрөмж олох (дуудлагын үеэр)")
+        print("  9  цуурай, дууны түвшин хэмжих (дуудлагын үеэр)")
         print("  0  гарах")
         choice = input("> ").strip()
         if choice == "1":
@@ -178,7 +357,18 @@ def menu(config: Config) -> int:
         elif choice == "4":
             asyncio.run(check(config))
         elif choice == "5":
-            pick_devices(config)
+            config = pick_devices(config)
+        elif choice == "6":
+            asyncio.run(pair(config))
+            config = load()
+        elif choice == "7":
+            asyncio.run(doctor(config))
+        elif choice == "8":
+            find_call_device()
+            config = load()
+        elif choice == "9":
+            asyncio.run(calibrate(config))
+            config = load()
         elif choice in ("0", "q", ""):
             return 0
 
@@ -194,6 +384,12 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("devices", help="the microphones and speakers")
     sub.add_parser("check", help="ask Bto about this station")
     sub.add_parser("serve", help="the background task")
+    sub.add_parser("pair", help="a pairing code for the phone app")
+    sub.add_parser("status", help="what the background task sees")
+    sub.add_parser("doctor", help="Bluetooth, Phone Link and VB-Cable on this PC")
+    find = sub.add_parser("find-call-device", help="during a call: the output Phone Link plays on")
+    find.add_argument("--no-wait", action="store_true", help="measure at once, no Enter")
+    sub.add_parser("calibrate", help="during a call: echo and the caller's level")
     args = parser.parse_args(argv)
 
     if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -225,6 +421,17 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(run_call(config, normalise_caller(args.caller), args.no_audio))
     if args.command == "check":
         return asyncio.run(check(config))
+    if args.command == "pair":
+        return asyncio.run(pair(config))
+    if args.command == "status":
+        print("\n".join(status_lines(config, read_status(), time.time())))
+        return 0
+    if args.command == "doctor":
+        return asyncio.run(doctor(config))
+    if args.command == "find-call-device":
+        return find_call_device(interactive=not args.no_wait)
+    if args.command == "calibrate":
+        return asyncio.run(calibrate(config))
     if args.command == "serve":
         while True:  # never a crash loop: a failure waits a minute and starts again
             try:

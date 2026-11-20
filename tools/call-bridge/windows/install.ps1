@@ -7,13 +7,22 @@
 #
 # or, from a copy of this folder:   powershell -ExecutionPolicy Bypass -File install.ps1 -Server ... -Key ...
 #
+# -Mode bluetooth (stage 3): the line's phone is paired to this PC with Windows Phone Link; the
+# bridge takes its calls through the Android app "Bto duudlaga" over the LAN (port 8766) and
+# carries the audio: the call captured from the output Phone Link plays on, the AI's voice into
+# VB-Cable ("CABLE Input"), Phone Link's microphone ("CABLE Output"). -Mode local (stage 2, the
+# default for a first install): test calls through this PC's headset only. -Mode cable needs a USB
+# sound card and cables that were not bought: refused. A repeat install keeps the mode, the devices
+# and the paired phone unless told otherwise.
+#
 # What it does, each step safe to repeat:
 #   1. downloads Python 3.12.10 (the official "embeddable" zip from python.org, checked by its
 #      SHA-256) into %LOCALAPPDATA%\BtoCall\python: a private copy, nothing is registered in Windows
 #   2. installs the pinned packages of requirements.txt with pip (every file checked by its hash)
 #   3. copies the bridge (btobridge\*.py) and writes config.json: the server, the key, the audio
-#      mode "local" and the chosen microphone and speakers (the key is a password: the folder is the
-#      user's own)
+#      mode and its devices (the key is a password: the folder is the user's own); bluetooth: checks
+#      Bluetooth, Phone Link and VB-Cable, and the inbound firewall rule for the phone's link (made
+#      only when this window is an administrator's; otherwise the one command is printed)
 #   4. starts the bridge's background task now and at every sign-in (a scheduled task; if Windows
 #      refuses one to a non-administrator, a shortcut in the user's Startup folder instead)
 #   5. puts "Bto AI call" on the desktop: the console for test calls and the numbers
@@ -26,6 +35,8 @@ param(
   [Parameter(Mandatory = $true)][string]$Key,
   [string]$InputDevice = '',
   [string]$OutputDevice = '',
+  [ValidateSet('', 'local', 'bluetooth', 'cable')][string]$Mode = '',
+  [string]$CallDevice = '',
   [switch]$NoDevicePrompt
 )
 
@@ -45,8 +56,29 @@ $AppFiles = @(
   'btobridge/__init__.py', 'btobridge/__main__.py', 'btobridge/audio.py', 'btobridge/bto.py',
   'btobridge/cli.py', 'btobridge/config.py', 'btobridge/dsp.py', 'btobridge/metrics.py',
   'btobridge/phone.py', 'btobridge/protocol.py', 'btobridge/session.py', 'btobridge/ws.py',
+  'btobridge/link.py', 'btobridge/serve.py', 'btobridge/calibrate.py', 'btobridge/checks.py',
   'requirements.txt'
 )
+$FirewallRule = 'Bto call bridge (phone link)'
+
+function Test-Administrator {
+  $who = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
+  return $who.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Set-PhoneFirewall([int]$Port) {
+  $rule = Get-NetFirewallRule -DisplayName $FirewallRule -ErrorAction SilentlyContinue
+  if ($rule) { Write-Host '     firewall: the phone link rule is there.'; return }
+  $command = "New-NetFirewallRule -DisplayName '$FirewallRule' -Direction Inbound -Protocol TCP -LocalPort $Port -RemoteAddress LocalSubnet -Action Allow -Profile Any"
+  if (Test-Administrator) {
+    Invoke-Expression $command | Out-Null
+    Write-Host '     firewall: the phone link rule was added (TCP' $Port ', the LAN only).'
+  } else {
+    Write-Host '     firewall: the phone cannot reach this PC until ONE command is run as administrator' -ForegroundColor Yellow
+    Write-Host '     (Start -> type PowerShell -> right click -> Run as administrator, paste, Enter):' -ForegroundColor Yellow
+    Write-Host "     $command"
+  }
+}
 
 function Get-Checked([string]$Url, [string]$Sha, [string]$OutFile) {
   if ((Test-Path $OutFile) -and ((Get-FileHash -Algorithm SHA256 $OutFile).Hash -eq $Sha.ToUpper())) { return }
@@ -117,19 +149,54 @@ function Install-Bridge {
     return
   }
 
-  Write-Host '4/6  microphone and speakers'
-  $bridgeSettings = [ordered]@{ server = $Server.TrimEnd('/'); key = $Key; mode = 'local'; input_device = $null; output_device = $null }
+  Write-Host '4/6  the audio mode and its devices'
+  $bridgeSettings = [ordered]@{ server = ''; key = ''; mode = 'local'; input_device = $null; output_device = $null }
   if (Test-Path $ConfigPath) {
     try {
+      # Every old setting is kept (the paired phone too); only what is given here changes.
       $old = Get-Content -Raw $ConfigPath | ConvertFrom-Json
-      foreach ($name in 'input_device', 'output_device', 'chunk_ms', 'max_call_s', 'silence_s', 'grace_s') {
-        if ($old.PSObject.Properties.Name -contains $name) { $bridgeSettings[$name] = $old.$name }
-      }
+      foreach ($prop in $old.PSObject.Properties) { $bridgeSettings[$prop.Name] = $prop.Value }
     } catch { }
   }
+  $bridgeSettings.server = $Server.TrimEnd('/')
+  $bridgeSettings.key = $Key
+  if ($Mode -eq 'cable') {
+    Write-Host '     The cable mode needs a USB sound card and cables that were not bought; it is not built. Use -Mode bluetooth.' -ForegroundColor Yellow
+  } elseif ($Mode) {
+    $bridgeSettings.mode = $Mode
+  }
+  if ($bridgeSettings.mode -eq 'cable') { $bridgeSettings.mode = 'local' }
+  $bridgeMode = $bridgeSettings.mode
+  Write-Host "     mode: $bridgeMode"
   if ($InputDevice) { $bridgeSettings.input_device = $InputDevice }
   if ($OutputDevice) { $bridgeSettings.output_device = $OutputDevice }
-  if (-not $NoDevicePrompt -and -not $InputDevice -and -not $OutputDevice) {
+  if ($CallDevice) { $bridgeSettings.call_output_device = $CallDevice }
+  if ($bridgeMode -eq 'bluetooth') {
+    if (-not $bridgeSettings.Contains('agent_output_device') -or -not $bridgeSettings.agent_output_device) { $bridgeSettings.agent_output_device = 'CABLE Input' }
+    if (-not $bridgeSettings.Contains('phone_port') -or -not $bridgeSettings.phone_port) { $bridgeSettings.phone_port = 8766 }
+  }
+  # The checks below run the bridge, which reads config.json: write it once now.
+  [IO.File]::WriteAllText($ConfigPath, ($bridgeSettings | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+  if ($bridgeMode -eq 'bluetooth') {
+    Write-Host '     Bluetooth, Phone Link, VB-Cable:'
+    & $python -m btobridge doctor
+    if (-not $NoDevicePrompt -and -not $CallDevice) {
+      & $python -m btobridge devices
+      Write-Host '     The CALL device is the speaker/headset Phone Link plays a call on (heard in it now).'
+      Write-Host '     D = find it now: call the line phone from another phone, take the call in Phone Link, keep talking, then press D.'
+      $answer = Read-Host '     The number of the CALL device, or D (Enter: Windows default output)'
+      $n = 0
+      if ($answer -eq 'D' -or $answer -eq 'd') {
+        & $python -m btobridge find-call-device --no-wait
+        $saved = Get-Content -Raw $ConfigPath | ConvertFrom-Json
+        $bridgeSettings.call_output_device = $saved.call_output_device
+      } elseif ([int]::TryParse($answer, [ref]$n)) {
+        $bridgeSettings.call_output_device = $n
+      }
+    }
+    Set-PhoneFirewall ([int]$bridgeSettings.phone_port)
+  }
+  if ($bridgeMode -eq 'local' -and -not $NoDevicePrompt -and -not $InputDevice -and -not $OutputDevice) {
     & $python -m btobridge devices
     Write-Host '     A headset is best: with speakers the AI hears itself.'
     $in = Read-Host '     The number of the MICROPHONE (Enter: Windows default)'
@@ -188,7 +255,11 @@ function Install-Bridge {
   & $python -m btobridge check
   if ($LASTEXITCODE -eq 0) {
     Write-Host ''
-    Write-Host 'INSTALLED. Open "Bto AI call" on the desktop to make a test call.' -ForegroundColor Green
+    if ($bridgeMode -eq 'bluetooth') {
+      Write-Host 'INSTALLED. Open "Bto AI call" on the desktop: 6 pairs the phone app, 9 measures a test call.' -ForegroundColor Green
+    } else {
+      Write-Host 'INSTALLED. Open "Bto AI call" on the desktop to make a test call.' -ForegroundColor Green
+    }
   } else {
     Write-Host ''
     Write-Host 'INSTALLED, BUT: Bto did not accept this station yet (see the line above).' -ForegroundColor Yellow
