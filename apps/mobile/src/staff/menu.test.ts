@@ -14,6 +14,7 @@ describe('the staff menu', () => {
     const keys = keysOf([]);
     expect(keys[0]).toBe('expiry');
     expect(keys).toContain('attendance');
+    expect(keys).toContain('payroll');
     expect(keys).toContain('community');
     expect(keys).not.toContain('rep');
     expect(keys).not.toContain('picking');

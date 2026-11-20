@@ -25,6 +25,7 @@ export type MenuKey =
   | 'attendance'
   | 'attendanceRequests'
   | 'attendanceHistory'
+  | 'payroll'
   | 'community'
   | 'notices'
   | 'news'
@@ -81,6 +82,8 @@ export function menuOf(me: Rights): MenuGroup[] {
         { key: 'attendance', href: '/attendance' },
         { key: 'attendanceRequests', href: '/attendance/requests' },
         { key: 'attendanceHistory', href: '/attendance/history' },
+        // «Миний цалин» (ADR-0235): every staff member's own approved payslips.
+        { key: 'payroll', href: '/payroll' },
       ],
     },
     {

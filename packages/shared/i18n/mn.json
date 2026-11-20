@@ -9269,7 +9269,8 @@
         "repSettings": "Захиалгын тохиргоо",
         "profile": "Профайл",
         "visits": "Айлчлал",
-        "productNew": "Бараа нэмэх"
+        "productNew": "Бараа нэмэх",
+        "payroll": "Миний цалин"
       },
       "favourite": "{{title}}: дуртай цэсэнд нэмэх",
       "unfavourite": "{{title}}: дуртай цэснээс хасах",
@@ -15435,6 +15436,41 @@
       "net": "Гарт олгох",
       "employerSi": "НДШ (ажил олгогч)",
       "totalCost": "Нийт зардал"
+    },
+    "app": {
+      "title": "Миний цалин",
+      "myKpi": "Миний KPI",
+      "scoring": "KPI үнэлгээ",
+      "empty": "Батлагдсан цалин одоогоор алга",
+      "netLabel": "Гарт олгох",
+      "money": "{{amount}} ₮",
+      "baseSalary": "Тогтмол цалин",
+      "kpiSection": "KPI",
+      "kpiTotal": "KPI нийт",
+      "adjustments": "Нэмэгдэл / суутгал",
+      "gross": "Нийт цалин",
+      "si": "НДШ",
+      "pit": "ХХОАТ",
+      "advance": "Урьдчилгаа",
+      "itemAmount": "Мөнгөн дүн",
+      "itemScore": "Оноо",
+      "itemEarned": "Авсан",
+      "notScored": "Үнэлээгүй",
+      "note": "Тайлбар",
+      "workdays": "Ажлын өдөр",
+      "attended": "Ирсэн",
+      "late": "Хоцорсон",
+      "penalty": "Хасалт %",
+      "noTerms": "Цалингийн нөхцөл тохируулаагүй байна",
+      "unscoredOf": "Үнэлээгүй {{unscored}} / {{total}}",
+      "scoredAll": "Бүгд үнэлсэн",
+      "noRight": "Танд үнэлгээ өгөх эрх алга",
+      "noDrafts": "Үнэлэх ноорог цалин алга",
+      "noEmployees": "Үнэлэх ажилтан алга",
+      "scorePercent": "Оноо %",
+      "scoreRange": "0–100 хооронд бичнэ үү",
+      "saved": "Үнэлгээ хадгалагдлаа",
+      "scoredBy": "Үнэлсэн: {{name}}"
     }
   }
 }
