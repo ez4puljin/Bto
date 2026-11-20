@@ -2,7 +2,12 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
+import { DB } from '../../src/common/db/db.tokens';
+import type { Db } from '../../src/common/db/db.types';
+import { inTransaction } from '../../src/common/db/transaction';
 import { FIN_DB, type FinDb, reconcileBooks } from '../../src/finance-core';
+import { FinBooks } from '../../src/modules/finance/services/fin-books';
+import { FinPosting } from '../../src/modules/finance/services/fin-posting';
 import { connectAs, createHttpApp } from '../harness/apps';
 import { idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { financeApi, type InvoiceJson, salesFlow } from '../harness/finance';
@@ -12,10 +17,11 @@ import { partnersApi } from '../harness/partners';
 
 /**
  * The stock's value in the books (F4, ADR-0097): every stock posting books its value — a surplus,
- * a sale's cost, a sales return, a goods issue by its expense type, an unpriced receipt against
- * goods received, its costing (what had already left goes to the cost of goods sold) — so the
- * inventory account follows the stock's value and goods received clears with the bill. A goods
- * issue to a supplier is the supplier's credit (F3), never a stock entry. Synthetic data only.
+ * a sale's cost, a sales return, a goods issue by its expense type. An unpriced receipt books
+ * nothing; its pricing is one entry, the supplier's bill, from the stock (what had already left
+ * goes to the cost of goods sold) to the payable, and nothing goes through goods received
+ * (ADR-0233) — so the inventory account follows the stock's value once the receipts are priced. A
+ * goods issue to a supplier is the supplier's credit (F3), never a stock entry. Synthetic data only.
  */
 describe('finance stock and cost', () => {
   let app: NestExpressApplication;
@@ -176,7 +182,7 @@ describe('finance stock and cost', () => {
     expect(credit.rows[0]?.amount).toBe('-700.00');
   });
 
-  it('books an unpriced receipt against goods received, and its costing and bill clear it', async () => {
+  it('books nothing for an unpriced receipt, and its pricing as one entry from the stock to the payable (ADR-0233)', async () => {
     // The receipt brings the flour onto its fixed shelf in its home (ADR-0099 #1).
     await inventoryApi(app, admin).homeShelf(flour.id, flow.wh.id, flow.shelf.id);
     const draft = (
@@ -193,11 +199,9 @@ describe('finance stock and cost', () => {
     ).body as { id: number; lines: { id: number }[] };
     // The note's amount is the price the accountant checks below (ADR-0115).
     await postReceipt(app, admin, draft.id, { amount: '9000' });
-    // In at the provisional cost (the average, 700).
-    expect(await stockLines('GR', draft.id)).toEqual({
-      '140101': '7000.00',
-      '310201': '-7000.00',
-    });
+    // In at the provisional cost (the average, 700), in quantities only: the books wait for the
+    // prices, and nothing goes through goods received.
+    expect(await stockLines('GR', draft.id)).toEqual({});
     // 50 of the 55 pieces leave before the price arrives: half the receipt is sold already.
     const sale = await flow.draft(shop, [{ productUnitId: flow.pcs(flour), qty: '50' }]);
     await flow.sell(sale.id);
@@ -207,7 +211,89 @@ describe('finance stock and cost', () => {
       .set(idempotency())
       .send({ costingVersion: 0, lines: [{ lineId: draft.lines[0]?.id, amount: '9000' }] })
       .expect(200);
-    const costing = Object.fromEntries(
+    const entries = (
+      await sql.query<{ type: string; date: string; code: string; amount: string }>(
+        `SELECT d.source_doc_type AS type, e.entry_date::text AS date, a.code,
+                (sum(l.debit) - sum(l.credit))::text AS amount
+           FROM fin.documents d
+           JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+           JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+           JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+          WHERE (d.source_doc_type = 'GOODS_RECEIPT' AND d.source_doc_id = $1)
+             OR (d.source_doc_type = 'STOCK_REVALUE' AND d.source_doc_id = $2)
+          GROUP BY d.source_doc_type, e.id, e.entry_date, a.code`,
+        [String(draft.id), `${draft.id}:1`],
+      )
+    ).rows;
+    // One entry, the supplier's bill, on the receipt's date.
+    expect(new Set(entries.map((row) => `${row.type} ${row.date}`))).toEqual(
+      new Set([`GOODS_RECEIPT ${today}`]),
+    );
+    const costing = Object.fromEntries(entries.map((row) => [row.code, row.amount]));
+    // 9,000 owed: the 5 pieces still on hand carry their share into the stock with the 7,000 the
+    // receipt went in at, the part already sold is a cost of goods sold.
+    expect(Object.keys(costing).sort()).toEqual(['140101', '310101', '610101']);
+    expect(costing['310101']).toBe('-9000.00');
+    expect(Number.parseFloat(costing['610101'] ?? '0')).toBeGreaterThan(0);
+    expect(
+      Number.parseFloat(costing['140101'] ?? '0') + Number.parseFloat(costing['610101'] ?? '0'),
+    ).toBeCloseTo(9000, 2);
+    // No line at all on goods received.
+    expect(await balance('310201')).toBe('0');
+  });
+
+  it('clears what a receipt confirmed before ADR-0233 left on goods received', async () => {
+    const draft = (
+      await http()
+        .post('/api/v1/receipts')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          supplierId: supplier,
+          supplierDocDate: today,
+          lines: [{ productUnitId: unitOf(flour, 'PCS').id, enteredQty: '2' }],
+        })
+        .expect(201)
+    ).body as { id: number; lines: { id: number }[] };
+    await postReceipt(app, admin, draft.id, { amount: '2000' });
+    const [entry] = (
+      await sql.query<{ first: string; value: string }>(
+        `SELECT min(id)::text AS first, sum(round(qty_base * unit_cost, 2))::text AS value
+           FROM stock_ledger WHERE doc_type = 'GR' AND doc_id = $1`,
+        [draft.id],
+      )
+    ).rows;
+    const value = entry?.value ?? '0';
+    expect(Number.parseFloat(value)).toBeGreaterThan(0);
+    // As the confirmation booked it until ADR-0233: the stock at its provisional cost against
+    // goods received.
+    await inTransaction(app.get<Db>(DB), (tx) =>
+      app.get(FinPosting).submitInTx(tx, app.get(FinBooks).source(), {
+        source: { system: 'BTO', docType: 'STOCK', docId: `GR:${draft.id}:${entry?.first}` },
+        body: {
+          action: 'POST',
+          documentType: 'BTO.STOCK_VALUE',
+          documentDate: today,
+          currency: 'MNT',
+          description: 'GR before ADR-0233',
+          controlTotal: value,
+          lines: [
+            { lineNo: 1, key: 'INVENTORY', side: 'DEBIT', amount: value },
+            { lineNo: 2, key: 'GOODS_RECEIVED', side: 'CREDIT', amount: value },
+          ],
+        },
+      }),
+    );
+    expect(await balance('310201')).toBe(`-${value}`);
+    await http()
+      .put(`/api/v1/receipts/${draft.id}/costs`)
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({ costingVersion: 0, lines: [{ lineId: draft.lines[0]?.id, amount: '2000' }] })
+      .expect(200);
+    // The bill clears it and debits the stock with the rest only; the last test of this suite
+    // finds the inventory account at the stock's value.
+    const bill = Object.fromEntries(
       (
         await sql.query<{ code: string; amount: string }>(
           `SELECT a.code, (sum(l.debit) - sum(l.credit))::text AS amount
@@ -215,19 +301,14 @@ describe('finance stock and cost', () => {
              JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
              JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
              JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
-            WHERE d.source_doc_type = 'STOCK_REVALUE' AND d.source_doc_id = $1
+            WHERE d.source_doc_type = 'GOODS_RECEIPT' AND d.source_doc_id = $1
             GROUP BY a.code`,
-          [`${draft.id}:1`],
+          [String(draft.id)],
         )
       ).rows.map((row) => [row.code, row.amount]),
     );
-    // 2,000 more: part still on hand moves the stock, the part already sold the cost of goods sold.
-    expect(costing['310201']).toBe('-2000.00');
-    expect(
-      Number.parseFloat(costing['140101'] ?? '0') + Number.parseFloat(costing['610101'] ?? '0'),
-    ).toBeCloseTo(2000, 2);
-    expect(Number.parseFloat(costing['610101'] ?? '0')).toBeGreaterThan(0);
-    // The bill (F3) debits goods received with the cost: nothing is left on it.
+    expect(bill['310201']).toBe(value);
+    expect(bill['310101']).toBe('-2000.00');
     expect(await balance('310201')).toBe('0.00');
   });
 

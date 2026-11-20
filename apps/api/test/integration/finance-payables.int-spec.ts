@@ -1,5 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { businessDate } from '@tugeel/shared/time';
+import { addDays, addMonths, businessDate } from '@tugeel/shared/time';
 import type { Client } from 'pg';
 import request from 'supertest';
 import { FIN_DB, type FinDb, reconcileBooks } from '../../src/finance-core';
@@ -51,8 +51,9 @@ interface ItemJson {
 }
 
 /**
- * The suppliers' payables (F3, ADR-0091): a receipt that gets its prices is the supplier's bill
- * (stock and input VAT against the payable), a re-costing books its difference, a supplier return
+ * The suppliers' payables (F3, ADR-0091): a receipt that gets its prices is the supplier's bill,
+ * one entry on the receipt's date (stock and input VAT against the payable, nothing through goods
+ * received, ADR-0233), a re-costing books its difference, a supplier return
  * lowers the payable at cost plus VAT, a manual entry pays a supplier and the accountant pairs it
  * with the bill; «Нийлүүлэгчийн тооцоо» reads it all. Synthetic data only.
  */
@@ -167,7 +168,7 @@ describe('finance payables', () => {
         )
       ).rows.map((row) => [row.code, row.amount]),
     );
-  /** Dr − Cr on goods received (310201) over every Bto document of one receipt (F3 + F4). */
+  /** Dr − Cr on goods received (310201) over every Bto document of one receipt: none (ADR-0233). */
   const goodsReceivedOf = async (receiptId: number) =>
     (
       await sql.query<{ amount: string }>(
@@ -184,6 +185,25 @@ describe('finance payables', () => {
         [`GR:${receiptId}:%`, `${receiptId}:%`, String(receiptId)],
       )
     ).rows[0]?.amount;
+  /** Every journal entry of one receipt (its confirmation, its bill, its re-costings), oldest first. */
+  const entriesOf = async (receiptId: number) =>
+    (
+      await sql.query<{ docType: string; docId: string; date: string; accounts: string }>(
+        `SELECT d.source_doc_type AS "docType", d.source_doc_id AS "docId",
+                e.entry_date::text AS date, string_agg(DISTINCT a.code, ',' ORDER BY a.code) AS accounts
+           FROM fin.documents d
+           JOIN fin.source_systems s ON s.id = d.source_system_id AND s.code = 'BTO'
+           JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+           JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+           JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+          WHERE (d.source_doc_type = 'STOCK' AND d.source_doc_id LIKE $1)
+             OR (d.source_doc_type IN ('STOCK_REVALUE', 'RECEIPT_RECOST') AND d.source_doc_id LIKE $2)
+             OR (d.source_doc_type = 'GOODS_RECEIPT' AND d.source_doc_id = $3)
+          GROUP BY d.id, d.source_doc_type, d.source_doc_id, e.id, e.entry_date
+          ORDER BY e.id`,
+        [`GR:${receiptId}:%`, `${receiptId}:%`, String(receiptId)],
+      )
+    ).rows;
   const supplier = async (name: string, vatPayer = false) =>
     (await partnersApi(app, admin).supplier({ name, vatPayer })).id;
 
@@ -235,7 +255,7 @@ describe('finance payables', () => {
     expect(posted).toMatchObject({ costingStatus: 'COSTED', costingVersion: 1 });
     expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
       '130301': '2400.00',
-      '310201': '24000.00',
+      '140101': '24000.00',
       '310101': '-26400.00',
     });
     expect(await balance(vatSupplier)).toMatchObject({
@@ -276,11 +296,17 @@ describe('finance payables', () => {
 
     await cost(posted.id, 0, [{ lineId, amount: '11000' }]).expect(200);
     expect(await balance(shop)).toMatchObject({ balance: '11000.00' });
+    // Nothing sold meanwhile: the whole cost is stock, straight against the payable (ADR-0233).
+    expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
+      '130301': '1000.00',
+      '140101': '10000.00',
+      '310101': '-11000.00',
+    });
     // Up: a bill of the difference (stock 1,000 more, VAT 100 more).
     await cost(posted.id, 1, [{ lineId, amount: '12100' }], '12100').expect(200);
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
       '130301': '100.00',
-      '310201': '1000.00',
+      '140101': '1000.00',
       '310101': '-1100.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '12100.00' });
@@ -288,7 +314,7 @@ describe('finance payables', () => {
     await cost(posted.id, 2, [{ lineId, amount: '9900' }], '9900').expect(200);
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:3`)).toEqual({
       '130301': '-200.00',
-      '310201': '-2000.00',
+      '140101': '-2000.00',
       '310101': '2200.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '9900.00' });
@@ -309,11 +335,11 @@ describe('finance payables', () => {
     // 26,400 less 10 %: 23,760 owed, 2,160 of it input VAT, 21,600 into the stock.
     expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
       '130301': '2160.00',
-      '310201': '21600.00',
+      '140101': '21600.00',
       '310101': '-23760.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '23760.00' });
-    expect(await goodsReceivedOf(posted.id)).toBe('0.00');
+    expect(await goodsReceivedOf(posted.id)).toBe('0');
     const recost = (version: number, discount: Record<string, unknown>) =>
       http()
         .put(`/api/v1/receipts/${posted.id}/costs`)
@@ -329,7 +355,7 @@ describe('finance payables', () => {
     await recost(1, { discounts: [], noteTotalAmount: '26400' });
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
       '130301': '240.00',
-      '310201': '2400.00',
+      '140101': '2400.00',
       '310101': '-2640.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '26400.00' });
@@ -337,12 +363,12 @@ describe('finance payables', () => {
     await recost(2, { discounts: [{ kind: 'NOTE', amount: '1100' }], noteTotalAmount: '25300' });
     expect(await linesOf('RECEIPT_RECOST', `${posted.id}:3`)).toEqual({
       '130301': '-100.00',
-      '310201': '-1000.00',
+      '140101': '-1000.00',
       '310101': '1100.00',
     });
     expect(await balance(shop)).toMatchObject({ balance: '25300.00' });
-    // Goods received clears with each bill.
-    expect(await goodsReceivedOf(posted.id)).toBe('0.00');
+    // Nothing passes through goods received.
+    expect(await goodsReceivedOf(posted.id)).toBe('0');
   });
 
   it('pays a supplier by a manual entry and lets the accountant pair it with the bill', async () => {
@@ -352,7 +378,7 @@ describe('finance payables', () => {
     ]);
     // No VAT for a supplier that pays none.
     expect(await linesOf('GOODS_RECEIPT', String(posted.id))).toEqual({
-      '310201': '5000.00',
+      '140101': '5000.00',
       '310101': '-5000.00',
     });
     const finance = financeApi(app, accountant);
@@ -518,6 +544,86 @@ describe('finance payables', () => {
     expect(party.rows).toEqual([{ name: 'Шинэ нэр АП', kind: 'COMPANY' }]);
   });
 
+  it('books the pricing as one entry on the receipt’s date, and a re-costing likewise (ADR-0233)', async () => {
+    const shop = await supplier('Нэг бичилт АП');
+    const day = addDays(today, today.endsWith('-01') ? 0 : -1);
+    const posted = await receipt(
+      shop,
+      [{ productUnitId: unitOf(water, 'PCS').id, enteredQty: '4' }],
+      { amount: '4000', supplierDocDate: day },
+    );
+    // The confirmation moved the quantities only: the books hold nothing of the receipt yet.
+    expect(await entriesOf(posted.id)).toEqual([]);
+    const lineId = posted.lines[0]?.id ?? 0;
+    await cost(posted.id, 0, [{ lineId, amount: '4000' }]).expect(200);
+    await cost(posted.id, 1, [{ lineId, amount: '4400' }], '4400').expect(200);
+    expect(await entriesOf(posted.id)).toEqual([
+      { docType: 'GOODS_RECEIPT', docId: String(posted.id), date: day, accounts: '140101,310101' },
+      { docType: 'RECEIPT_RECOST', docId: `${posted.id}:2`, date: day, accounts: '140101,310101' },
+    ]);
+    expect(await linesOf('RECEIPT_RECOST', `${posted.id}:2`)).toEqual({
+      '140101': '400.00',
+      '310101': '-400.00',
+    });
+    expect(await items(shop)).toEqual([
+      expect.objectContaining({ side: 'CREDIT', amount: '4000.00' }),
+      expect.objectContaining({ side: 'CREDIT', amount: '400.00' }),
+    ]);
+  });
+
+  it('books the pricing today when the receipt’s month is closed (ADR-0233)', async () => {
+    const shop = await supplier('Хаасан сар АП');
+    const lastMonth = addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7);
+    const day = `${lastMonth}-15`;
+    const posted = await receipt(
+      shop,
+      [{ productUnitId: unitOf(water, 'PCS').id, enteredQty: '3' }],
+      { amount: '3000', supplierDocDate: day },
+    );
+    const period = (action: string, body?: Record<string, unknown>) =>
+      http()
+        .post(`/api/v1/finance/periods/${lastMonth}/${action}`)
+        .set(bearer(accountant))
+        .set(idempotency())
+        .send(body);
+    await period('close').expect(200);
+    try {
+      await cost(posted.id, 0, [{ lineId: posted.lines[0]?.id ?? 0, amount: '3000' }]).expect(200);
+    } finally {
+      await period('reopen', { reason: 'Шалгалтын дараа' }).expect(200);
+    }
+    // The entry is on the first open day; the bill keeps the receipt's date as its own.
+    expect(await entriesOf(posted.id)).toEqual([
+      {
+        docType: 'GOODS_RECEIPT',
+        docId: String(posted.id),
+        date: today,
+        accounts: '140101,310101',
+      },
+    ]);
+    const bill = await sql.query<{ date: string }>(
+      `SELECT document_date::text AS date FROM fin.documents
+        WHERE source_doc_type = 'GOODS_RECEIPT' AND source_doc_id = $1`,
+      [String(posted.id)],
+    );
+    expect(bill.rows).toEqual([{ date: day }]);
+    expect(await balance(shop)).toMatchObject({ balance: '3000.00' });
+  });
+
+  it('never posts a receipt on goods received (ADR-0233)', async () => {
+    const used = await sql.query<{ n: string }>(
+      `SELECT count(*)::text AS n
+         FROM fin.documents d
+         JOIN fin.journal_entries e ON e.company_id = d.company_id AND e.document_id = d.id
+         JOIN fin.journal_lines l ON l.company_id = e.company_id AND l.entry_id = e.id
+         JOIN fin.accounts a ON a.company_id = l.company_id AND a.id = l.account_id
+        WHERE a.code = '310201'
+          AND (d.source_doc_type IN ('GOODS_RECEIPT', 'RECEIPT_RECOST', 'STOCK_REVALUE')
+            OR (d.source_doc_type = 'STOCK' AND d.source_doc_id LIKE 'GR:%'))`,
+    );
+    expect(used.rows[0]?.n).toBe('0');
+  });
+
   it('bills the account the receipt names, and refuses one off the list (ADR-0154)', async () => {
     const shop = await supplier('Тусгай данс АП');
     for (const [code, name] of [
@@ -557,7 +663,7 @@ describe('finance payables', () => {
     );
     await costReceiptAsTyped(app, accountant, draft.id);
     expect(await linesOf('GOODS_RECEIPT', String(draft.id))).toEqual({
-      '310201': '5000.00',
+      '140101': '5000.00',
       '310177': '-5000.00',
     });
     const detail = (await http().get(`/api/v1/receipts/${draft.id}`).set(bearer(admin)).expect(200))
@@ -575,7 +681,7 @@ describe('finance payables', () => {
     );
     await costReceiptAsTyped(app, accountant, counted.id);
     expect(await linesOf('GOODS_RECEIPT', String(counted.id))).toEqual({
-      '310201': '2000.00',
+      '140101': '2000.00',
       '313011': '-2000.00',
     });
   });

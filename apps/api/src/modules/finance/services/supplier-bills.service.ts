@@ -6,11 +6,12 @@ import type { Tx } from '../../../common/db/db.types';
 import { FinReader } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
 import { type Actor, OrgService } from '../../identity';
-import type {
-  PurchaseBooks,
-  ReceiptBookFacts,
-  ReceiptBookTotals,
-  SupplierReturnFacts,
+import {
+  type PurchaseBooks,
+  type ReceiptBookFacts,
+  type ReceiptBookTotals,
+  StockPostingService,
+  type SupplierReturnFacts,
 } from '../../inventory';
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
@@ -27,16 +28,19 @@ export const receiptGroupRef = (receiptId: number): string => `receipt:${receipt
  * and posted through the Finance Core's intake inside the receipt's or the issue's transaction, as
  * source BTO with the staff member as the actor (a warehouse user needs no finance right):
  * - a receipt that gets its prices (costing version 1) is the supplier's bill
- *   `BTO/GOODS_RECEIPT/<id>`: Dr goods received (the clearing the receipt's stock entry credited,
- *   F4 ADR-0097), Dr input VAT / Cr payable, due on its date;
- * - a later costing books only the difference `BTO/RECEIPT_RECOST/<id>:<version>`: a bill when the
- *   payable grows, a credit settling the receipt's open bill when it shrinks, a journal when only
- *   the stock and the VAT move;
+ *   `BTO/GOODS_RECEIPT/<id>`, one entry straight from the stock to the payable (ADR-0233): Dr stock
+ *   (the costed value less what had already left), Dr cost of goods sold (that part: goods sold
+ *   before the prices came), Dr input VAT / Cr payable, due on the receipt's date;
+ * - a later costing books only the difference of the same four `BTO/RECEIPT_RECOST/<id>:<version>`:
+ *   a bill when the payable grows, a credit settling the receipt's open bill when it shrinks, a
+ *   journal when only the stock, the cost of sales and the VAT move;
  * - a supplier return `BTO/SUPPLIER_RETURN/<id>`: Dr payable / Cr stock, Cr input VAT, left open
  *   for the accountant to pair (TODO-VERIFY D8).
- * The accounts are the rules of the keys AP, VAT_INPUT, GOODS_RECEIVED and INVENTORY (temporary,
- * TODO-VERIFY D16). Since F4 the stock itself is booked by the receipt's posting and its costings
- * (`StockBooksService`); a supplier return still takes it out here.
+ * Both receipt entries are dated the receipt's date, or today when that month is closed. The
+ * confirmation of a receipt books nothing (its quantities only); goods received 310201 is no longer
+ * used, except to clear what a receipt confirmed before ADR-0233 had credited there.
+ * The accounts are the rules of the keys AP, VAT_INPUT, INVENTORY and COGS (temporary, TODO-VERIFY
+ * D16).
  */
 @Injectable()
 export class SupplierBillsService implements PurchaseBooks {
@@ -46,9 +50,13 @@ export class SupplierBillsService implements PurchaseBooks {
     private readonly parties: FinPartiesBridge,
     private readonly reader: FinReader,
     private readonly org: OrgService,
+    private readonly stock: StockPostingService,
   ) {}
 
-  /** `revision`: the bill's revision (2 when the development re-post books an F3 bill again, F4). */
+  /**
+   * `facts.previous` null: the whole receipt as one bill (its first costing; the development
+   * re-post at its latest). `revision`: the bill's revision when a re-post books it again.
+   */
   async receiptCostedInTx(
     tx: Tx,
     actor: Actor,
@@ -60,33 +68,15 @@ export class SupplierBillsService implements PurchaseBooks {
     const counterKey = facts.counterAccountCode
       ? { key: receiptCounterKey(facts.counterAccountCode) }
       : {};
-    if (facts.previous === null) {
-      const { payable, vat, vatBase, stock } = facts.totals;
-      if (!payable.gt(0)) return;
-      await this.post(tx, actor, facts.supplierId, {
-        docType: FIN_DOC_TYPES.SUPPLIER_BILL.docType,
-        docId: String(facts.receiptId),
-        docNo: facts.number,
-        documentType: FIN_DOC_TYPES.SUPPLIER_BILL.code,
-        date: facts.date,
-        revision,
-        warehouseIds: facts.warehouseIds,
-        lines: [
-          { role: 'GOODS_RECEIVED', debit: stock, credit: ZERO },
-          { role: 'VAT_INPUT', debit: vat, credit: ZERO, taxBase: vatBase },
-          {
-            role: 'AP',
-            ...counterKey,
-            debit: ZERO,
-            credit: payable,
-            extra: { openItem: { dueDate: facts.date, groupRef } },
-          },
-        ],
-      });
-      return;
-    }
-    const delta = difference(facts.totals, facts.previous);
-    const today = businessDate();
+    const first = facts.previous === null;
+    const delta = facts.previous === null ? facts.totals : difference(facts.totals, facts.previous);
+    // What the costing charged to goods that had already left; the rest of the value is stock.
+    const variance = await this.stock.costingVariance(
+      facts.receiptId,
+      tx,
+      first ? undefined : facts.version,
+    );
+    const cleared = first ? await this.bookedAtConfirmation(tx, actor, facts.receiptId) : ZERO;
     // A lower payable settles what is still open of the receipt's bills; the rest stays open.
     const billsOpen = delta.payable.lt(0)
       ? await this.reader.groupOpenInTx(tx, this.books.source(actor), {
@@ -102,7 +92,7 @@ export class SupplierBillsService implements PurchaseBooks {
           ...counterKey,
           debit: ZERO,
           credit: delta.payable,
-          extra: { openItem: { dueDate: today, groupRef } },
+          extra: { openItem: { dueDate: facts.date, groupRef } },
         }
       : delta.payable.lt(0)
         ? {
@@ -116,7 +106,6 @@ export class SupplierBillsService implements PurchaseBooks {
             },
           }
         : null;
-    if (ap === null && delta.stock.isZero() && delta.vat.isZero()) return;
     const type =
       ap === null
         ? FIN_DOC_TYPES.RECEIPT_RECOST
@@ -124,18 +113,52 @@ export class SupplierBillsService implements PurchaseBooks {
           ? FIN_DOC_TYPES.SUPPLIER_BILL
           : FIN_DOC_TYPES.SUPPLIER_BILL_CREDIT;
     await this.post(tx, actor, facts.supplierId, {
-      docType: FIN_DOC_TYPES.RECEIPT_RECOST.docType,
-      docId: `${facts.receiptId}:${facts.version}`,
-      docNo: `${facts.number}/${facts.version}`,
+      ...(first
+        ? {
+            docType: FIN_DOC_TYPES.SUPPLIER_BILL.docType,
+            docId: String(facts.receiptId),
+            docNo: facts.number,
+            revision,
+          }
+        : {
+            docType: FIN_DOC_TYPES.RECEIPT_RECOST.docType,
+            docId: `${facts.receiptId}:${facts.version}`,
+            docNo: `${facts.number}/${facts.version}`,
+          }),
       documentType: type.code,
-      date: today,
+      date: facts.date,
       warehouseIds: facts.warehouseIds,
       lines: [
-        signed('GOODS_RECEIVED', delta.stock),
+        signed('INVENTORY', delta.stock.minus(variance).minus(cleared)),
+        signed('COGS', variance),
+        signed('GOODS_RECEIVED', cleared),
         { ...signed('VAT_INPUT', delta.vat), taxBase: delta.vatBase.abs() },
         ...(ap === null ? [] : [ap]),
       ],
     });
+  }
+
+  /**
+   * What a receipt confirmed before ADR-0233 credited to goods received (310201) for its stock at
+   * the provisional cost, `BTO/STOCK/GR:<id>:<first ledger row>`: its bill clears that instead of
+   * debiting the stock a second time. Zero for every receipt confirmed since.
+   */
+  private async bookedAtConfirmation(tx: Tx, actor: Actor, receiptId: number): Promise<Decimal> {
+    const entry = await this.stock.receiptEntry(receiptId, tx);
+    if (entry === null || entry.value.isZero()) return ZERO;
+    const docId = `GR:${receiptId}:${entry.firstLedgerId}`;
+    const known = await this.reader.documentsOfSource(
+      this.books.source(actor),
+      {
+        company: await this.books.company(),
+        system: BTO_SOURCE,
+        docType: FIN_DOC_TYPES.STOCK_VALUE.docType,
+        docIds: [docId],
+      },
+      this.books.executor(tx),
+    );
+    const document = known.get(docId);
+    return document && document.reversal === null ? entry.value : ZERO;
   }
 
   /** One confirmed part of a supplier return (ADR-0117 #2), `BTO/SUPPLIER_RETURN/<issue>:<warehouse>`. */
@@ -203,10 +226,18 @@ export class SupplierBillsService implements PurchaseBooks {
     await this.parties.supplierPartyInTx(tx, actor, supplierId);
     const party = await this.parties.supplierPartyIn(tx, supplierId);
     const lines = doc.lines.filter((line) => !(line.debit.isZero() && line.credit.isZero()));
+    if (lines.length < 2) return;
+    // A closed month never stops a costing or a return: the entry goes on today then (ADR-0233).
+    const accountingDate = await this.reader.postingDate(
+      this.books.source(actor),
+      { company: await this.books.company(), date: doc.date },
+      this.books.executor(tx),
+    );
     const body: PostBody = {
       action: 'POST',
       documentType: doc.documentType,
       documentDate: doc.date,
+      ...(accountingDate === doc.date ? {} : { accountingDate }),
       currency: 'MNT',
       party,
       dueDate: doc.date,

@@ -6,6 +6,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import { type CompanyScope, type FinExecutor, resolveCompany } from '../context/authorize';
 import type { FinCallContext } from '../context/call-context';
 import { FIN_DB, type FinDb, type FinTx } from '../db/fin-db';
+import { monthOf } from '../ledger/periods';
 import { lockPartiesInTx } from './sub-ledger';
 
 /** A party as a source knows it (`BTO`, `customer:412`). */
@@ -429,6 +430,31 @@ export class FinReader {
            sql`, `,
          )})`);
     return new Map(result.rows.map((row) => [str(row.source_doc_id), toDocumentRow(row)]));
+  }
+
+  /**
+   * The day a document dated `date` can be booked on (ADR-0233): `date` itself while its month takes
+   * postings, else the company's business date today. The rule is `openPeriodInTx`'s, read without
+   * its lock: a month is shut when it is CLOSED, or has no row while it or a later month is CLOSED.
+   * A source that must not fail on a closed month picks its `accountingDate` with this first.
+   */
+  async postingDate(
+    ctx: FinCallContext,
+    query: { company: string; date: string },
+    executor: FinExecutor = this.db,
+  ): Promise<string> {
+    const scope = await this.scope(executor, ctx, query.company);
+    const month = monthOf(query.date).code;
+    const result = await executor.execute<Row>(sql`
+      SELECT (SELECT p.status FROM fin.fiscal_periods p
+               WHERE p.company_id = ${scope.companyId} AND p.code = ${month}) AS status,
+             EXISTS (SELECT 1 FROM fin.fiscal_periods p
+                      WHERE p.company_id = ${scope.companyId} AND p.status = 'CLOSED'
+                        AND p.code >= ${month}) AS closed_later`);
+    const row = result.rows[0];
+    const status = strOrNull(row?.status);
+    const open = status === null ? row?.closed_later !== true : status === 'OPEN';
+    return open ? query.date : this.today(executor, scope);
   }
 
   /** Every allocation touching these documents' items (mirror pairings left out), oldest first. */

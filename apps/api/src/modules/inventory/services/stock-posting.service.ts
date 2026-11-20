@@ -28,7 +28,6 @@ import {
   type StockBookParty,
   type StockBooks,
   type StockPostedFacts,
-  type StockRevaluedFacts,
 } from '../hooks';
 import { stockLedger, stockValuationAdjustments } from '../ledger.schema';
 import {
@@ -604,7 +603,8 @@ export class StockPostingService implements OnModuleInit {
    * the value of its rows (`valueOf(qty, unit cost)`, signed) by what they did — received, sold or
    * returned from a sale, lost or found (an adjustment's reason, a count's sign), the opening stock,
    * issued for an expense type. A goods issue to a supplier is the supplier's credit (F3), never
-   * here; value-neutral moves book only a non-zero remainder.
+   * here; neither is a receipt, whose value the books take with its prices in the supplier's bill
+   * (ADR-0233); value-neutral moves book only a non-zero remainder.
    */
   private async bookFacts(
     tx: Db | Tx,
@@ -655,6 +655,8 @@ export class StockPostingService implements OnModuleInit {
           new Decimal(row.unitCost.toString()),
         );
         const kind = bookKindOf(row.movementType, reason, value);
+        // A receipt's value reaches the books with its prices, in the supplier's bill (ADR-0233).
+        if (kind === 'RECEIPT') continue;
         if (kind === null) {
           neutral = neutral.plus(value);
           continue;
@@ -1001,26 +1003,7 @@ export class StockPostingService implements OnModuleInit {
         };
       }),
     );
-    // The books (F4, ADR-0097): what the costing moved in the stock and what had already left.
-    if (this.books) {
-      const absorbed = results.reduce((sum, result) => sum.plus(result.absorbed), ZERO);
-      const variance = results.reduce((sum, result) => sum.plus(result.variance), ZERO);
-      if (!absorbed.isZero() || !variance.isZero()) {
-        const [receipt] = await tx
-          .select({ number: goodsReceipts.number })
-          .from(goodsReceipts)
-          .where(eq(goodsReceipts.id, input.docId));
-        await this.books.stockRevaluedInTx(tx, actor, {
-          receiptId: input.docId,
-          number: receipt?.number ?? null,
-          version: input.version,
-          date: effectiveDate,
-          absorbed,
-          variance,
-          warehouseIds: [...new Set(input.lines.map((line) => line.warehouseId))],
-        });
-      }
-    }
+    // The books take this costing in the supplier's bill (ADR-0233), from `costingVariance`.
     return results;
   }
 
@@ -1044,42 +1027,75 @@ export class StockPostingService implements OnModuleInit {
     return facts;
   }
 
-  /** Every receipt costing's absorbed value and variance (the development re-post, F4). */
-  async revaluationHistory(): Promise<StockRevaluedFacts[]> {
-    const result = await this.db.execute<{
-      doc_id: number;
-      version: number;
-      date: string;
-      absorbed: string;
-      variance: string;
-      number: string | null;
-      warehouse_ids: string[];
-    }>(sql`
-      SELECT v.doc_id::int AS doc_id, v.version::int AS version, min(v.effective_date)::text AS date,
-             sum(v.absorbed)::text AS absorbed, sum(v.variance)::text AS variance, r.number,
-             array_agg(DISTINCT v.warehouse_id::text) AS warehouse_ids
-        FROM stock_valuation_adjustments v
-        JOIN goods_receipts r ON r.id = v.doc_id
-       WHERE v.doc_type = 'GR'
-       GROUP BY v.doc_id, v.version, r.number
-       ORDER BY v.doc_id, v.version`);
-    return result.rows.flatMap((row) => {
-      const absorbed = new Decimal(row.absorbed);
-      const variance = new Decimal(row.variance);
-      return absorbed.isZero() && variance.isZero()
-        ? []
-        : [
-            {
-              receiptId: row.doc_id,
-              number: row.number,
-              version: row.version,
-              date: row.date,
-              absorbed,
-              variance,
-              warehouseIds: row.warehouse_ids.map(toId),
-            },
-          ];
-    });
+  /**
+   * What a receipt's costings charged to goods that had already left (ADR-0233): Σ variance of one
+   * costing version, or of every version when none is named. The supplier's bill books it on COGS
+   * and the rest of the costed value on INVENTORY.
+   */
+  async costingVariance(
+    docId: number,
+    executor: Db | Tx = this.db,
+    version?: number,
+  ): Promise<Decimal> {
+    const [row] = await executor
+      .select({
+        variance: sql<string>`coalesce(sum(${stockValuationAdjustments.variance}), 0)::text`,
+      })
+      .from(stockValuationAdjustments)
+      .where(
+        and(
+          eq(stockValuationAdjustments.docType, 'GR'),
+          eq(stockValuationAdjustments.docId, docId),
+          ...(version === undefined ? [] : [eq(stockValuationAdjustments.version, version)]),
+        ),
+      );
+    return new Decimal(row?.variance ?? 0);
+  }
+
+  /**
+   * The value a receipt's stock went in at when it was confirmed (quantity × the product's average
+   * that day, ADR-0033) and the first ledger row of that posting; null when it has no stock rows.
+   * The books take this value with the receipt's prices, never at the confirmation (ADR-0233).
+   */
+  async receiptEntry(
+    docId: number,
+    executor: Db | Tx = this.db,
+  ): Promise<{ firstLedgerId: number; value: Decimal } | null> {
+    const rows = await executor
+      .select({ id: stockLedger.id, qtyBase: stockLedger.qtyBase, unitCost: stockLedger.unitCost })
+      .from(stockLedger)
+      .where(
+        and(
+          eq(stockLedger.docType, 'GR'),
+          eq(stockLedger.docId, docId),
+          eq(stockLedger.movementType, 'RECEIPT'),
+        ),
+      );
+    if (rows.length === 0) return null;
+    return {
+      firstLedgerId: Math.min(...rows.map((row) => row.id)),
+      value: rows.reduce((sum, row) => sum.plus(valueOf(row.qtyBase, row.unitCost)), ZERO),
+    };
+  }
+
+  /**
+   * The value of the receipts that are confirmed and not yet priced, as their stock went in
+   * (ADR-0233): the stock's value holds it, the books' INVENTORY account not before the pricing.
+   */
+  async unpricedReceiptValue(executor: Db | Tx = this.db): Promise<Decimal> {
+    const rows = await executor
+      .select({ qtyBase: stockLedger.qtyBase, unitCost: stockLedger.unitCost })
+      .from(stockLedger)
+      .innerJoin(goodsReceipts, eq(goodsReceipts.id, stockLedger.docId))
+      .where(
+        and(
+          eq(stockLedger.docType, 'GR'),
+          eq(stockLedger.movementType, 'RECEIPT'),
+          eq(goodsReceipts.status, 'POSTED'),
+          eq(goodsReceipts.costingVersion, 0),
+        ),
+      );
+    return rows.reduce((sum, row) => sum.plus(valueOf(row.qtyBase, row.unitCost)), ZERO);
   }
 
   /**

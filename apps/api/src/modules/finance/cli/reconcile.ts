@@ -65,11 +65,17 @@ async function main(): Promise<void> {
     const run = await reconcileReceivables(db, 'MANUAL');
     for (const line of describeRun(run)) console.log(line);
     // The stock's value against the INVENTORY account (F4, ADR-0097): information, never an exit 2;
-    // the averages' four decimals leave cents.
-    const stock = await new StockPostingService(db, new NumberingService()).stockValue();
+    // the averages' four decimals leave cents. Receipts confirmed and not yet priced are in the
+    // stock's value and not yet in the books (ADR-0233), so their value is shown beside it.
+    // A receipt confirmed before ADR-0233 and still unpriced was booked at its confirmation, so it
+    // is in the books already and the difference shows its value until it is priced (the CLI has
+    // no call context to read the core's documents with).
+    const posting = new StockPostingService(db, new NumberingService());
+    const stock = await posting.stockValue();
+    const unpriced = await posting.unpricedReceiptValue();
     for (const books of await postingKeyBalances(db, 'INVENTORY')) {
       console.log(
-        `Stock value ${stock.toFixed(2)}; ${books.company} ${books.accountCode ?? '—'} ${books.balance.toFixed(2)}; difference ${stock.minus(books.balance).toFixed(2)}.`,
+        `Stock value ${stock.toFixed(2)} (receipts waiting for prices went in at ${unpriced.toFixed(2)}, taken off; one confirmed before ADR-0233 is in the books already); ${books.company} ${books.accountCode ?? '—'} ${books.balance.toFixed(2)}; difference ${stock.minus(unpriced).minus(books.balance).toFixed(2)}.`,
       );
     }
     if (run.status === 'DRIFT') process.exitCode = 2;

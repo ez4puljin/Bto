@@ -127,7 +127,7 @@ describe('receipt discounts and supplier products', () => {
         )
       ).rows.map((row) => [row.code, row.amount]),
     );
-  /** Dr − Cr on goods received (310201) over every Bto document of one receipt. */
+  /** Dr − Cr on goods received (310201) over every Bto document of one receipt: none (ADR-0233). */
   const goodsReceivedOf = async (receiptId: number) =>
     (
       await sql.query<{ amount: string }>(
@@ -271,14 +271,14 @@ describe('receipt discounts and supplier products', () => {
       { version: 1, doc_amount: '2200.00', discount_amount: '319.00', amount: '1710.00' },
       { version: 1, doc_amount: '0.00', discount_amount: null, amount: '0.00' },
     ]);
-    // The payable is Σ net, input VAT its VAT, goods received cleared by the stock's arrival.
+    // The payable is Σ net, input VAT its VAT, the rest the stock itself (ADR-0233).
     expect(await linesOf('GOODS_RECEIPT', String(receipt.id))).toEqual({
       '130301': '2603.00',
-      '310201': '26030.00',
+      '140101': '26030.00',
       '310101': '-28633.00',
     });
     expect(await balance(vatSupplier)).toBe('28633.00');
-    expect(await goodsReceivedOf(receipt.id)).toBe('0.00');
+    expect(await goodsReceivedOf(receipt.id)).toBe('0');
     const costing = (
       await http().get(`/api/v1/receipts/${receipt.id}/costing`).set(bearer(admin)).expect(200)
     ).body as { discounts: DiscountJson[]; total: string; docTotal: string };
@@ -322,11 +322,11 @@ describe('receipt discounts and supplier products', () => {
     // 30,690 owed now: 2,057 more, 187 of it VAT, 1,870 into the stock.
     expect(await linesOf('RECEIPT_RECOST', `${receipt.id}:2`)).toEqual({
       '130301': '187.00',
-      '310201': '1870.00',
+      '140101': '1870.00',
       '310101': '-2057.00',
     });
     expect(await balance(vatSupplier)).toBe('30690.00');
-    expect(await goodsReceivedOf(receipt.id)).toBe('0.00');
+    expect(await goodsReceivedOf(receipt.id)).toBe('0');
     const after = await get(receipt.id);
     expect(after.totals).toMatchObject({
       discountTotal: '3410.00',

@@ -5,15 +5,13 @@ import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
-import { FinJournalReader, FinReader } from '../../../finance-core';
+import { FinReader } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES } from '../../fin-bridge';
 import { type Actor } from '../../identity';
 import { GoodsIssuesService, ReceiptsService, StockPostingService } from '../../inventory';
 import { creditNotes, invoices } from '../schema';
 import { CreditNotesService } from './credit-notes.service';
 import { FinBooks } from './fin-books';
-import { FinPosting } from './fin-posting';
-import { GlAccountsService } from './gl-accounts.service';
 import { StockBooksService } from './stock-books.service';
 import { InvoicingService } from './invoicing.service';
 import { SupplierBillsService } from './supplier-bills.service';
@@ -25,7 +23,8 @@ export interface RepostCounts {
   /** F3 (ADR-0091): the bills of posted, costed receipts and the credits of supplier returns. */
   supplierBills: number;
   supplierReturns: number;
-  /** F4 (ADR-0097): F3 bills booked again on goods received, stock postings, receipt costings. */
+  /** F4 (ADR-0097): the stock postings. The other two stay 0 since ADR-0233: a bill is no longer
+   *  booked again on goods received, and a costing is part of the receipt's bill. */
   billsRebooked: number;
   stockPostings: number;
   stockRevaluations: number;
@@ -51,9 +50,6 @@ export class JournalRepostService {
     private readonly bills: SupplierBillsService,
     private readonly reader: FinReader,
     private readonly books: FinBooks,
-    private readonly accounts: GlAccountsService,
-    private readonly journal: FinJournalReader,
-    private readonly posting: FinPosting,
     private readonly stock: StockPostingService,
     private readonly stockBooks: StockBooksService,
   ) {}
@@ -138,7 +134,8 @@ export class JournalRepostService {
     }
 
     // F3 (ADR-0091): each costed receipt's bill at its latest costing, each supplier return's
-    // credit; a receipt or an issue the books already hold is skipped.
+    // credit; a receipt or an issue the books already hold is skipped. The bill is the one entry
+    // of ADR-0233: stock, the cost of what was sold before the prices, VAT / payable.
     const receiptIds = await this.receipts.postedCostedIds();
     const billed = await this.booked(FIN_DOC_TYPES.SUPPLIER_BILL.docType, receiptIds);
     for (const id of receiptIds) {
@@ -171,38 +168,7 @@ export class JournalRepostService {
       counts.supplierReturns += 1;
     }
 
-    // F4 (ADR-0097): an F3 bill debited the stock itself; the receipt's posting now does, so the
-    // bill is reversed and booked again (revision 2) on goods received.
-    const inventoryCodes = new Set(
-      (await this.accounts.list())
-        .filter((account) => account.role === 'INVENTORY')
-        .map((account) => account.code),
-    );
-    const bills = await this.reader.documentsOfSource(this.books.source(), {
-      company: await this.books.company(),
-      system: BTO_SOURCE,
-      docType: FIN_DOC_TYPES.SUPPLIER_BILL.docType,
-      docIds: receiptIds.map(String),
-    });
-    for (const [docId, bill] of bills) {
-      if (bill.reversal !== null || bill.entryId === null) continue;
-      const entry = await this.journal.entry(this.books.source(), {
-        company: await this.books.company(),
-        id: bill.entryId,
-      });
-      if (!entry?.lines.some((line) => inventoryCodes.has(line.accountCode))) continue;
-      await inTransaction(this.db, async (tx) => {
-        await this.posting.submitInTx(tx, this.books.source(actor), {
-          source: { system: BTO_SOURCE, docType: FIN_DOC_TYPES.SUPPLIER_BILL.docType, docId },
-          body: { action: 'REVERSE', accountingDate: businessDate(), reason: 'F4: goods received' },
-        });
-        const facts = await this.receipts.bookFacts(Number.parseInt(docId, 10), tx);
-        await this.bills.receiptCostedInTx(tx, actor, facts, 2);
-      });
-      counts.billsRebooked += 1;
-    }
-
-    // The stock's history, one posting at a time, and the receipts' costings (F4).
+    // The stock's history, one posting at a time (F4); a receipt's rows book nothing (ADR-0233).
     const history = await this.stock.historyFacts();
     const posted = await this.booked(
       FIN_DOC_TYPES.STOCK_VALUE.docType,
@@ -212,16 +178,6 @@ export class JournalRepostService {
       if (posted.has(`${facts.docType}:${facts.docId}:${facts.firstLedgerId}`)) continue;
       await inTransaction(this.db, (tx) => this.stockBooks.stockPostedInTx(tx, actor, facts));
       counts.stockPostings += 1;
-    }
-    const costings = await this.stock.revaluationHistory();
-    const revalued = await this.booked(
-      FIN_DOC_TYPES.STOCK_REVALUE.docType,
-      costings.map((facts) => `${facts.receiptId}:${facts.version}`),
-    );
-    for (const facts of costings) {
-      if (revalued.has(`${facts.receiptId}:${facts.version}`)) continue;
-      await inTransaction(this.db, (tx) => this.stockBooks.stockRevaluedInTx(tx, actor, facts));
-      counts.stockRevaluations += 1;
     }
     return counts;
   }

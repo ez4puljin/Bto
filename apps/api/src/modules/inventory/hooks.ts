@@ -240,7 +240,10 @@ export interface DamageChargeFacts {
   warehouseIds: number[];
 }
 
-/** A receipt's costing: what moved the stock's value and what had already left (the variance). */
+/**
+ * A receipt's costing: what moved the stock's value and what had already left (the variance). Not
+ * used since ADR-0233 (the supplier's bill books a costing).
+ */
 export interface StockRevaluedFacts {
   receiptId: number;
   number: string | null;
@@ -253,13 +256,13 @@ export interface StockRevaluedFacts {
 }
 
 /**
- * The stock's value in the books (F4, ADR-0097): every posting and every receipt costing, inside
- * the posting's transaction (a refusal rolls it back). Finance binds it with `useExisting`; nothing
+ * The stock's value in the books (F4, ADR-0097): every posting, inside the posting's transaction (a
+ * refusal rolls it back). A receipt is not told here: its value is booked with its prices through
+ * PURCHASE_BOOKS, in the supplier's bill (ADR-0233). Finance binds it with `useExisting`; nothing
  * is booked when nothing is bound (tests that load inventory alone).
  */
 export interface StockBooks {
   stockPostedInTx(tx: Tx, actor: Actor, facts: StockPostedFacts): Promise<void>;
-  stockRevaluedInTx(tx: Tx, actor: Actor, facts: StockRevaluedFacts): Promise<void>;
   /** A «Хүнд тооцох» part confirmed: the receivable on the party (ADR-0117 #3). */
   damageChargedInTx(tx: Tx, actor: Actor, facts: DamageChargeFacts): Promise<void>;
   /** A correction confirmed: the corrected part's charge reversed (ADR-0117 #5). */

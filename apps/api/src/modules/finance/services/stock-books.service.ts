@@ -15,7 +15,6 @@ import type {
   StockBookParty,
   StockBooks,
   StockPostedFacts,
-  StockRevaluedFacts,
 } from '../../inventory';
 import { FinBooks } from './fin-books';
 import { FinPosting } from './fin-posting';
@@ -24,9 +23,11 @@ import { stockCountKey } from './stock-count-accounts.service';
 
 const ZERO = new Decimal(0);
 
-/** The counter account of each kind of stock line (F4, ADR-0097; TODO-VERIFY D8). */
-const ROLE_OF_KIND: Readonly<Record<Exclude<StockBookKind, 'ISSUE'>, GlRole>> = {
-  RECEIPT: 'GOODS_RECEIVED',
+/**
+ * The counter account of each kind of stock line (F4, ADR-0097; TODO-VERIFY D8). A receipt has
+ * none: its value is booked with its prices by the supplier's bill (ADR-0233).
+ */
+const ROLE_OF_KIND: Readonly<Record<Exclude<StockBookKind, 'ISSUE' | 'RECEIPT'>, GlRole>> = {
   SALE: 'COGS',
   SALE_RETURN: 'COGS',
   LOSS: 'STOCK_LOSS',
@@ -71,12 +72,11 @@ const LABELS: Readonly<Record<string, string>> = mn.finance.stockBooks;
  * the Finance Core's intake inside the stock posting's transaction, as source BTO with the staff
  * member as the actor (a refusal rolls the posting back; a till's sale is parked as any refusal):
  * - every posting of a stock document → `BTO/STOCK/<docType>:<docId>:<first ledger row>`, a JOURNAL
- *   of type BTO.STOCK_VALUE: the change of INVENTORY against the kind's account — goods received
- *   (cleared by the supplier's bill, F3), the cost of goods sold or returned, a loss or a gain, the
- *   opening stock's offset, an expense type's account;
- * - a receipt's costing → `BTO/STOCK_REVALUE/<receipt>:<version>`: what moved the stock's value on
- *   INVENTORY, what had already left on COGS, against goods received.
- * So INVENTORY follows the stock's value, and goods received holds what is received but not billed.
+ *   of type BTO.STOCK_VALUE: the change of INVENTORY against the kind's account — the cost of goods
+ *   sold or returned, a loss or a gain, the opening stock's offset, an expense type's account;
+ * - a receipt books nothing here (ADR-0233): its confirmation moves quantities only, and its value
+ *   enters INVENTORY with its prices, in the supplier's bill (`SupplierBillsService`).
+ * So INVENTORY follows the stock's value, less the value of receipts still waiting for their prices.
  */
 @Injectable()
 export class StockBooksService implements StockBooks {
@@ -98,6 +98,8 @@ export class StockBooksService implements StockBooks {
     // account report filters by account and party.
     const party = facts.party ? await this.partyIn(tx, actor, facts.party) : undefined;
     for (const line of facts.lines) {
+      // A receipt's confirmation moves quantities only (ADR-0233): nothing on goods received.
+      if (line.kind === 'RECEIPT') continue;
       stock = stock.plus(line.value);
       if (line.kind !== 'ISSUE') {
         // A product count's difference (ADR-0176 #7, #8): its chosen account by the account's own
@@ -231,21 +233,6 @@ export class StockBooksService implements StockBooks {
     }
     const name = party.name.trim().slice(0, 200) || '—';
     return { ref: otherRef(name), kind: 'OTHER', name };
-  }
-
-  async stockRevaluedInTx(tx: Tx, actor: Actor, facts: StockRevaluedFacts): Promise<void> {
-    await this.post(tx, actor, {
-      docType: FIN_DOC_TYPES.STOCK_REVALUE.docType,
-      docId: `${facts.receiptId}:${facts.version}`,
-      date: facts.date,
-      description: `${LABELS.revalue ?? 'GR'} ${facts.number ?? `#${facts.receiptId}`}/${facts.version}`,
-      warehouseIds: facts.warehouseIds,
-      lines: [
-        signed('INVENTORY', facts.absorbed),
-        signed('COGS', facts.variance),
-        opposite('GOODS_RECEIVED', facts.absorbed.plus(facts.variance)),
-      ],
-    });
   }
 
   /** The expense-type keys that hold an account on the posting's date (none asked: none read). */
