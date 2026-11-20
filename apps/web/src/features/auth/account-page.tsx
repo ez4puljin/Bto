@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { passwordMessage } from '@/lib/forms';
 import { problemOf } from '@/lib/problem';
+import { OwnPhotoCard } from './own-photo/own-photo-card';
 import { localPhone } from '@/features/partners/phone';
 import { toast } from '@/lib/toast';
 
@@ -89,6 +90,7 @@ export function AccountPage() {
       {/* Two stacks, not a grid of cards: a card's height never opens a hole in the other column. */}
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-5">
+          <OwnPhotoCard name={me.fullName} />
           <FieldList
             title={t('auth.account.profile')}
             items={[
