@@ -103,6 +103,11 @@ async def check(config: Config) -> int:
     except BtoError as error:
         if error.code == "PHONE_KEY_INVALID":
             print("Bto түлхүүрийг хүлээж авсангүй. Шугамын хуудаснаас шинэ түлхүүр аваад дахин суулгана.")
+        elif error.status == 403:
+            print(
+                "Cloudflare хүсэлтийг хаалаа (403). Серверийн хаягийг дотоод сүлжээний "
+                "http://192.168.1.250 болгож дахин суулгана уу."
+            )
         else:
             print(f"Bto татгалзлаа: {error.code}")
         return 1

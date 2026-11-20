@@ -14,7 +14,7 @@ import pytest
 
 from btobridge import protocol
 from btobridge.audio import StageThree, open_audio
-from btobridge.bto import BtoClient, BtoError, BtoUnreachable
+from btobridge.bto import USER_AGENT, BtoClient, BtoError, BtoUnreachable
 from btobridge.config import Config, load, save
 from btobridge.dsp import Resampler, VoiceDetector, to_mono
 from btobridge.metrics import CallMetrics, append_csv, percentile, report
@@ -164,6 +164,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "path": self.path,
                 "auth": self.headers.get("Authorization"),
                 "key": self.headers.get("Idempotency-Key"),
+                "agent": self.headers.get("User-Agent"),
                 "body": body,
             }
         )
@@ -192,6 +193,9 @@ def test_the_client_retries_with_the_same_key_and_keeps_only_the_code() -> None:
         assert [s["key"] for s in _Handler.seen] == ["k-1", "k-1"]
         assert _Handler.seen[0]["path"] == "/api/v1/phone-agent/calls/7/tools/search_products"
         assert _Handler.seen[0]["auth"] == f"Bearer {KEY}"
+        # Cloudflare 403s the default «Python-urllib/x» agent, so the bridge names itself.
+        assert _Handler.seen[0]["agent"] == USER_AGENT
+        assert _Handler.seen[0]["agent"].startswith("BtoCallBridge/")
 
         _Handler.plan[:] = [(409, {"code": "PHONE_ORDER_NOT_CONFIRMED", "detail": "x"})]
         with pytest.raises(BtoError) as refused:

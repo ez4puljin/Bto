@@ -8,6 +8,8 @@ from typing import Any
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+from .bto import USER_AGENT
+
 
 class WsConnection:
     def __init__(self, socket: Any) -> None:
@@ -18,6 +20,7 @@ class WsConnection:
     async def open(cls, url: str) -> WsConnection:
         socket = await websockets.connect(
             url,
+            user_agent_header=USER_AGENT,
             open_timeout=6,
             max_size=8 * 1024 * 1024,
             # The provider pings at the application level (ping/pong messages); keep the

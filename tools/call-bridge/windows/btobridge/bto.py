@@ -15,7 +15,10 @@ import urllib.request
 import uuid
 from typing import Any, Protocol
 
+from . import __version__
+
 API = "/api/v1/phone-agent"
+USER_AGENT = f"BtoCallBridge/{__version__} (Windows)"
 
 
 class BtoUnreachable(Exception):
@@ -141,7 +144,12 @@ class BtoClient:
         idempotency: str | None,
         timeout: float,
     ) -> dict[str, Any]:
-        headers = {"Authorization": f"Bearer {self._key}", "Accept": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {self._key}",
+            "Accept": "application/json",
+            # Cloudflare blocks the default «Python-urllib/x» agent (403) on the public address.
+            "User-Agent": USER_AGENT,
+        }
         data = None
         if body is not None:
             data = json.dumps(body, ensure_ascii=False).encode("utf-8")
