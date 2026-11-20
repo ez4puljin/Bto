@@ -34,7 +34,7 @@ $TaskName = 'Bto call bridge'
 $Folder = Join-Path $env:LOCALAPPDATA 'BtoCall'
 $PythonDir = Join-Path $Folder 'python'
 $AppDir = Join-Path $Folder 'app'
-$Config = Join-Path $Folder 'config.json'
+$ConfigPath = Join-Path $Folder 'config.json'
 $Raw = 'https://raw.githubusercontent.com/ez4puljin/Bto/main/tools/call-bridge/windows'
 
 $PythonUrl = 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip'
@@ -118,28 +118,35 @@ function Install-Bridge {
   }
 
   Write-Host '4/6  microphone and speakers'
-  $config = [ordered]@{ server = $Server.TrimEnd('/'); key = $Key; mode = 'local'; input_device = $null; output_device = $null }
-  if (Test-Path $Config) {
+  $bridgeSettings = [ordered]@{ server = $Server.TrimEnd('/'); key = $Key; mode = 'local'; input_device = $null; output_device = $null }
+  if (Test-Path $ConfigPath) {
     try {
-      $old = Get-Content -Raw $Config | ConvertFrom-Json
+      $old = Get-Content -Raw $ConfigPath | ConvertFrom-Json
       foreach ($name in 'input_device', 'output_device', 'chunk_ms', 'max_call_s', 'silence_s', 'grace_s') {
-        if ($old.PSObject.Properties.Name -contains $name) { $config[$name] = $old.$name }
+        if ($old.PSObject.Properties.Name -contains $name) { $bridgeSettings[$name] = $old.$name }
       }
     } catch { }
   }
-  if ($InputDevice) { $config.input_device = $InputDevice }
-  if ($OutputDevice) { $config.output_device = $OutputDevice }
+  if ($InputDevice) { $bridgeSettings.input_device = $InputDevice }
+  if ($OutputDevice) { $bridgeSettings.output_device = $OutputDevice }
   if (-not $NoDevicePrompt -and -not $InputDevice -and -not $OutputDevice) {
     & $python -m btobridge devices
     Write-Host '     A headset is best: with speakers the AI hears itself.'
     $in = Read-Host '     The number of the MICROPHONE (Enter: Windows default)'
     $out = Read-Host '     The number of the HEADPHONES / SPEAKERS (Enter: Windows default)'
     $n = 0
-    if ([int]::TryParse($in, [ref]$n)) { $config.input_device = $n }
-    if ([int]::TryParse($out, [ref]$n)) { $config.output_device = $n }
+    if ([int]::TryParse($in, [ref]$n)) { $bridgeSettings.input_device = $n }
+    if ([int]::TryParse($out, [ref]$n)) { $bridgeSettings.output_device = $n }
   }
-  $json = $config | ConvertTo-Json
-  [IO.File]::WriteAllText($Config, $json, (New-Object Text.UTF8Encoding($false)))
+  $json = $bridgeSettings | ConvertTo-Json
+  [IO.File]::WriteAllText($ConfigPath, $json, (New-Object Text.UTF8Encoding($false)))
+  # An older installer wrote the settings to a file with this odd name in the current folder: remove it.
+  foreach ($stray in @((Get-Location).Path, $HOME)) {
+    $strayFile = Join-Path $stray 'System.Collections.Specialized.OrderedDictionary'
+    if ((Test-Path $strayFile -PathType Leaf) -and ((Get-Item $strayFile).Length -lt 4096)) {
+      Remove-Item -Force $strayFile -ErrorAction SilentlyContinue
+    }
+  }
 
   Write-Host '5/6  the background task, now and at every sign-in'
   $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
