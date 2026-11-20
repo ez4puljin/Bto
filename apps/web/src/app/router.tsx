@@ -144,6 +144,13 @@ import { PollsPage } from '@/features/hr/community/polls-page';
 import { SharesPage } from '@/features/hr/community/shares-page';
 import { SitesPage } from '@/features/hr/community/sites-page';
 import { HrHomePage } from '@/features/hr/home-page';
+import { PayrollAdvancesPage } from '@/features/payroll/advances-page';
+import { PayrollRunPage } from '@/features/payroll/run-page';
+import { PayrollRunsPage } from '@/features/payroll/runs-page';
+import { PayrollScoringPage } from '@/features/payroll/scoring-page';
+import { PayrollSettingsPage } from '@/features/payroll/settings-page';
+import { PayrollTemplatesPage } from '@/features/payroll/templates-page';
+import { PayrollTermsPage } from '@/features/payroll/terms-page';
 import { InsightsPage } from '@/features/hr/insights/insights-page';
 import { EmployeePage, OldUserRedirect, OldUsersRedirect } from '@/features/hr/employee-page';
 import { BannersPage } from '@/features/customer-app/banners-page';
@@ -1067,6 +1074,42 @@ function appRoutes(): RouteObject[] {
   ];
 }
 
+/** The payroll pages (ADR-0235), under «Хүний нөөц → Цалин». */
+function payrollRoutes(): RouteObject[] {
+  const view = (element: ReactNode) => (
+    <RequirePermission permission="hr.payroll.view">{element}</RequirePermission>
+  );
+  return [
+    { path: 'hr/payroll/runs', handle: { width: 'wide' }, element: view(<PayrollRunsPage />) },
+    { path: 'hr/payroll/runs/:id', handle: { width: 'wide' }, element: view(<PayrollRunPage />) },
+    {
+      path: 'hr/payroll/scoring',
+      handle: { width: 'wide' },
+      element: (
+        <RequirePermission permission={['hr.payroll.score', 'hr.payroll.manage']}>
+          <PayrollScoringPage />
+        </RequirePermission>
+      ),
+    },
+    { path: 'hr/payroll/terms', handle: { width: 'wide' }, element: view(<PayrollTermsPage />) },
+    {
+      path: 'hr/payroll/templates',
+      handle: { width: 'wide' },
+      element: view(<PayrollTemplatesPage />),
+    },
+    {
+      path: 'hr/payroll/advances',
+      handle: { width: 'wide' },
+      element: view(<PayrollAdvancesPage />),
+    },
+    {
+      path: 'hr/payroll/settings',
+      handle: { width: 'reading' },
+      element: view(<PayrollSettingsPage />),
+    },
+  ];
+}
+
 /**
  * The attendance pages (ADR-0131), every one behind hr.attendance.view: the setup (sites, the
  * schedule, the employees) reads to a viewer and is changed by hr.attendance.manage, which the menu
@@ -1109,6 +1152,9 @@ function hrRoutes(): RouteObject[] {
     { path: 'hr/schedules', handle: { width: 'wide' }, element: view(<SchedulesPage />) },
     { path: 'hr/requests', handle: { width: 'wide' }, element: view(<RequestsPage />) },
     { path: 'hr/report', handle: { width: 'wide' }, element: view(<HrReportPage />) },
+    // Payroll with KPI (ADR-0235): its own rights, not the attendance ones. Editing needs
+    // hr.payroll.manage; the pages hide the buttons from a viewer and the api refuses anyway.
+    ...payrollRoutes(),
   ];
 }
 

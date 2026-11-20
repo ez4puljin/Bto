@@ -101,8 +101,10 @@ import {
   Warehouse,
 } from 'lucide-react';
 
-type NavKey = `nav.${Exclude<keyof (typeof mn)['nav'], 'groups' | 'modules' | 'menu' | 'account'>}`;
-type NavGroupKey = `nav.groups.${keyof (typeof mn)['nav']['groups']}`;
+type NavKey =
+  | `nav.${Exclude<keyof (typeof mn)['nav'], 'groups' | 'modules' | 'menu' | 'account'>}`
+  | `payroll.web.nav.${Exclude<keyof (typeof mn)['payroll']['web']['nav'], 'group'>}`;
+type NavGroupKey = `nav.groups.${keyof (typeof mn)['nav']['groups']}` | 'payroll.web.nav.group';
 type QuickActionKey = `home.actions.${keyof (typeof mn)['home']['actions']}`;
 type AttentionLabel = `home.attention.${keyof (typeof mn)['home']['attention']}`;
 
@@ -439,6 +441,49 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'nav.hrSetup',
         icon: MapPinned,
         permission: 'hr.attendance.manage',
+      },
+    ],
+  },
+  {
+    // Payroll with KPI (ADR-0235): the rates, the KPI templates, each person's terms, the advances,
+    // the monthly runs; a manager who only scores sees the last entry alone.
+    label: 'payroll.web.nav.group',
+    items: [
+      {
+        to: '/hr/payroll/runs',
+        label: 'payroll.web.nav.runs',
+        icon: Calculator,
+        permission: 'hr.payroll.view',
+      },
+      {
+        to: '/hr/payroll/scoring',
+        label: 'payroll.web.nav.scoring',
+        icon: ClipboardCheck,
+        permission: ['hr.payroll.score', 'hr.payroll.manage'],
+      },
+      {
+        to: '/hr/payroll/terms',
+        label: 'payroll.web.nav.terms',
+        icon: WalletCards,
+        permission: 'hr.payroll.view',
+      },
+      {
+        to: '/hr/payroll/templates',
+        label: 'payroll.web.nav.templates',
+        icon: ClipboardList,
+        permission: 'hr.payroll.view',
+      },
+      {
+        to: '/hr/payroll/advances',
+        label: 'payroll.web.nav.advances',
+        icon: HandCoins,
+        permission: 'hr.payroll.view',
+      },
+      {
+        to: '/hr/payroll/settings',
+        label: 'payroll.web.nav.settings',
+        icon: SlidersHorizontal,
+        permission: 'hr.payroll.view',
       },
     ],
   },
@@ -868,7 +913,13 @@ export const NAV_MODULES: readonly NavModule[] = [
     key: 'hr',
     label: 'nav.modules.hr',
     icon: IdCard,
-    groups: ['nav.groups.hrMain', 'nav.groups.hrCommunity', 'nav.groups.hrPeople', 'nav.groups.hr'],
+    groups: [
+      'nav.groups.hrMain',
+      'nav.groups.hrCommunity',
+      'nav.groups.hrPeople',
+      'nav.groups.hr',
+      'payroll.web.nav.group',
+    ],
   },
   {
     key: 'finance',
