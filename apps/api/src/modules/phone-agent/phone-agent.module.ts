@@ -14,6 +14,7 @@ import { PhoneAgentSweepJob } from './jobs/phone-agent-sweep.job';
 import { PhoneCallFlowService } from './services/phone-call-flow.service';
 import { PhoneCallsService } from './services/phone-calls.service';
 import { PhoneLinesService } from './services/phone-lines.service';
+import { PhoneProductSearchService } from './services/phone-product-search.service';
 import { PhoneReconcileFlowService } from './services/phone-reconcile-flow.service';
 import { PhoneToolsService } from './services/phone-tools.service';
 
@@ -31,6 +32,7 @@ import { PhoneToolsService } from './services/phone-tools.service';
     PhoneLinesService,
     PhoneCallsService,
     PhoneToolsService,
+    PhoneProductSearchService,
     PhoneCallFlowService,
     PhoneReconcileFlowService,
   ],

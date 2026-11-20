@@ -7,7 +7,10 @@
 // The first time (no ELEVENLABS_AGENT_ID in the environment) it creates the agent and prints its
 // id: put it in deploy/store/.env as ELEVENLABS_AGENT_ID. Afterwards the same command updates that
 // agent in place. Options:
-//   --llm <model>   another LLM for this push (e.g. claude-sonnet-4-6), for the stage-2 comparison
+//   --llm <model>   another LLM for this push (agent.json has claude-sonnet-5-5; claude-haiku-4-5
+//                   is the faster one to switch back to)
+//   --asr <id>      another speech recogniser for this push (agent.json has scribe_realtime; the
+//                   provider also lists scribe_v3_live)
 //   --dry-run       print what would be sent (no key needed, nothing sent)
 //
 // The tools are workspace tools (POST/PATCH /v1/convai/tools), found again by their name; the agent
@@ -20,6 +23,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_BASE = 'https://api.elevenlabs.io';
+/** Scribe realtime's keyterm limits (the provider's keyterm prompting page). */
+export const KEYWORDS_MAX = 50;
+export const KEYWORD_LENGTH_MAX = 20;
 
 /** Leaves out the `_comment` keys and the nulls (a null voice keeps the provider's default). */
 export function clean(value) {
@@ -38,24 +44,43 @@ export async function loadAgent(dir = HERE) {
   const agent = JSON.parse(await readFile(join(dir, 'agent.json'), 'utf8'));
   const prompt = await readFile(join(dir, 'prompt.mn.md'), 'utf8');
   const tools = JSON.parse(await readFile(join(dir, 'tools.json'), 'utf8'));
-  return { agent, prompt, tools };
+  const keywords = JSON.parse(await readFile(join(dir, 'keywords.json'), 'utf8')).keywords ?? [];
+  return { agent, prompt, tools, keywords };
 }
 
-export function agentBody({ agent, prompt }, toolIds, llm) {
+/** The recogniser's keywords: trimmed, each once, within the provider's limits (refused beyond). */
+export function keywordList(keywords) {
+  const kept = [...new Set(keywords.map((word) => String(word).trim()).filter(Boolean))];
+  const long = kept.filter((word) => [...word].length > KEYWORD_LENGTH_MAX);
+  if (long.length > 0) {
+    throw new Error(
+      `keywords.json: longer than ${KEYWORD_LENGTH_MAX} characters: ${long.join(', ')}`,
+    );
+  }
+  if (kept.length > KEYWORDS_MAX) {
+    throw new Error(`keywords.json: ${kept.length} keywords, at most ${KEYWORDS_MAX}`);
+  }
+  return kept;
+}
+
+export function agentBody({ agent, prompt, keywords = [] }, toolIds, llm, asr) {
   const body = clean(structuredClone(agent));
   const settings = body.conversation_config.agent.prompt;
   settings.prompt = prompt.trim();
   settings.tool_ids = toolIds;
   if (llm) settings.llm = llm;
+  body.conversation_config.asr.keywords = keywordList(keywords);
+  if (asr) body.conversation_config.asr.provider = asr;
   return body;
 }
 
 function parseArgs(argv) {
-  const options = { llm: null, dryRun: false };
+  const options = { llm: null, asr: null, dryRun: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--dry-run') options.dryRun = true;
     else if (arg === '--llm') options.llm = argv[(index += 1)] ?? null;
+    else if (arg === '--asr') options.asr = argv[(index += 1)] ?? null;
     else throw new Error(`unknown option ${arg}`);
   }
   return options;
@@ -112,7 +137,7 @@ export async function push({ fetchImpl = fetch, env = process.env, argv = [], lo
   if (options.dryRun) {
     log(
       JSON.stringify(
-        { tools: loaded.tools, agent: agentBody(loaded, ['<tool ids>'], options.llm) },
+        { tools: loaded.tools, agent: agentBody(loaded, ['<tool ids>'], options.llm, options.asr) },
         null,
         2,
       ),
@@ -141,7 +166,7 @@ export async function push({ fetchImpl = fetch, env = process.env, argv = [], lo
     }
   }
 
-  const body = agentBody(loaded, toolIds, options.llm);
+  const body = agentBody(loaded, toolIds, options.llm, options.asr);
   const agentId = env.ELEVENLABS_AGENT_ID;
   if (agentId) {
     await call('PATCH', `/v1/convai/agents/${encodeURIComponent(agentId)}`, body);

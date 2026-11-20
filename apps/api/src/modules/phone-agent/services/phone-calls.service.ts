@@ -39,6 +39,10 @@ export interface MessageMeta {
   status?: number;
   answer?: unknown;
   no_hit?: boolean;
+  /** A search that found only partial matches (no product holds every word). */
+  partial_only?: boolean;
+  /** How long the search took, milliseconds. */
+  search_ms?: number;
   quote_id?: string;
   /** The provider's turn index a RECONCILED message came from. */
   turn?: number;

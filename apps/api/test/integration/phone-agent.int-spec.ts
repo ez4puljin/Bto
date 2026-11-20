@@ -8,7 +8,10 @@ import {
   ELEVENLABS_FETCH,
   type ElevenLabsFetch,
 } from '../../src/integrations/elevenlabs';
-import { PhoneReconcileFlowService } from '../../src/modules/phone-agent';
+import {
+  PhoneProductSearchService,
+  PhoneReconcileFlowService,
+} from '../../src/modules/phone-agent';
 import { connectAs, createHttpApp, sqlStateOf } from '../harness/apps';
 import { idempotency, type ProductJson, unitOf } from '../harness/catalog';
 import { salesFlow } from '../harness/finance';
@@ -27,6 +30,7 @@ interface StartJson {
 interface ProductAnswer {
   productId: number;
   name: string;
+  match: 'exact' | 'partial';
   sellable: boolean;
   stock: string;
   units: { unitId: number; name: string; factor: string; base: boolean }[];
@@ -492,6 +496,7 @@ describe('the phone AI order line (ADR-0232)', () => {
       {
         productId: cola.id,
         name: 'Кола утас',
+        match: 'exact',
         sellable: true,
         stock: 'available',
         units: expect.arrayContaining([
@@ -1047,5 +1052,68 @@ describe('the phone AI order line (ADR-0232)', () => {
       .query({ from: '2026-02-30' })
       .set(bearer(admin))
       .expect(422);
+  });
+
+  it('finds products as a salesperson would: a brand without its generic word, a mis-heard one', async () => {
+    // The first real call (2026-11-20): «Түмний ундаа» found nothing, the names say «кола», «жүрж».
+    const family = {
+      kola: await flow.product('9611', 'Түмний кола 2л', '3000', '24'),
+      pear: await flow.product('9612', 'Түмний ханборгоцой 2л', '3000', '24'),
+      sprite: await flow.product('9613', 'Түмний sprite 2л', '3000', '24'),
+      orange: await flow.product('9614', 'Түмний жүрж 2л', '3000', '24'),
+    };
+    const latin = await flow.product('9615', 'Sprite утас 900мл', '2000', '12');
+    app.get(PhoneProductSearchService).forget();
+    const call = await answered(storePhone);
+    let seq = 0;
+    const search = async (query: string) => {
+      seq += 1;
+      return (
+        (await station().tool(call.callId, 'search_products', seq, { query }).expect(200)).body as {
+          answer: { products: ProductAnswer[]; family?: string };
+        }
+      ).answer;
+    };
+    const ids = (answer: { products: ProductAnswer[] }) => answer.products.map((p) => p.productId);
+    const meta = async () =>
+      (
+        await sql.query<{ meta: Record<string, unknown> }>(
+          'SELECT meta FROM phone_call_messages WHERE call_id = $1 AND seq = $2',
+          [call.callId, seq],
+        )
+      ).rows[0]?.meta ?? {};
+
+    const brand = await search('Түмний ундаа');
+    expect(ids(brand).sort()).toEqual(
+      [family.kola.id, family.pear.id, family.sprite.id, family.orange.id].sort(),
+    );
+    expect(brand.products.every((product) => product.match === 'partial')).toBe(true);
+    expect(brand.family).toMatch(/^Түмний: .*кола.* — 2л$/);
+    expect(await meta()).toMatchObject({ partial_only: true });
+    expect((await meta()).no_hit).toBeUndefined();
+    const timings = [Number((await meta()).search_ms)];
+
+    // Mis-heard by the recogniser: the vowels and the ending.
+    for (const misheard of ['түмэн ундаа', 'түмны ундаа байна уу']) {
+      expect(ids(await search(misheard))).toEqual(expect.arrayContaining([family.kola.id]));
+      timings.push(Number((await meta()).search_ms));
+    }
+    // A Latin brand heard in Cyrillic.
+    const sprite = await search('спрайт');
+    expect(ids(sprite).slice(0, 2).sort()).toEqual([family.sprite.id, latin.id].sort());
+
+    // Every word in the name stays on top, the partial ones after it.
+    const exact = await search('түмний кола');
+    expect(exact.products[0]).toMatchObject({ productId: family.kola.id, match: 'exact' });
+    expect(exact.products.slice(1).every((product) => product.match === 'partial')).toBe(true);
+    expect(exact.products.length).toBeLessThanOrEqual(5);
+    expect(await meta()).not.toHaveProperty('partial_only');
+    timings.push(Number((await meta()).search_ms));
+    // Never a price or a stock number.
+    expect(JSON.stringify(exact)).not.toMatch(/price|available":|sku|3000|"24"/);
+
+    expect(timings.every((ms) => Number.isFinite(ms) && ms < 500)).toBe(true);
+    process.stdout.write(`phone search ms (test DB): ${timings.join(', ')}\n`);
+    await station().end(call.callId, { reason: 'COMPLETED', durationS: 30 }).expect(200);
   });
 });

@@ -30,6 +30,7 @@ import { confirmed, isPhoneTool, PHONE_LIMITS, type PhoneTool } from '../phone-a
 import { phoneCallbacks, phoneCallMessages, phoneCalls } from '../schema';
 import { type CallRow, type MessageMeta, metaOf, PhoneCallsService } from './phone-calls.service';
 import type { PhoneLine } from './phone-lines.service';
+import { PhoneProductSearchService } from './phone-product-search.service';
 
 /** One tool call as the bridge forwards it (ADR-0232 #3). */
 export interface ToolCall {
@@ -135,6 +136,7 @@ export class PhoneToolsService implements OnModuleInit {
     private readonly orders: SalesOrdersService,
     private readonly history: CustomerOrdersService,
     private readonly addresses: CustomerAddressesService,
+    private readonly search: PhoneProductSearchService,
     private readonly moduleRef: ModuleRef,
   ) {}
 
@@ -268,20 +270,27 @@ export class PhoneToolsService implements OnModuleInit {
     }
   }
 
-  /** At most five products by what the caller said; nothing found is marked `no_hit`. */
+  /**
+   * At most five sellable products by what the caller said: those whose name holds every word
+   * first (`match: exact`), then partial matches (a brand word, a case ending, a mis-heard word;
+   * `PhoneSearchIndex`), in stock first, with a `family` hint when they share a brand. Nothing
+   * found is marked `no_hit`; only partial matches, `partial_only`.
+   */
   private async searchProducts(args: { query: string }): Promise<ToolResult> {
-    const scope = await this.shop.customerScope();
-    const page = await this.shop.productPage(scope, {
-      q: args.query,
-      limit: PHONE_LIMITS.searchRows,
-      withHome: true,
-    });
-    const products = page.data.map((product) => ({
+    const found = await this.search.search(args.query, PHONE_LIMITS.searchRows);
+    const products = found.rows.map(({ product, match }) => ({
       ...spoken(product),
+      match,
       sellable: product.sellable,
       stock: product.available.gt(0) ? 'available' : 'out',
     }));
-    return { answer: { products }, meta: products.length === 0 ? { no_hit: true } : {} };
+    const meta: Partial<MessageMeta> = { search_ms: found.ms.total };
+    if (products.length === 0) meta.no_hit = true;
+    else if (found.rows.every((row) => row.match === 'partial')) meta.partial_only = true;
+    return {
+      answer: { products, ...(found.family ? { family: found.family } : {}) },
+      meta,
+    };
   }
 
   /**

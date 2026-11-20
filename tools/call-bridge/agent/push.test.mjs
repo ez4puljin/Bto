@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { agentBody, loadAgent, push } from './push.mjs';
+import { agentBody, KEYWORDS_MAX, keywordList, loadAgent, push } from './push.mjs';
 
 const KEY = 'test-key-not-real';
 
@@ -44,8 +44,16 @@ test('creates the tools and the agent the first time and prints the id, never th
   const prompt = created.body.conversation_config.agent.prompt;
   assert.equal(prompt.tool_ids.length, 8);
   assert.ok(prompt.tool_ids.includes('tool_old'));
-  assert.equal(prompt.llm, 'claude-haiku-4-5');
+  // Sonnet since the owner's decision of 2026-11-20, thinking off for the latency.
+  assert.equal(prompt.llm, 'claude-sonnet-5-5');
+  assert.equal(prompt.thinking_budget, 0);
   assert.ok(prompt.prompt.startsWith('# Үүрэг'));
+  const asr = created.body.conversation_config.asr;
+  assert.ok(asr.keywords.includes('Түмний'));
+  assert.ok(asr.keywords.length > 0 && asr.keywords.length <= KEYWORDS_MAX);
+  assert.equal(asr.provider, 'scribe_realtime');
+  assert.equal(created.body.conversation_config.turn.turn_eagerness, 'patient');
+  assert.equal(created.body._asr, undefined);
   assert.equal(created.body.conversation_config.tts.voice_id, undefined);
   assert.equal(created.body._llm, undefined);
   assert.equal(
@@ -60,12 +68,13 @@ test('updates the agent in place when its id is set, with another LLM on request
   await push({
     fetchImpl,
     env: { ELEVENLABS_API_KEY: KEY, ELEVENLABS_AGENT_ID: 'agent_1' },
-    argv: ['--llm', 'claude-sonnet-4-6'],
+    argv: ['--llm', 'claude-haiku-4-5', '--asr', 'scribe_v3_live'],
     log: () => {},
   });
   const patched = calls.find((c) => c.path === '/v1/convai/agents/agent_1');
   assert.equal(patched.method, 'PATCH');
-  assert.equal(patched.body.conversation_config.agent.prompt.llm, 'claude-sonnet-4-6');
+  assert.equal(patched.body.conversation_config.agent.prompt.llm, 'claude-haiku-4-5');
+  assert.equal(patched.body.conversation_config.asr.provider, 'scribe_v3_live');
   assert.ok(!calls.some((c) => c.path === '/v1/convai/agents/create'));
 });
 
@@ -115,4 +124,13 @@ test('the dry run needs no key', async () => {
   const shown = JSON.parse(lines[0]);
   assert.deepEqual(shown.agent.conversation_config.agent.prompt.tool_ids, ['<tool ids>']);
   assert.ok(agentBody(await loadAgent(), [], null).platform_settings.overrides);
+});
+
+test('the recogniser’s keywords stay within the provider’s limits', () => {
+  assert.deepEqual(keywordList([' Түмний ', 'Түмний', '', 'Пепси']), ['Түмний', 'Пепси']);
+  assert.throws(() => keywordList(['а'.repeat(21)]), /longer than 20/);
+  assert.throws(
+    () => keywordList(Array.from({ length: KEYWORDS_MAX + 1 }, (_, index) => `үг${index}`)),
+    /at most 50/,
+  );
 });

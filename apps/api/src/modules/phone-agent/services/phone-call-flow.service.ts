@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ElevenLabsError, ElevenLabsGateway } from '../../../integrations/elevenlabs';
 import { type PhoneDeclineReason, PHONE_LIMITS } from '../phone-agent.rules';
 import { PhoneCallsService } from './phone-calls.service';
+import { PhoneProductSearchService } from './phone-product-search.service';
 import { type PhoneLine, staffAnswer } from './phone-lines.service';
 
 /** What the bridge hands the agent when the conversation starts (dynamic variables, ADR-0232 #15). */
@@ -34,6 +35,7 @@ export class PhoneCallFlowService {
   constructor(
     private readonly calls: PhoneCallsService,
     private readonly agent: ElevenLabsGateway,
+    private readonly products: PhoneProductSearchService,
   ) {}
 
   async start(
@@ -64,6 +66,8 @@ export class PhoneCallFlowService {
       return { answer: false, callId: call.id, reason: 'AGENT_UNAVAILABLE' };
     }
     this.logger.log({ callId: call.id, ms: Date.now() - startedAt }, 'phone call answered');
+    // The caller will name products within seconds: the search's index is ready by then.
+    this.products.warm();
     return {
       answer: true,
       callId: call.id,

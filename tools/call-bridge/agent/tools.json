@@ -2,7 +2,7 @@
   {
     "type": "client",
     "name": "search_products",
-    "description": "Find products by what the caller said (a name, a brand, a kind). Answers up to 5 products: productId, name, sellable, stock (available or out) and units (unitId, name, factor = base units in one of this unit, base = true for the base unit). Empty products means nothing was found.",
+    "description": "Find products by what the caller said (a brand, a name, a kind, a size). It tolerates mis-heard words and words the names lack: «Түмний ундаа» finds the Түмний drinks. Answers up to 5 sellable products, in stock first: productId, name, match (exact = every word is in the name; partial = some words, the brand counts most), stock (available or out) and units (unitId, name, factor = base units in one of this unit, base = true for the base unit), plus family when they share a brand («Түмний: кола, жүрж — 2л»). Partial matches are candidates to offer by name, never a reason to say nothing was found. Empty products means nothing at all matched: try again with fewer or other words before telling the caller.",
     "expects_response": true,
     "response_timeout_secs": 15,
     "parameters": {
@@ -11,7 +11,7 @@
       "properties": {
         "query": {
           "type": "string",
-          "description": "The caller's words for the product, 1 to 100 characters, in Mongolian as spoken."
+          "description": "The product words only (brand, kind, flavour, size), 1 to 100 characters, in Mongolian as spoken, without «байна уу» and the like. Retry with the brand word alone, then the kind, then a corrected spelling."
         }
       }
     }
