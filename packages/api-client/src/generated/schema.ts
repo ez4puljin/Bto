@@ -24987,10 +24987,13 @@ export interface components {
             totals: components["schemas"]["StockReportTotals"];
         };
         SupplierReportRow: {
-            /** @description With VAT, at the delivery notes, net of returns */
+            /** @description With VAT, at the delivery notes, net of returns; after the receipts’ discounts, or before them with `splitDiscounts` */
             purchases: string;
+            /** @description Without VAT, after the receipts’ discounts (the books’ cost) */
             purchasesExVat: string;
             otherBills: string;
+            /** @description The receipts’ discounts of the period (ADR-0234), with `splitDiscounts` only */
+            discounts: string | null;
             payments: string;
             /** @description Owed at `to` (+ we owe) */
             balance: string;
@@ -25000,10 +25003,13 @@ export interface components {
             name: string;
         };
         SupplierReportTotals: {
-            /** @description With VAT, at the delivery notes, net of returns */
+            /** @description With VAT, at the delivery notes, net of returns; after the receipts’ discounts, or before them with `splitDiscounts` */
             purchases: string;
+            /** @description Without VAT, after the receipts’ discounts (the books’ cost) */
             purchasesExVat: string;
             otherBills: string;
+            /** @description The receipts’ discounts of the period (ADR-0234), with `splitDiscounts` only */
+            discounts: string | null;
             payments: string;
             /** @description Owed at `to` (+ we owe) */
             balance: string;
@@ -25024,9 +25030,11 @@ export interface components {
             kind: "PURCHASE" | "OPENING" | "PAYMENT" | "OTHER_BILL";
             number: string | null;
             receiptId: number | null;
-            /** @description + raised the payable, − lowered it */
+            /** @description + raised the payable, − lowered it; with `splitDiscounts` a receipt’s before its discount */
             amount: string;
             vatAmount: string;
+            /** @description The receipt’s discount the entry carries (ADR-0234), with `splitDiscounts` only; amount − discount is the payable’s movement */
+            discount: string | null;
             reversal: boolean;
         };
         SupplierEntries: {
@@ -52333,6 +52341,8 @@ export interface operations {
                 from: string;
                 to: string;
                 q?: string;
+                /** @description ADR-0234: receipts before their discounts, the discounts apart (default false: after them) */
+                splitDiscounts?: boolean;
             };
             header?: never;
             path?: never;
@@ -52365,6 +52375,8 @@ export interface operations {
                 from: string;
                 to: string;
                 q?: string;
+                /** @description ADR-0234: receipts before their discounts, the discounts apart (default false: after them) */
+                splitDiscounts?: boolean;
             };
             header?: never;
             path?: never;
@@ -52396,6 +52408,8 @@ export interface operations {
             query: {
                 from: string;
                 to: string;
+                /** @description ADR-0234: receipts before their discounts, the discounts apart (default false: after them) */
+                splitDiscounts?: boolean;
             };
             header?: never;
             path: {

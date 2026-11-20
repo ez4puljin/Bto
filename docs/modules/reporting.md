@@ -53,7 +53,7 @@ Job: `reporting.refresh`, cron `*/15 * * * *` (Ulaanbaatar time), the scheduled 
 | `GET profit?by=customer\|product\|category\|rep&from&to&source&customerId&productId&categoryId&repUserId&app` (+ `.xlsx`) | reports.margins.view | 2,000 rows, the rest in `others` |
 | `GET sales-documents?…` (the same filters) | reports.view | Newest 500, `more`; costs null without margins |
 | `GET stock?slowDays&filter&warehouseId&categoryId&q&offset&limit` (+ `.xlsx`) | reports.view | `slowDays` 30 / 60 / 90 / 180; the Excel holds up to 30,000 products |
-| `GET suppliers?from&to&q` (+ `.xlsx`), `GET suppliers/:partyId/entries?from&to` | reports.margins.view | Purchases are costs |
+| `GET suppliers?from&to&q&splitDiscounts` (+ `.xlsx`), `GET suppliers/:partyId/entries?from&to&splitDiscounts` | reports.margins.view | Purchases are costs; `splitDiscounts` shows receipts before their discounts and the discounts apart (ADR-0234) |
 | `GET book-options` | reports.view | The prompts' lists: active warehouses, categories, customer groups, active staff (ADR-0133) |
 | `GET stock-balance?from&to&by=product|warehouse&warehouseIds&categoryId&productId` (+ `.xlsx`), `GET stock-balance/lines?from&to&productId&warehouseIds` | reports.view | «Бараа материалын үлдэгдлийн тайлан»: opening, in, out, closing in base units and at cost (values null without margins); 5,000 rows, 2,000 lines |
 | `GET product-sales?from&to&source&kind=ALL|SALES|RETURNS&repUserId&customerCategoryId&customerId&productId&categoryId&warehouseId&brandIds&segmentIds&by=none|category|brand|segment|user&payments` (+ `.xlsx`), `GET product-sales/documents?…&productId&group` | reports.view | «Борлуулалт /Бараагаар/», live from `sales_lines`; cost and profit null without margins; rows carry their group (ADR-0134) and, with `payments`, the net sales by payment (wholesale «Авлага», a till's sale by its tenders) |
@@ -73,6 +73,7 @@ Without `reports.margins.view` every cost, profit, margin and stock value comes 
 - The stock value a month or a year ago comes from `stock_snapshot_daily` (the latest snapshot within a week before the date); turnover days = the period's average snapshot value × days ÷ the period's cost.
 - Low stock follows `ai.low_stock`: a location with a minimum at or under it.
 - Supplier purchases = the PURCHASE entries (the goods receipt's bill, re-costing differences, supplier returns); an unpriced receipt is no purchase yet.
+- The discount view (ADR-0234, «Хөнгөлөлтийг задалж харуулах»): each receipt entry (`GOODS_RECEIPT/<id>`, `RECEIPT_RECOST/<id>:<version>`) carries the receipt's discount from `stock_valuation_adjustments.discount_amount` — the bill its booked version's, a re-costing the change since the version booked before it, a reversal the opposite (`receipt-discounts.ts`); purchases are then shown plus the period's discounts and «Хөнгөлөлт» beside them; the ex-VAT purchases and the balance are the books'.
 - Margin = profit ÷ sales × 100, one decimal, HALF_UP; flagged under the threshold, or a loss without sales.
 - Erkhet's stock reports (ADR-0133) count the warehouse movements only (receipt, delivery, till sale, issue and its reversal, transfer legs, return, adjustment, count); bin moves inside a warehouse are left out. Stock value = Σ qty × the ledger's unit cost + `stock_valuation_adjustments.value_delta` (the re-costing of stock on hand; its `variance` goes to the cost of sales, not to stock).
 
@@ -90,6 +91,7 @@ Top-bar module «Тайлан» (ADR-0133). «Удирдлагын тайлан�
 
 - `apps/api/test/integration/reporting.int-spec.ts`: rights and hidden costs, sales ex-VAT net of returns with the ledger's cost, the documents behind a figure, the flag, the dashboard moved by its documents against the same days, aging by due date with the invoice link, stock cover and slow movers, the supplier report, the refresh lock and grants (fictitious data).
 - `apps/api/src/modules/reporting/services/report-periods.spec.ts`: same-days periods, short months, whole months, ranges.
+- `apps/api/test/integration/reports-suppliers.int-spec.ts`: the discount view (ADR-0234) — net by default, before the discounts with the discount apart, a re-costing's change, the same balance, the entries and the Excel; `receipt-discounts.spec.ts`: each entry's part of a receipt's discount.
 - `apps/api/test/integration/report-views.int-spec.ts`: own and shared views, the author alone changes one, the page's right, a moving period without dates, the name once per person and page, the limit; `packages/shared/src/reports/reports.test.ts`: presets and the kept address; `apps/web/src/features/reports/report-views.test.tsx`: the menu, opening, saving, replacing, deleting.
 - `nightly-jobs.int-spec.ts` lists the schedule; web tests in `apps/web/src/features/reports/`.
 

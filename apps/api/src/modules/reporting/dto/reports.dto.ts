@@ -396,14 +396,32 @@ export class SupplierReportQueryDto {
   @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
   @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
   @ApiPropertyOptional() @IsOptional() @Transform(trimmed) @IsString() @MaxLength(100) q?: string;
+  @ApiPropertyOptional({
+    description:
+      'ADR-0234: receipts before their discounts, the discounts apart (default false: after them)',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  splitDiscounts?: boolean;
 }
 
 @ApiSchema({ name: 'SupplierReportTotals' })
 export class SupplierReportTotalsDto {
-  @ApiProperty({ description: 'With VAT, at the delivery notes, net of returns' })
+  @ApiProperty({
+    description:
+      'With VAT, at the delivery notes, net of returns; after the receipts’ discounts, or before them with `splitDiscounts`',
+  })
   purchases: string;
-  @ApiProperty() purchasesExVat: string;
+  @ApiProperty({ description: 'Without VAT, after the receipts’ discounts (the books’ cost)' })
+  purchasesExVat: string;
   @ApiProperty() otherBills: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The receipts’ discounts of the period (ADR-0234), with `splitDiscounts` only',
+  })
+  discounts: string | null;
   @ApiProperty() payments: string;
   @ApiProperty({ description: 'Owed at `to` (+ we owe)' }) balance: string;
 }
@@ -427,6 +445,14 @@ export class SupplierReportDto extends ReportRangeDto {
 export class SupplierEntriesQueryDto {
   @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
   @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiPropertyOptional({
+    description:
+      'ADR-0234: receipts before their discounts, the discounts apart (default false: after them)',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  splitDiscounts?: boolean;
 }
 
 @ApiSchema({ name: 'SupplierEntry' })
@@ -436,8 +462,19 @@ export class SupplierEntryDto {
   @ApiProperty({ enum: AP_ENTRY_KINDS }) kind: ApEntryKind;
   @ApiProperty({ type: String, nullable: true }) number: string | null;
   @ApiProperty({ type: Number, nullable: true }) receiptId: number | null;
-  @ApiProperty({ description: '+ raised the payable, − lowered it' }) amount: string;
+  @ApiProperty({
+    description:
+      '+ raised the payable, − lowered it; with `splitDiscounts` a receipt’s before its discount',
+  })
+  amount: string;
   @ApiProperty() vatAmount: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'The receipt’s discount the entry carries (ADR-0234), with `splitDiscounts` only; amount − discount is the payable’s movement',
+  })
+  discount: string | null;
   @ApiProperty() reversal: boolean;
 }
 

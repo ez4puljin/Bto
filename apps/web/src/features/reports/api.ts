@@ -76,6 +76,8 @@ export interface SupplierFilter {
   from: string;
   to: string;
   q?: string;
+  /** «Хөнгөлөлтийг задалж харуулах» (ADR-0234): receipts before their discounts. */
+  splitDiscounts?: boolean;
 }
 
 /** The query string of a sales filter: only what narrows (a default source, no app flag). */
@@ -111,7 +113,12 @@ function stockQuery(filter: StockFilter) {
 }
 
 function supplierQuery(filter: SupplierFilter) {
-  return { from: filter.from, to: filter.to, ...(filter.q ? { q: filter.q } : {}) };
+  return {
+    from: filter.from,
+    to: filter.to,
+    ...(filter.q ? { q: filter.q } : {}),
+    ...(filter.splitDiscounts ? { splitDiscounts: true } : {}),
+  };
 }
 
 /** When the daily totals were last rebuilt. */
@@ -257,15 +264,22 @@ export function useSupplierReport(filter: SupplierFilter | null) {
   });
 }
 
-export function useSupplierEntries(partyId: number | null, range: { from: string; to: string }) {
+export function useSupplierEntries(
+  partyId: number | null,
+  range: { from: string; to: string },
+  splitDiscounts = false,
+) {
   const api = useApiClient();
   return useQuery({
-    queryKey: [...REPORTS, 'supplier-entries', partyId, range],
+    queryKey: [...REPORTS, 'supplier-entries', partyId, range, splitDiscounts],
     enabled: partyId !== null,
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET('/api/v1/reports/suppliers/{partyId}/entries', {
-          params: { path: { partyId: partyId ?? 0 }, query: range },
+          params: {
+            path: { partyId: partyId ?? 0 },
+            query: { ...range, ...(splitDiscounts ? { splitDiscounts: true } : {}) },
+          },
           signal,
         }),
       ),

@@ -40834,6 +40834,15 @@
               "maxLength": 100,
               "type": "string"
             }
+          },
+          {
+            "name": "splitDiscounts",
+            "required": false,
+            "in": "query",
+            "description": "ADR-0234: receipts before their discounts, the discounts apart (default false: after them)",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -40898,6 +40907,15 @@
               "maxLength": 100,
               "type": "string"
             }
+          },
+          {
+            "name": "splitDiscounts",
+            "required": false,
+            "in": "query",
+            "description": "ADR-0234: receipts before their discounts, the discounts apart (default false: after them)",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -40961,6 +40979,15 @@
             "schema": {
               "example": "2026-10-31",
               "type": "string"
+            }
+          },
+          {
+            "name": "splitDiscounts",
+            "required": false,
+            "in": "query",
+            "description": "ADR-0234: receipts before their discounts, the discounts apart (default false: after them)",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -93473,13 +93500,19 @@
         "properties": {
           "purchases": {
             "type": "string",
-            "description": "With VAT, at the delivery notes, net of returns"
+            "description": "With VAT, at the delivery notes, net of returns; after the receipts’ discounts, or before them with `splitDiscounts`"
           },
           "purchasesExVat": {
-            "type": "string"
+            "type": "string",
+            "description": "Without VAT, after the receipts’ discounts (the books’ cost)"
           },
           "otherBills": {
             "type": "string"
+          },
+          "discounts": {
+            "type": "string",
+            "nullable": true,
+            "description": "The receipts’ discounts of the period (ADR-0234), with `splitDiscounts` only"
           },
           "payments": {
             "type": "string"
@@ -93507,6 +93540,7 @@
           "purchases",
           "purchasesExVat",
           "otherBills",
+          "discounts",
           "payments",
           "balance",
           "partyId",
@@ -93520,13 +93554,19 @@
         "properties": {
           "purchases": {
             "type": "string",
-            "description": "With VAT, at the delivery notes, net of returns"
+            "description": "With VAT, at the delivery notes, net of returns; after the receipts’ discounts, or before them with `splitDiscounts`"
           },
           "purchasesExVat": {
-            "type": "string"
+            "type": "string",
+            "description": "Without VAT, after the receipts’ discounts (the books’ cost)"
           },
           "otherBills": {
             "type": "string"
+          },
+          "discounts": {
+            "type": "string",
+            "nullable": true,
+            "description": "The receipts’ discounts of the period (ADR-0234), with `splitDiscounts` only"
           },
           "payments": {
             "type": "string"
@@ -93540,6 +93580,7 @@
           "purchases",
           "purchasesExVat",
           "otherBills",
+          "discounts",
           "payments",
           "balance"
         ]
@@ -93601,10 +93642,15 @@
           },
           "amount": {
             "type": "string",
-            "description": "+ raised the payable, − lowered it"
+            "description": "+ raised the payable, − lowered it; with `splitDiscounts` a receipt’s before its discount"
           },
           "vatAmount": {
             "type": "string"
+          },
+          "discount": {
+            "type": "string",
+            "nullable": true,
+            "description": "The receipt’s discount the entry carries (ADR-0234), with `splitDiscounts` only; amount − discount is the payable’s movement"
           },
           "reversal": {
             "type": "boolean"
@@ -93618,6 +93664,7 @@
           "receiptId",
           "amount",
           "vatAmount",
+          "discount",
           "reversal"
         ]
       },

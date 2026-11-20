@@ -7,6 +7,7 @@ import {
   ChevronHead,
   EmptyState,
   FilterBar,
+  FilterToggle,
   ListCard,
   ListTable,
   SearchField,
@@ -59,13 +60,20 @@ import { ReportViews } from './report-views';
 import { PeekLink } from './books/record-peek';
 import { usePeek } from './books/use-peek';
 
-const AMOUNTS = ['purchases', 'purchasesExVat', 'otherBills', 'payments', 'balance'] as const;
+type Amount = 'purchases' | 'purchasesExVat' | 'otherBills' | 'discounts' | 'payments' | 'balance';
+
+/** The amounts, the credit side first; the discounts beside the payments when split (ADR-0234). */
+const amountsOf = (split: boolean): readonly Amount[] =>
+  split
+    ? ['purchases', 'purchasesExVat', 'otherBills', 'discounts', 'payments', 'balance']
+    : ['purchases', 'purchasesExVat', 'otherBills', 'payments', 'balance'];
 
 /** An amount's width when it is not a money column's 8.5rem, and when it leaves a narrow table. */
-const AMOUNT_COLUMNS: Record<(typeof AMOUNTS)[number], Pick<ColumnSpec, 'width' | 'drop'>> = {
+const AMOUNT_COLUMNS: Record<Amount, Pick<ColumnSpec, 'width' | 'drop'>> = {
   purchases: { width: 10 },
   purchasesExVat: { width: 10, drop: 1 },
   otherBills: { drop: 2 },
+  discounts: { width: 10, drop: 4 },
   payments: { width: 10, drop: 4 },
   balance: {},
 };
@@ -75,14 +83,22 @@ const AMOUNT_COLUMNS: Record<(typeof AMOUNTS)[number], Pick<ColumnSpec, 'width' 
  * in all, the turnover of a year 10rem («12,345,678,901») and the smaller amounts 8.5. What a
  * narrower table lets go, least needed first (ADR-0201): the purchases without VAT (60.25); the
  * other bills (a till PC's 55.5rem: 51.75); the code (44.75); the payments (a tablet's 40.5rem:
- * 34.75) — the supplier's panel says them all. The name, the purchases and what is owed stay.
+ * 34.75) — the supplier's panel says them all. The name, the purchases and what is owed stay. The
+ * discounts' column (ADR-0234, 10rem more) leaves with the payments.
  */
-const COLUMNS: readonly ColumnSpec[] = [
+const columnsOf = (split: boolean): readonly ColumnSpec[] => [
   { key: 'code', kind: 'code', drop: 3 },
   { key: 'name', kind: 'text', weight: 3, min: 14 },
-  ...AMOUNTS.map((key): ColumnSpec => ({ key, kind: 'money', ...AMOUNT_COLUMNS[key] })),
+  ...amountsOf(split).map((key): ColumnSpec => ({ key, kind: 'money', ...AMOUNT_COLUMNS[key] })),
   { key: 'chevron', kind: 'chevron' },
 ];
+const COLUMNS = columnsOf(false);
+const SPLIT_COLUMNS = columnsOf(true);
+
+/** An amount with its sign turned: a discount closes part of what is owed. */
+function negated(amount: string): string {
+  return amount.startsWith('-') ? amount.slice(1) : `-${amount}`;
+}
 
 /** With `onOpen` (the screen) the columns are sized by the layout; on paper the table lays itself out. */
 function SuppliersTable(props: {
@@ -91,6 +107,9 @@ function SuppliersTable(props: {
 }) {
   const { t } = useTranslation();
   const columns = 'reports.suppliers.columns';
+  // The server split the discounts out (ADR-0234): the purchases stand before them.
+  const split = props.report.totals.discounts !== null;
+  const amounts = amountsOf(split);
   const body = (
     <>
       <TableHeader>
@@ -98,9 +117,9 @@ function SuppliersTable(props: {
           <TableHead>{t(`${columns}.code`)}</TableHead>
           <TableHead>{t(`${columns}.name`)}</TableHead>
           {/* «Худалдан авалт (НӨАТ-тэй)» is wider than its amounts: a head may take two lines. */}
-          {AMOUNTS.map((key) => (
+          {amounts.map((key) => (
             <TableHead key={key} className="text-right leading-tight whitespace-normal">
-              {t(`${columns}.${key}`)}
+              {t(`${columns}.${split && key === 'purchases' ? 'grossPurchases' : key}`)}
             </TableHead>
           ))}
           {props.onOpen ? <ChevronHead /> : null}
@@ -120,7 +139,7 @@ function SuppliersTable(props: {
                   row.name
                 )}
               </TruncateCell>
-              {AMOUNTS.map((key) => (
+              {amounts.map((key) => (
                 <AmountCell key={key} value={row[key]} />
               ))}
             </>
@@ -136,7 +155,7 @@ function SuppliersTable(props: {
         <TableRow className="font-semibold">
           <TableCell />
           <TableCell>{t('reports.common.total')}</TableCell>
-          {AMOUNTS.map((key) => (
+          {amounts.map((key) => (
             <AmountCell key={key} value={props.report.totals[key]} />
           ))}
           {props.onOpen ? <TableCell /> : null}
@@ -144,7 +163,11 @@ function SuppliersTable(props: {
       </TableBody>
     </>
   );
-  return props.onOpen ? <ListTable columns={COLUMNS}>{body}</ListTable> : <Table>{body}</Table>;
+  return props.onOpen ? (
+    <ListTable columns={split ? SPLIT_COLUMNS : COLUMNS}>{body}</ListTable>
+  ) : (
+    <Table>{body}</Table>
+  );
 }
 
 /** One supplier's entries in the period: a purchase opens its goods receipt, the rest the journal. */
@@ -152,10 +175,12 @@ function EntriesSheet(props: {
   row: SupplierReportRow | null;
   partyId: number | null;
   range: { from: string; to: string };
+  /** Receipts before their discounts, each discount beside its receipt (ADR-0234). */
+  split: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const entries = useSupplierEntries(props.partyId, props.range);
+  const entries = useSupplierEntries(props.partyId, props.range, props.split);
   // A receipt or entry opens over the list (2026-11-16, the owner).
   const peek = usePeek();
   const { row } = props;
@@ -180,8 +205,23 @@ function EntriesSheet(props: {
         {row ? (
           <TotalsGrid
             items={[
-              [t('reports.suppliers.columns.purchases'), formatTugrik(row.purchases)],
+              [
+                t(
+                  row.discounts === null
+                    ? 'reports.suppliers.columns.purchases'
+                    : 'reports.suppliers.columns.grossPurchases',
+                ),
+                formatTugrik(row.purchases),
+              ],
               [t('reports.suppliers.columns.otherBills'), formatTugrik(row.otherBills)],
+              ...(row.discounts === null
+                ? []
+                : [
+                    [t('reports.suppliers.columns.discounts'), formatTugrik(row.discounts)] as [
+                      string,
+                      string,
+                    ],
+                  ]),
               [t('reports.suppliers.columns.payments'), formatTugrik(row.payments)],
               [t('reports.suppliers.columns.balance'), formatTugrik(row.balance)],
             ]}
@@ -197,12 +237,17 @@ function EntriesSheet(props: {
                 <TableHead>{t(`${columns}.date`)}</TableHead>
                 <TableHead>{t(`${columns}.kind`)}</TableHead>
                 <TableHead>{t(`${columns}.number`)}</TableHead>
-                <TableHead className="text-right">{t(`${columns}.amount`)}</TableHead>
+                <TableHead className="text-right">
+                  {t(`${columns}.${props.split ? 'grossAmount' : 'amount'}`)}
+                </TableHead>
+                {props.split ? (
+                  <TableHead className="text-right">{t(`${columns}.discount`)}</TableHead>
+                ) : null}
                 <TableHead className="text-right">{t(`${columns}.vat`)}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.isPending ? <SkeletonRows columns={5} rows={3} /> : null}
+              {entries.isPending ? <SkeletonRows columns={props.split ? 6 : 5} rows={3} /> : null}
               {entries.data?.data.map((entry) => {
                 const number = entry.number ?? `#${entry.entryId}`;
                 return (
@@ -231,6 +276,14 @@ function EntriesSheet(props: {
                     <TableCell className="text-right font-mono">
                       {formatMnt(entry.amount)}
                     </TableCell>
+                    {props.split ? (
+                      <TableCell className="text-right font-mono">
+                        {/* What closes part of the receipt: shown taken off, blank without one. */}
+                        {entry.discount && entry.discount !== '0.00'
+                          ? formatMnt(negated(entry.discount))
+                          : ''}
+                      </TableCell>
+                    ) : null}
                     <TableCell className="text-right font-mono">
                       {formatMnt(entry.vatAmount)}
                     </TableCell>
@@ -298,7 +351,13 @@ export function SuppliersReportPage() {
   const range = useRange();
   const [q, setQ] = useState(search.get('q') ?? '');
   const debounced = useDebounced(q.trim(), 300);
-  const filter = { from: range.from, to: range.to, q: debounced || undefined };
+  const split = search.get('discounts') === '1';
+  const filter = {
+    from: range.from,
+    to: range.to,
+    q: debounced || undefined,
+    splitDiscounts: split || undefined,
+  };
   const report = useSupplierReport(range.valid ? filter : null);
   const downloads = useReportDownloads();
   const action = useAction();
@@ -328,7 +387,15 @@ export function SuppliersReportPage() {
                 )
               }
             />
-            <PrintLink to={reportHref('/reports/suppliers/print', { ...filter, format: 'a4' })} />
+            <PrintLink
+              to={reportHref('/reports/suppliers/print', {
+                from: filter.from,
+                to: filter.to,
+                q: filter.q,
+                discounts: split ? 1 : undefined,
+                format: 'a4',
+              })}
+            />
           </>
         }
       />
@@ -350,6 +417,11 @@ export function SuppliersReportPage() {
             setQ(event.target.value);
             setParam('q', event.target.value.trim() || null);
           }}
+        />
+        <FilterToggle
+          label={t('reports.suppliers.splitDiscounts')}
+          checked={split}
+          onCheckedChange={(checked) => setParam('discounts', checked ? '1' : null)}
         />
       </FilterBar>
       <ProblemAlert problem={action.problem ?? problemFromError(report.error)} />
@@ -376,18 +448,24 @@ export function SuppliersReportPage() {
         row={open}
         partyId={partyId}
         range={{ from: range.from, to: range.to }}
+        split={split}
         onClose={() => setParam('party', null)}
       />
     </div>
   );
 }
 
-/** The supplier report on paper (`/reports/suppliers/print?from&to&q`). */
+/** The supplier report on paper (`/reports/suppliers/print?from&to&q&discounts`). */
 export function SuppliersPrintPage() {
   const { t } = useTranslation();
   const [search] = useSearchParams();
   const range = useRange();
-  const filter = { from: range.from, to: range.to, q: search.get('q') ?? undefined };
+  const filter = {
+    from: range.from,
+    to: range.to,
+    q: search.get('q') ?? undefined,
+    splitDiscounts: search.get('discounts') === '1' || undefined,
+  };
   const report = useSupplierReport(range.valid ? filter : null);
   const company = useCompanyName();
   const title = t('reports.suppliers.title');

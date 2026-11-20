@@ -284,6 +284,7 @@ const supplierRow = (index: number): SupplierReportRow => ({
   purchases: `${(13 - index) * 100000}.00`,
   purchasesExVat: `${(13 - index) * 90909}.09`,
   otherBills: '0.00',
+  discounts: null,
   payments: '50000.00',
   balance: '10000.00',
 });
@@ -297,6 +298,7 @@ export const SUPPLIERS: SupplierReport = {
     purchases: '7800000.00',
     purchasesExVat: '7090908.08',
     otherBills: '0.00',
+    discounts: null,
     payments: '600000.00',
     balance: '120000.00',
   },
@@ -312,6 +314,7 @@ export const SUPPLIER_ENTRIES: SupplierEntries = {
       receiptId: 61,
       amount: '1200000.00',
       vatAmount: '109090.91',
+      discount: null,
       reversal: false,
     },
     {
@@ -322,6 +325,7 @@ export const SUPPLIER_ENTRIES: SupplierEntries = {
       receiptId: null,
       amount: '-50000.00',
       vatAmount: '0.00',
+      discount: null,
       reversal: false,
     },
   ],

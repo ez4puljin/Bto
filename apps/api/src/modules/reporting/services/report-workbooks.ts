@@ -176,27 +176,31 @@ export function stockWorkbook(report: StockReport, margins: boolean): Promise<Bu
   return sheet(`${s.title} ${report.date}`, columns, rows);
 }
 
+/** With the discounts apart (ADR-0234) the purchases stand before them and «Хөнгөлөлт» beside them. */
 export function supplierWorkbook(report: SupplierReport): Promise<Buffer> {
   const s = L.suppliers;
+  const split = report.totals.discounts !== null;
   const columns = [
     text(s.code),
     text(s.name),
-    num(s.purchases),
+    num(split ? s.grossPurchases : s.purchases),
     num(s.purchasesExVat),
     num(s.otherBills),
+    ...(split ? [num(s.discounts)] : []),
     num(s.payments),
     num(s.balance),
   ];
-  const rows: ExcelRow[] = report.rows.map((row) => [
-    row.code,
-    row.name,
-    row.purchases,
-    row.purchasesExVat,
-    row.otherBills,
-    row.payments,
-    row.balance,
-  ]);
-  const t = report.totals;
-  rows.push([null, s.total, t.purchases, t.purchasesExVat, t.otherBills, t.payments, t.balance]);
+  const line = (code: string | null, name: string, t: SupplierReport['totals']): ExcelRow => [
+    code,
+    name,
+    t.purchases,
+    t.purchasesExVat,
+    t.otherBills,
+    ...(split ? [t.discounts] : []),
+    t.payments,
+    t.balance,
+  ];
+  const rows: ExcelRow[] = report.rows.map((row) => line(row.code, row.name, row));
+  rows.push(line(null, s.total, report.totals));
   return sheet(`${s.title} ${report.from} – ${report.to}`, columns, rows);
 }
