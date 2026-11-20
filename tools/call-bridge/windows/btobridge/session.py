@@ -34,7 +34,7 @@ from typing import Any, Awaitable, Callable, Protocol
 import numpy as np
 
 from . import protocol
-from .audio import AudioPort
+from .audio import AudioPort, describe_error
 from .bto import BtoError, BtoUnreachable, StationApi, new_key
 from .dsp import EchoGate, VoiceDetector
 from .metrics import CallMetrics, append_csv
@@ -247,7 +247,7 @@ class CallSession:
         try:
             await asyncio.to_thread(prepare)
         except Exception as error:  # noqa: BLE001 - LookupError, a driver error
-            log.warning("audio devices not ready (%s: %s)", type(error).__name__, str(error)[:120])
+            log.warning("audio devices not ready (%s)", describe_error(error))
             return True
         return False
 
@@ -472,7 +472,11 @@ class CallSession:
                     await self.audio.start(self._on_mic, self._mic_rate)
                 except Exception as error:  # noqa: BLE001 - a device gone or busy
                     log.warning(
-                        "call %s: audio did not open (%s)", self.call_id, type(error).__name__
+                        "call %s: audio did not open (%s)", self.call_id, describe_error(error)
+                    )
+                    self.say(
+                        f"Дуудлага {self.call_id}: дуу нээгдсэнгүй. Цэс → «дууны зам шалгах»-аар"
+                        " шалгана уу (алдаа bridge.log-д)."
                     )
                     self.finish("ERROR")
         elif kind == "client_error":

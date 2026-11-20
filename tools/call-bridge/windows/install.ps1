@@ -57,6 +57,7 @@ $AppFiles = @(
   'btobridge/cli.py', 'btobridge/config.py', 'btobridge/dsp.py', 'btobridge/metrics.py',
   'btobridge/phone.py', 'btobridge/protocol.py', 'btobridge/session.py', 'btobridge/ws.py',
   'btobridge/link.py', 'btobridge/serve.py', 'btobridge/calibrate.py', 'btobridge/checks.py',
+  'btobridge/audiotest.py',
   'requirements.txt'
 )
 $FirewallRule = 'Bto call bridge (phone link)'

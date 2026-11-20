@@ -14,9 +14,18 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
 
 from btobridge.audio import NullAudio
-from btobridge.link import CODE_TRIES, MemoryCredentials, Paired, Pairing, PhoneServer, sha256
+from btobridge.link import (
+    CODE_TRIES,
+    RECONNECT_CODE,
+    MemoryCredentials,
+    Paired,
+    Pairing,
+    PhoneServer,
+    port_in_use,
+    sha256,
+)
 from btobridge.phone import AndroidLanPhone, Ring
-from btobridge.serve import CallDesk
+from btobridge.serve import CallDesk, background_link
 from btobridge.session import CallSession, Limits
 
 from fakes import FakeBto, FakeConversation, audio_message, metadata_message, tool_call
@@ -135,6 +144,65 @@ def test_pairing_with_the_code_gives_a_token_kept_hashed_then_hello_is_welcome(t
             await asyncio.sleep(0.05)
             assert h.server.connected
         await h.server.stop()
+
+    run(main())
+
+
+def test_a_temporary_pairing_server_tells_the_phone_to_reconnect_to_the_background_task(
+    tmp_path: Path,
+) -> None:
+    """`bridge pair` without the background task: its own server pairs the phone, then closes the
+    phone's connection with 1012 so the app says hello to the background task once it listens."""
+    h = Harness(tmp_path, paired=Paired(None, None))
+
+    async def main() -> None:
+        temporary = PhoneServer(
+            h.credentials, h.pairing, lambda _ring: None, port=0, host="127.0.0.1", role="pairing"
+        )
+        await temporary.start()
+        code = h.pairing.new()
+        url = f"ws://127.0.0.1:{temporary.port}/phone"
+        ws = await connect(url)
+        await ws.send(json.dumps({"type": "pair", "code": code, "device": "S23 FE", "app": "0.2.1"}))
+        token = json.loads(await ws.recv())["token"]
+        await asyncio.sleep(0.05)
+        assert temporary.connected
+        await temporary.stop(reconnect=True)
+        with pytest.raises(ConnectionClosed):
+            await asyncio.wait_for(ws.recv(), 3)
+        assert ws.close_code == RECONNECT_CODE
+        # The background task starts on the same port; the phone's hello is welcome there.
+        background = PhoneServer(
+            h.credentials, h.pairing, lambda _ring: None, port=temporary.port, host="127.0.0.1"
+        )
+        await background.start()
+        async with connect(url) as again:
+            assert await hello(again, token) == {"type": "welcome"}
+            await asyncio.sleep(0.05)
+            assert background.connected
+        await background.stop()
+
+    run(main())
+
+
+def test_pairing_goes_through_the_background_task_whenever_it_listens() -> None:
+    now = 1000.0
+    fresh = {"updated": now - 15, "link": {"listening": True}}
+    assert background_link(True, None, now)
+    assert background_link(False, fresh, now)
+    assert not background_link(False, {**fresh, "updated": now - 300}, now)  # not running
+    assert not background_link(False, {"updated": now, "station": {}}, now)  # local mode: no link
+    assert not background_link(False, None, now)
+
+
+def test_the_port_check_sees_a_listener_on_every_address() -> None:
+    async def main() -> None:
+        server = await asyncio.start_server(lambda _r, w: w.close(), "0.0.0.0", 0)
+        port = int(server.sockets[0].getsockname()[1])
+        assert await asyncio.to_thread(port_in_use, port)
+        server.close()
+        await server.wait_closed()
+        assert not await asyncio.to_thread(port_in_use, port)
 
     run(main())
 

@@ -28,3 +28,10 @@ def test_installer_lowercases_and_validates_mode():
     assert "NOT INSTALLED: -Mode" in text
     assert text.index("$Mode.Trim().ToLower()") < text.index("1/6")
     assert "NOT INSTALLED: the bridge does not accept config.json" in text
+
+
+def test_installer_copies_every_module_of_the_bridge():
+    text = (HERE / "install.ps1").read_text(encoding="utf-8")
+    listed = set(re.findall(r"'(btobridge/\w+\.py)'", text))
+    modules = {f"btobridge/{path.name}" for path in (HERE / "btobridge").glob("*.py")}
+    assert modules <= listed, f"install.ps1 does not copy: {sorted(modules - listed)}"

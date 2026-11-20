@@ -159,6 +159,22 @@ def write_status(data: dict[str, Any], folder: Path | None = None) -> None:
         pass
 
 
+#: The background task rewrites link.json every 10 s; older than this, it is not running.
+STATUS_FRESH_S = 120
+
+
+def background_link(port_busy: bool, status: dict[str, Any] | None, now: float) -> bool:
+    """Does the background task hold the phone's link? Yes when the port answers on this PC, or
+    its status file is fresh and says it listens. Pairing then goes through it: the console only
+    writes the code, and the phone stays connected to the task that takes its calls."""
+    if port_busy:
+        return True
+    if status is None or now - float(status.get("updated") or 0) > STATUS_FRESH_S:
+        return False
+    link = status.get("link")
+    return isinstance(link, dict) and bool(link.get("listening"))
+
+
 def read_status(folder: Path | None = None) -> dict[str, Any] | None:
     try:
         data = json.loads(((folder or home()) / STATUS_FILE).read_text(encoding="utf-8"))

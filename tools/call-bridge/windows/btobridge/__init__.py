@@ -8,4 +8,4 @@ ElevenLabs key and never logs a word of a conversation: only call ids, timings, 
 Python 3.12 (the embeddable build install.ps1 installs); the code stays 3.12-compatible.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

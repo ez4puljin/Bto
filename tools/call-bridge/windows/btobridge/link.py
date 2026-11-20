@@ -14,7 +14,8 @@ Phone -> PC: `ringing {callRef, number, at}`, `state {callRef, state, cause, at}
 `route {callRef, endpoint, available}`, `pong {id}`.
 PC -> phone: `answer {callRef, route}`, `ignore {callRef}`, `hangup {callRef}`, `ping {id}` every
 5 s. Errors the PC may send before closing: `BAD_TOKEN`, `BAD_CODE` (wrong or used up code),
-`NO_PAIRING` (no code open), `BAD_MESSAGE`.
+`NO_PAIRING` (no code open), `BAD_MESSAGE`. A pairing server of the console that stops closes the
+phone's connection with 1012 («service restart»): the app reconnects with `hello`.
 
 Nothing here logs a caller's number or a token.
 """
@@ -47,6 +48,8 @@ FIRST_MESSAGE_S = 10.0
 CODE_TTL_S = 600
 CODE_TRIES = 5
 TEXT_MAX = 100
+#: WebSocket close code «service restart»: the app reconnects with `hello`.
+RECONNECT_CODE = 1012
 
 
 def sha256(value: str) -> str:
@@ -157,6 +160,7 @@ class PhoneServer:
         pong_timeout_s: float = PONG_TIMEOUT_S,
         on_change: Callable[[], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        role: str = "background",
     ) -> None:
         self.credentials = credentials
         self.pairing = pairing
@@ -167,6 +171,9 @@ class PhoneServer:
         self.pong_timeout_s = pong_timeout_s
         self.on_change = on_change or (lambda: None)
         self.clock = clock
+        #: Which process holds the link, for the log: "background" (`serve`) or "pairing" (the
+        #: console's own server while the background task does not listen).
+        self.role = role
         self._server: Any = None
         self._ws: Any = None
         self._calls: dict[str, CallListener] = {}
@@ -194,9 +201,15 @@ class PhoneServer:
         sockets = list(self._server.sockets)
         if sockets:
             self.port = int(sockets[0].getsockname()[1])
-        log.info("phone link listening on port %s", self.port)
+        log.info("phone link listening on port %s (%s)", self.port, self.role)
 
-    async def stop(self) -> None:
+    async def stop(self, *, reconnect: bool = False) -> None:
+        """Stop listening. `reconnect`: the phone's connection is closed with 1012 («service
+        restart») first, so the app reconnects with `hello` to whoever listens next."""
+        ws = self._ws
+        if reconnect and ws is not None:
+            with contextlib.suppress(Exception):
+                await ws.close(RECONNECT_CODE, "reconnect")
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
@@ -280,7 +293,7 @@ class PhoneServer:
         if old is not None:
             with contextlib.suppress(Exception):
                 await old.close(4000, "replaced")
-        log.info("phone link: connected")
+        log.info("phone link: connected (%s)", self.role)
         self.on_change()
         pinger = asyncio.create_task(self._pinger(ws))
         try:
@@ -293,7 +306,12 @@ class PhoneServer:
             pinger.cancel()
             if self._ws is ws:
                 self._ws = None
-                log.info("phone link: disconnected")
+                log.info(
+                    "phone link: disconnected (%s; close %s %s)",
+                    self.role,
+                    getattr(ws, "close_code", None),
+                    str(getattr(ws, "close_reason", "") or "")[:40],
+                )
                 self.on_change()
 
     async def _pinger(self, ws: Any) -> None:
@@ -396,6 +414,8 @@ def lan_address(server: str) -> str | None:
 
 
 def port_in_use(port: int) -> bool:
+    """Something on this PC listens on `port`. The background task binds 0.0.0.0, which takes
+    connections to 127.0.0.1 too (on Windows as on Linux); loopback is never firewalled."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.settimeout(0.5)
         return probe.connect_ex(("127.0.0.1", port)) == 0

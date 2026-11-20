@@ -55,11 +55,12 @@ uv pip compile requirements.in --python-platform x86_64-pc-windows-msvc --python
 | `devices` | the WASAPI microphones and speakers with their numbers |
 | `check` | `GET /phone-agent/station`: the line, on or off, working hours now, the agent on the server |
 | `serve` | the background task: the station's heartbeat every 60 s; in the bluetooth mode also the phone's link and its calls |
-| `pair` | a 6-digit pairing code (10 min, 5 tries) and this PC's LAN address for the phone app; listens itself when the background task does not |
+| `pair` | a 6-digit pairing code (10 min, 5 tries) and this PC's LAN address for the phone app; goes through the background task whenever it listens (the port answers on 127.0.0.1, or `link.json` is fresh and says it listens), so the phone stays connected to the task that takes its calls; only when it does not, listens itself and, once paired, closes the phone's connection with 1012 («service restart») so the app says `hello` to the background task when that starts. `bridge.log` names which process held the link and each disconnect's close code |
 | `status` | the station and the phone's link as the background task last saw them |
 | `doctor` | Bluetooth radio, Bluetooth service, Phone Link, a phone paired as a hands-free gateway, VB-Cable; plain Mongolian lines, exit 1 when something is missing |
 | `find-call-device [--no-wait]` | during a test call: every output's loopback level for 4 s; the clearly loudest (6 dB above the next, above −55 dBFS, never VB-Cable) is saved as `call_output_device` |
 | `calibrate` | during a test call: the echo leak of a 1 kHz tone and the caller's level (below) |
+| `audio-test` | before a call (menu 10): opens the call device's loopback and the agent's output exactly as a call does, for 5 s; plays a 1 kHz tone into «CABLE Input» after 1 s and listens for it on «CABLE Output»; prints which device / host API / rate opened, the levels, and «OK» or the exact error with every way tried (exit 1) |
 
 ## One call (`btobridge/session.py`)
 
@@ -157,6 +158,21 @@ JSON text frames over a plain WebSocket; the PC is the server on `phone_port` (8
 | `bluetooth` | WASAPI loopback of `call_output_device` (PyAudioWPatch; null = the default output), plus zero samples while the loopback delivers nothing (`SilenceFiller`: loopback is silent when nothing plays, and ElevenLabs needs the silence to hear the end of a turn) | `agent_output_device` = «CABLE Input» (sounddevice); «CABLE Output» is Phone Link's microphone |
 | `cable` | not built (the owner bought no parts, 2026-11-20): `open_audio` refuses it; it would be `DeviceAudio(_InputCapture(cable_input_device), _Playback(cable_output_device))` | |
 
+**Opening the devices (0.3.1).** Every PortAudio call (sounddevice's DLL and the PortAudio
+PyAudioWPatch links in) runs on one audio thread that joins COM's multithreaded apartment first.
+0.3.0 found the devices on a worker thread and opened the streams on the event loop's thread,
+which had no COM, so WASAPI refused the open (`PortAudioError`) and every bluetooth call ended in
+1–2 s. Each open follows a plan (`device_plan`): the device's WASAPI entry at its own rate with
+WASAPI's converter (`WasapiSettings(auto_convert=True)`: any rate and channel count in shared
+mode), then 48000, 44100; then its DirectSound entry, then its MME entry (the same device found by
+name across host APIs, MME's names cut at 31 characters; «CABLE In 16ch» never); in the bluetooth
+mode PyAudioWPatch's own WASAPI output last. A loopback opens at its own rate and channels first
+(`loopback_plan`). Every failed try is logged with PortAudio's text, its `PaErrorCode` and the host
+API's error (WASAPI's HRESULT in hex), and the try that opened is logged; no call content is in
+any of them. Both libraries stay: sounddevice for the agent's voice (WASAPI's converter, DirectSound
+and MME fallbacks; PyAudioWPatch has no WASAPI stream settings), PyAudioWPatch for the loopback
+(sounddevice 0.5.6 has none); the one thread keeps them from being entered at once.
+
 `check_roles` refuses (the phone keeps ringing) an agent output that is the call device itself or
 not VB-Cable: the agent must never play where the loopback listens. A loopback device is found by
 the output's name (`<name> [Loopback]`), whole or in part. The Windows sound settings the owner
@@ -207,12 +223,17 @@ well inside the deadline, the greeting held until «connected», declines, a slo
 `hangup` after `end_call`, no number or token in the log. `tests/test_stage3_parts.py`: device
 roles, the loopback match, the call device detection, resampling, the silence filler, the echo
 gate (also inside the session), calibrate's analysis, the Windows checks' words, metrics, config.
+`tests/test_audio_open.py` with fake sounddevice / PyAudioWPatch modules (`tests/fake_sound.py`,
+the owner's devices on four host APIs, VB-Cable carrying «CABLE Input» to «CABLE Output»): the
+plan's order, rates and channels, the cut MME names and «CABLE In 16ch», the fallback from a
+refused WASAPI open, every PortAudio call on one thread that is not the event loop's, the error
+text in the session's log, and `audio-test`'s OK and error.
 
 ## Not verified here
 
-Built and tested on Linux without sound hardware. Not run on Windows yet: PyAudioWPatch's
-loopback on the owner's devices, two PortAudio libraries in one process (sounddevice's and
-PyAudioWPatch's), whether Phone Link takes «CABLE Output» as its microphone through the default
+Built and tested on Linux without sound hardware. Not run on Windows yet: the audio thread's COM
+fix and the fallbacks of 0.3.1 (`audio-test` shows them), PyAudioWPatch's loopback on the owner's
+devices, whether Phone Link takes «CABLE Output» as its microphone through the default
 communication device (Microsoft does not document a virtual microphone for calls, ADR-0232 #13),
 the delay Phone Link needs after a call connects (`audio_ready_ms` 300 is a guess), whether a
 muted call device still gives loopback audio, the `doctor` PowerShell probe on that PC, the

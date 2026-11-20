@@ -11,6 +11,8 @@
   doctor                                       Bluetooth, Phone Link, VB-Cable on this PC
   find-call-device                             during a call: which output Phone Link plays it on
   calibrate                                    during a call: echo and the caller's level
+  audio-test                                   before a call: open the call's audio as a call
+                                               does, play a tone into VB-Cable, OK or the error
 """
 
 from __future__ import annotations
@@ -27,12 +29,15 @@ from typing import Any
 
 from . import __version__
 from .audio import (
+    CABLE_OUTPUT_NAME,
+    ListenAudio,
     NullAudio,
     StageThree,
     list_devices,
     measure_outputs,
     open_audio,
     open_local_audio,
+    output_and_input_names,
     pick_call_output,
 )
 from .bto import BtoClient, BtoError, BtoUnreachable
@@ -40,7 +45,7 @@ from .config import PHONE_MODES, VB_CABLE_INPUT, Config, home, load, update
 from .link import Pairing, PhoneServer, lan_address, port_in_use
 from .metrics import report
 from .phone import LocalPhone
-from .serve import PAIRING_FILE, ConfigCredentials, read_status
+from .serve import PAIRING_FILE, ConfigCredentials, background_link, read_status
 from .serve import serve as serve_phone
 from .session import CallSession, Limits
 
@@ -147,16 +152,25 @@ async def pair(config: Config) -> int:
     print("  «Bto дуудлага» апп → «Компьютер холбох» дээр энэ хаяг, кодыг оруулна.")
     print("  Код 10 минут хүчинтэй.")
     own: PhoneServer | None = None
-    if not port_in_use(int(config.phone_port)):
-        # The background task is not listening: listen here until the phone pairs.
+    port = int(config.phone_port)
+    if background_link(port_in_use(port), read_status(), time.time()):
+        # The background task takes the code from pairing.json; the phone stays connected to it.
+        log.info("pairing through the background task")
+    else:
+        # The background task is not listening: listen here until the phone pairs, then tell the
+        # phone to reconnect (it says hello to the background task when that runs).
         own = PhoneServer(
-            ConfigCredentials(), pairing, lambda _ring: None, port=int(config.phone_port)
+            ConfigCredentials(), pairing, lambda _ring: None, port=port, role="pairing"
         )
         try:
             await own.start()
         except OSError as error:
-            print(f"Порт {config.phone_port} нээгдсэнгүй ({type(error).__name__}).")
-            return 1
+            # The port is taken after all (the background task is starting): go through it.
+            log.info("pairing: port busy (%s), through the background task", type(error).__name__)
+            own = None
+        else:
+            print("  Анхаар: арын програм ажиллахгүй байна. Холбосны дараа утас түр тасарч,")
+            print("  арын програм асахад (компьютерээ дахин асаахад) өөрөө дахин холбогдоно.")
     try:
         while True:
             await asyncio.sleep(1)
@@ -173,7 +187,7 @@ async def pair(config: Config) -> int:
                 return 1
     finally:
         if own is not None:
-            await own.stop()
+            await own.stop(reconnect=True)
 
 
 def status_lines(config: Config, status: dict[str, Any] | None, now: float) -> list[str]:
@@ -217,11 +231,7 @@ async def doctor(config: Config) -> int:
         print("Windows-ийн шалгалт хийгдсэнгүй (Windows биш эсвэл PowerShell хариулсангүй).")
         return 1
     try:
-        import sounddevice as sd  # noqa: PLC0415
-
-        devices = sd.query_devices()
-        outs = [str(d["name"]) for d in devices if d["max_output_channels"] > 0]
-        ins = [str(d["name"]) for d in devices if d["max_input_channels"] > 0]
+        outs, ins = output_and_input_names()
         facts.vb_cable = checks.has_vb_cable(outs, ins)
     except Exception:  # noqa: BLE001
         facts.vb_cable = False
@@ -290,6 +300,20 @@ async def calibrate(config: Config) -> int:
     return 0
 
 
+async def audio_test(config: Config) -> int:
+    from . import audiotest  # noqa: PLC0415
+
+    try:
+        audio = open_audio(config)
+    except StageThree as error:
+        print(error)
+        return 2
+    # Bluetooth: the tone must come out of VB-Cable's other end, Phone Link's microphone.
+    listen = ListenAudio(CABLE_OUTPUT_NAME) if config.mode == "bluetooth" else None
+    result = await audiotest.run(audio, listen, print)
+    return 0 if result.ok else 1
+
+
 async def serve(config: Config) -> int:
     """The background task at sign-in."""
     return await serve_phone(config)
@@ -345,6 +369,7 @@ def menu(config: Config) -> int:
         print("  7  Bluetooth, Phone Link, VB-Cable шалгах")
         print("  8  дуудлагын төхөөрөмж олох (дуудлагын үеэр)")
         print("  9  цуурай, дууны түвшин хэмжих (дуудлагын үеэр)")
+        print(" 10  дууны зам шалгах (дуудлагын өмнө)")
         print("  0  гарах")
         choice = input("> ").strip()
         if choice == "1":
@@ -369,6 +394,8 @@ def menu(config: Config) -> int:
         elif choice == "9":
             asyncio.run(calibrate(config))
             config = load()
+        elif choice == "10":
+            asyncio.run(audio_test(config))
         elif choice in ("0", "q", ""):
             return 0
 
@@ -390,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
     find = sub.add_parser("find-call-device", help="during a call: the output Phone Link plays on")
     find.add_argument("--no-wait", action="store_true", help="measure at once, no Enter")
     sub.add_parser("calibrate", help="during a call: echo and the caller's level")
+    sub.add_parser("audio-test", help="before a call: open the call's audio, tone into VB-Cable")
     args = parser.parse_args(argv)
 
     if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -432,6 +460,8 @@ def main(argv: list[str] | None = None) -> int:
         return find_call_device(interactive=not args.no_wait)
     if args.command == "calibrate":
         return asyncio.run(calibrate(config))
+    if args.command == "audio-test":
+        return asyncio.run(audio_test(config))
     if args.command == "serve":
         while True:  # never a crash loop: a failure waits a minute and starts again
             try:
