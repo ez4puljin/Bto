@@ -969,4 +969,83 @@ describe('the phone AI order line (ADR-0232)', () => {
     await http().get('/api/v1/phone-callbacks').set(bearer(office)).expect(403);
     await http().get(`/api/v1/phone-calls/${callId}`).set(bearer(office)).expect(403);
   });
+
+  it('takes the order only from the newest quote the caller answered, never an older one', async () => {
+    const call = await answered(storePhone);
+    const first = [{ unitId: flow.pcs(water), qty: 2 }];
+    const second = [
+      { unitId: flow.pcs(water), qty: 4 },
+      { unitId: unitOf(cola, 'BOX').id, qty: 1 },
+    ];
+    const quoteOf = async (seq: number, lines: object[]) =>
+      (
+        (await station().tool(call.callId, 'quote', seq, { lines }).expect(200)).body as {
+          answer: { quoteId: string };
+        }
+      ).answer.quoteId;
+    await station()
+      .events(call.callId, [{ seq: 1, role: 'USER', text: 'Хоёр ус' }])
+      .expect(200);
+    const older = await quoteOf(2, first);
+    await station()
+      .events(call.callId, [
+        { seq: 3, role: 'AGENT', text: 'Хоёр ус. Зөв үү?' },
+        { seq: 4, role: 'USER', text: 'Үгүй, дөрвөн ус, нэг хайрцаг кола' },
+      ])
+      .expect(200);
+    const newer = await quoteOf(5, second);
+    await station()
+      .events(call.callId, [
+        { seq: 6, role: 'AGENT', text: 'Дөрвөн ус, нэг хайрцаг кола. Зөв үү?' },
+        { seq: 7, role: 'USER', text: 'Тийм' },
+      ])
+      .expect(200);
+    // The caller said «тийм» to the newer cart: the older quote's id is not a way around it.
+    const refused = await station()
+      .tool(call.callId, 'place_order', 8, { quoteId: older, fulfilment: 'PICKUP' })
+      .expect(409);
+    expect(refused.body).toMatchObject({ code: 'PHONE_QUOTE_NOT_FOUND' });
+    const before = await phoneOrders();
+    const placed = (
+      await station()
+        .tool(call.callId, 'place_order', 9, { quoteId: newer, fulfilment: 'PICKUP' })
+        .expect(200)
+    ).body as { answer: { number: string } };
+    expect(Number(await phoneOrders())).toBe(Number(before) + 1);
+    const lines = await sql.query<{ product_id: string; qty: string }>(
+      `SELECT l.product_id::text, l.qty::text FROM sales_order_lines l
+         JOIN sales_orders o ON o.id = l.order_id WHERE o.number = $1 ORDER BY l.line_no`,
+      [placed.answer.number],
+    );
+    expect(lines.rows).toEqual([
+      { product_id: String(water.id), qty: '4.000' },
+      { product_id: String(cola.id), qty: '1.000' },
+    ]);
+    await station().end(call.callId, { reason: 'COMPLETED', durationS: 40 }).expect(200);
+  });
+
+  it('filters the calls by Ulaanbaatar day and by whether they placed an order', async () => {
+    const list = async (query: Record<string, string>) =>
+      (
+        (await http().get('/api/v1/phone-calls').query(query).set(bearer(admin)).expect(200))
+          .body as { data: { id: number; orderNumber: string | null }[] }
+      ).data;
+    const ordered = await list({ hasOrder: 'true', limit: '100' });
+    expect(ordered.length).toBeGreaterThanOrEqual(2);
+    expect(ordered.every((call) => call.orderNumber !== null)).toBe(true);
+    expect(ordered.map((call) => call.id)).toContain(callId);
+    const without = await list({ hasOrder: 'false', limit: '100' });
+    expect(without.length).toBeGreaterThan(0);
+    expect(without.every((call) => call.orderNumber === null)).toBe(true);
+    expect((await list({ from: today, to: today, hasOrder: 'true' })).map((c) => c.id)).toContain(
+      callId,
+    );
+    expect(await list({ from: addDays(today, 1) })).toEqual([]);
+    expect(await list({ to: addDays(today, -1) })).toEqual([]);
+    await http()
+      .get('/api/v1/phone-calls')
+      .query({ from: '2026-02-30' })
+      .set(bearer(admin))
+      .expect(422);
+  });
 });

@@ -10,6 +10,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -36,6 +37,7 @@ import {
 // argument and answer shapes are documented in docs/modules/phone-agent.md §4.
 
 const EVENT_ROLES = ['USER', 'AGENT'] as const;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // ------------------------------------------------------------------------------------------------
 // The station.
@@ -350,6 +352,30 @@ export class PhoneCallQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(['true', 'false'])
   answered?: 'true' | 'false';
+
+  @ApiPropertyOptional({
+    format: 'date',
+    description: 'Started on or after this day (Ulaanbaatar)',
+  })
+  @IsOptional()
+  @Matches(ISO_DATE)
+  from?: string;
+
+  @ApiPropertyOptional({
+    format: 'date',
+    description: 'Started on or before this day (Ulaanbaatar)',
+  })
+  @IsOptional()
+  @Matches(ISO_DATE)
+  to?: string;
+
+  @ApiPropertyOptional({
+    enum: ['true', 'false'],
+    description: 'Only calls that placed an order, or only calls that did not',
+  })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  hasOrder?: 'true' | 'false';
 }
 
 @ApiSchema({ name: 'PhoneCallMessage' })

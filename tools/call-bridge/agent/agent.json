@@ -1,0 +1,70 @@
+{
+  "_about": "The ElevenLabs agent of Bto's phone AI order line (ADR-0232 #15). push.mjs sends this file (keys starting with _ left out) with conversation_config.agent.prompt.prompt read from prompt.mn.md and prompt.tool_ids from tools.json.",
+  "_llm": "prompt.llm: claude-haiku-4-5 (speed) is the stage-2 default. To try Sonnet, run push.mjs with --llm claude-sonnet-4-6 (or claude-sonnet-5-5), or change the value here and push again; the owner picks after the measurement.",
+  "_voice": "tts.voice_id: null keeps the provider's default voice. Pick a voice that speaks Mongolian well in the ElevenLabs voice library, put its id here and push again.",
+  "name": "Bto phone order line",
+  "tags": ["bto", "phone-ai"],
+  "conversation_config": {
+    "agent": {
+      "language": "mn",
+      "first_message": "Сайн байна уу, Оргил бөөний төвийн захиалгын AI туслах байна. Яриа бичигдэж байгаа. Юугаар туслах вэ?",
+      "disable_first_message_interruptions": false,
+      "max_conversation_duration_message": "Уучлаарай, ярианы хугацаа дууслаа. Ажилтан тань руу эргэж залгана. Баярлалаа, сайхан амраарай.",
+      "dynamic_variables": {
+        "dynamic_variable_placeholders": {
+          "call_id": "0",
+          "caller_known": true,
+          "store_name": "Туршилтын дэлгүүр",
+          "can_deliver": true,
+          "greeting": ""
+        }
+      },
+      "prompt": {
+        "llm": "claude-haiku-4-5",
+        "temperature": 0,
+        "enable_parallel_tool_calls": false,
+        "timezone": "Asia/Ulaanbaatar"
+      }
+    },
+    "asr": {
+      "quality": "high",
+      "provider": "scribe_realtime",
+      "user_input_audio_format": "pcm_16000",
+      "keywords": []
+    },
+    "tts": {
+      "model_id": "eleven_v4_turbo",
+      "voice_id": null,
+      "agent_output_audio_format": "pcm_16000",
+      "text_normalisation_type": "system_prompt"
+    },
+    "turn": {
+      "turn_timeout": 8,
+      "silence_end_call_timeout": 40,
+      "turn_eagerness": "normal"
+    },
+    "conversation": {
+      "max_duration_seconds": 600,
+      "client_events": [
+        "conversation_initiation_metadata",
+        "ping",
+        "audio",
+        "interruption",
+        "user_transcript",
+        "agent_response",
+        "agent_response_correction",
+        "client_tool_call",
+        "client_error"
+      ]
+    }
+  },
+  "platform_settings": {
+    "overrides": {
+      "conversation_config_override": {
+        "agent": {
+          "first_message": true
+        }
+      }
+    }
+  }
+}

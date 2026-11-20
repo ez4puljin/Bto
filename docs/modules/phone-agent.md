@@ -2,7 +2,7 @@
 
 Outside the shop's working hours an AI agent answers the order phone in Mongolian. The Android phone takes the GSM call, a Windows bridge beside it holds the conversation with ElevenLabs Agents, and every tool the agent uses is a call from that bridge to Bto over the LAN. This module is Bto's side: who may be answered and when, who is calling, what the agent may say and do, the transcript, and the callback tasks.
 
-Status: **stage 1** (the api), built 2026-11-20. Stage 2 adds the station screen, the calls screen and the Windows bridge; stage 3 the Android app. Nothing here is switched on until a line exists, is active, the sales settings name a PHONE_AI stage and the server has the agent's key.
+Status: **stage 1** (the api) and **stage 2** (the station and calls screens, the Windows bridge `tools/call-bridge/windows` in `local` mode with test calls through the PC's headset, and the agent as code `tools/call-bridge/agent`), built 2026-11-20. Stage 3: the Android app and the `cable` / `bluetooth` audio modes. Nothing here is switched on until a line exists, is active, the sales settings name a PHONE_AI stage and the server has the agent's key.
 
 - **Code:** `apps/api/src/modules/phone-agent/`; the provider's client in `apps/api/src/integrations/elevenlabs/`.
 - **Decisions:** ADR-0232 (everything here), ADR-0226 #4 (the station key scheme), ADR-0079 #5 and ADR-0082 #3 (an order without a staff author), ADR-0045 #7 (nothing spoken is logged), ADR-0069 #7 (the module's own error catalog).
@@ -93,11 +93,29 @@ The office:
 | `POST /phone-lines` | `phone.lines.manage`, Idempotency-Key (the key is not stored in the replay) | `{ name, schedule?, greeting? }` → `{ line, key }`, 201; the line is off |
 | `PUT /phone-lines/{id}` | `phone.lines.manage` | `{ name?, active?, schedule?, greeting? }` |
 | `POST /phone-lines/{id}/key` | `phone.lines.manage`, Idempotency-Key | a new key `{ line, key }`; the old one stops |
-| `GET /phone-calls?outcome&answered&cursor&limit` | `phone.calls.read` | newest first, keyset |
+| `GET /phone-calls?outcome&answered&from&to&hasOrder&cursor&limit` | `phone.calls.read` | newest first, keyset; `from` / `to` are Ulaanbaatar days (`YYYY-MM-DD`, both inclusive, by `started_at`); `hasOrder=true` only the calls that placed an order, `false` only the others |
 | `GET /phone-calls/{id}` | `phone.calls.read` | `{ call, messages }`, the transcript in the order it was spoken (`at_ms`, then `seq`) |
 | `GET /phone-callbacks?status&cursor&limit` | `phone.calls.read` | OPEN unless another status is asked |
 | `POST /phone-callbacks/{id}/close` | `phone.calls.read`, Idempotency-Key | `{ status: DONE/DROPPED }`; only an open task closes (`PHONE_CALLBACK_STATE`, 409) |
 | `GET /phone-searches/no-hits?cursor&limit` | `phone.calls.read` | «Олдоогүй хайлтууд»: `{ callId, seq, query, createdAt }`, newest first |
+
+### 4.1 How the bridge uses the station routes (stage 2, `tools/call-bridge/windows`)
+
+- One `POST /calls` per ring, no retry (a replay carries no signed URL). The signed URL opens the
+  conversation; the first message carries `dynamicVariables`, and the line's `greeting` as the
+  `first_message` override only when it is not empty.
+- `user_transcript` and `agent_response` take the next `seq` in the WebSocket's order; a
+  `client_tool_call` takes the next one when it arrives. Turns go to `/events` in batches of at
+  most 200, each second. Before a tool is forwarded every buffered turn is stored; if Bto does not
+  take them the tool is not sent at all. The tool call carries `afterSeq = seq - 1`; tools run one
+  at a time. A retry reuses its Idempotency-Key.
+- The agent hears a tool's `answer` as JSON, or `{"error": "<code>"}` with `is_error` for a refusal;
+  `BTO_UNAVAILABLE` when Bto did not answer (the call then ends as ERROR within 20 s).
+- `/end` carries the reason (`COMPLETED` after `end_call`, `CALLER_HANGUP`, `TIMEOUT`, `SILENCE`,
+  `ERROR`), `durationS` and the conversation id.
+- The bridge logs and prints no words, numbers of callers, URLs or answers: ids, milliseconds, counts
+  and codes. Its numbers per call (response time, greeting, searches, no-hit searches) stay in the
+  PC's `metrics.csv`.
 
 ## 5. Error codes (`phone-agent.errors.ts`, messages under `errors.*` of mn.json)
 
@@ -118,4 +136,4 @@ The office:
 
 - Which roles besides ADMIN hold `phone.calls.read` and `phone.lines.manage` is the owner's to say.
 - Whether the apps' minimum order amount applies to a phone order is not decided; it is not applied.
-- The screens, the bell's rows for the two new kinds, the bridge and the agent's configuration are stages 2 and 3.
+- Stage 3: the Android link and the two audio modes. Stage 2's measurements (recognition, the LLM, latency, cost) decide the agent's settings.

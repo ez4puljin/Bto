@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import { and, asc, desc, eq, isNull, lt, type SQL, sql } from 'drizzle-orm';
+import { addDays, businessInstant, isIsoDate } from '@tugeel/shared/time';
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
+import { invalid } from '../../../common/errors/app-error';
 import { JobsService } from '../../../common/jobs/jobs.service';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { type AuthContext, AuditService } from '../../identity';
@@ -434,15 +436,37 @@ export class PhoneCallsService {
   async page(query: {
     outcome?: PhoneCallOutcome;
     answered?: boolean;
+    /** Started on or after this Ulaanbaatar day, `YYYY-MM-DD`. */
+    from?: string;
+    /** Started on or before this Ulaanbaatar day, `YYYY-MM-DD`. */
+    to?: string;
+    /** Only calls that placed an order (true) or only those that did not (false). */
+    hasOrder?: boolean;
     cursor?: string;
     limit?: number;
   }): Promise<{ data: PhoneCallView[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const cursor = decodeCursor(query.cursor);
     const after = typeof cursor?.id === 'number' ? cursor.id : null;
+    for (const field of ['from', 'to'] as const) {
+      const day = query[field];
+      if (day !== undefined && !isIsoDate(day))
+        throw invalid(field, 'date', `${field}: no such day`);
+    }
     const filters: (SQL | undefined)[] = [
       query.outcome ? eq(phoneCalls.outcome, query.outcome) : undefined,
       query.answered === undefined ? undefined : eq(phoneCalls.answered, query.answered),
+      query.from === undefined
+        ? undefined
+        : gte(phoneCalls.startedAt, businessInstant(`${query.from} 00:00:00`)),
+      query.to === undefined
+        ? undefined
+        : lt(phoneCalls.startedAt, businessInstant(`${addDays(query.to, 1)} 00:00:00`)),
+      query.hasOrder === undefined
+        ? undefined
+        : query.hasOrder
+          ? isNotNull(phoneCalls.salesOrderId)
+          : isNull(phoneCalls.salesOrderId),
       after === null ? undefined : lt(phoneCalls.id, after),
     ];
     const rows = await this.db

@@ -50809,6 +50809,39 @@
                 "false"
               ]
             }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Started on or after this day (Ulaanbaatar)",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Started on or before this day (Ulaanbaatar)",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasOrder",
+            "required": false,
+            "in": "query",
+            "description": "Only calls that placed an order, or only calls that did not",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
           }
         ],
         "responses": {

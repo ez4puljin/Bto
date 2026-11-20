@@ -168,6 +168,9 @@ export class PhoneCallsController {
     const page = await this.calls.page({
       ...(query.outcome ? { outcome: query.outcome } : {}),
       ...(query.answered === undefined ? {} : { answered: query.answered === 'true' }),
+      ...(query.from === undefined ? {} : { from: query.from }),
+      ...(query.to === undefined ? {} : { to: query.to }),
+      ...(query.hasOrder === undefined ? {} : { hasOrder: query.hasOrder === 'true' }),
       ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
       ...(query.limit === undefined ? {} : { limit: query.limit }),
     });

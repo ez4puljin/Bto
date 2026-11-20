@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Decimal } from '@tugeel/shared/money';
 import { eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
@@ -109,7 +110,12 @@ export class PhoneReconcileFlowService {
         .set({
           reconciledAt: sql`now()`,
           durationS: locked.durationS ?? duration,
-          costEstimate: conversation.cost === null ? null : conversation.cost.toFixed(4),
+          costEstimate:
+            conversation.cost === null
+              ? null
+              : new Decimal(String(conversation.cost))
+                  .toDecimalPlaces(4, Decimal.ROUND_HALF_UP)
+                  .toFixed(4),
         })
         .where(eq(phoneCalls.id, callId));
       return missing.length;

@@ -1,0 +1,157 @@
+[
+  {
+    "type": "client",
+    "name": "search_products",
+    "description": "Find products by what the caller said (a name, a brand, a kind). Answers up to 5 products: productId, name, sellable, stock (available or out) and units (unitId, name, factor = base units in one of this unit, base = true for the base unit). Empty products means nothing was found.",
+    "expects_response": true,
+    "response_timeout_secs": 15,
+    "parameters": {
+      "type": "object",
+      "required": ["query"],
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The caller's words for the product, 1 to 100 characters, in Mongolian as spoken."
+        }
+      }
+    }
+  },
+  {
+    "type": "client",
+    "name": "check_availability",
+    "description": "Check whether a quantity of one product in one of its units is available. Answers status available, out, or only with qty and unit (say «ердөө <qty> <unit> үлдсэн байна»). Never say any other stock number.",
+    "expects_response": true,
+    "response_timeout_secs": 15,
+    "parameters": {
+      "type": "object",
+      "required": ["productId", "unitId", "qty"],
+      "properties": {
+        "productId": { "type": "integer", "description": "productId from search_products." },
+        "unitId": {
+          "type": "integer",
+          "description": "unitId of the unit the caller confirmed, from the product's units."
+        },
+        "qty": {
+          "type": "number",
+          "description": "How many of that unit, more than 0, at most three decimals."
+        }
+      }
+    }
+  },
+  {
+    "type": "client",
+    "name": "quote",
+    "description": "Price the whole cart at today's wholesale prices, recognised stores only. Answers quoteId, preliminary = true, lines (name, unit, qty, total) and total, in MNT. Read every line and the total back to the caller, say it is preliminary, and ask whether it is right.",
+    "expects_response": true,
+    "response_timeout_secs": 15,
+    "parameters": {
+      "type": "object",
+      "required": ["lines"],
+      "properties": {
+        "lines": {
+          "type": "array",
+          "description": "Every line of the cart, 1 to 20.",
+          "items": {
+            "type": "object",
+            "required": ["unitId", "qty"],
+            "properties": {
+              "unitId": {
+                "type": "integer",
+                "description": "unitId of the product unit the caller confirmed."
+              },
+              "qty": {
+                "type": "number",
+                "description": "How many of that unit, more than 0, at most three decimals."
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "client",
+    "name": "place_order",
+    "description": "Place the order of the latest quote. Call only after reading that quote back and hearing a clear yes from the caller. Answers the order's number, fulfilment and deliveryDate. The order's lines are the quote's.",
+    "expects_response": true,
+    "response_timeout_secs": 20,
+    "parameters": {
+      "type": "object",
+      "required": ["quoteId"],
+      "properties": {
+        "quoteId": { "type": "string", "description": "quoteId of the latest quote of this call." },
+        "fulfilment": {
+          "type": "string",
+          "enum": ["DELIVERY", "PICKUP"],
+          "description": "DELIVERY to the store's address, or PICKUP at the warehouse, as the caller chose."
+        },
+        "note": {
+          "type": "string",
+          "description": "A short note the caller asked to add to the order, at most 300 characters."
+        }
+      }
+    }
+  },
+  {
+    "type": "client",
+    "name": "order_status",
+    "description": "The calling store's own orders: the one with this number, or its newest three without a number. Answers found and orders (number, state, createdDate, fulfilment, deliveryDate).",
+    "expects_response": true,
+    "response_timeout_secs": 15,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "string",
+          "description": "The order's number if the caller said one, at most 40 characters."
+        }
+      }
+    }
+  },
+  {
+    "type": "client",
+    "name": "new_products",
+    "description": "New products in stock, to suggest once per call (at most two). Answers products (productId, name, units); a second call answers none.",
+    "expects_response": true,
+    "response_timeout_secs": 15,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "limit": { "type": "integer", "description": "How many, 1 to 3; 2 when left out." }
+      }
+    }
+  },
+  {
+    "type": "client",
+    "name": "request_callback",
+    "description": "Leave a task for staff to ring the caller back: cancellations, changes, complaints, payments, an unknown number wanting to order, anything the tools cannot answer, or two misunderstandings in a row.",
+    "expects_response": true,
+    "response_timeout_secs": 15,
+    "parameters": {
+      "type": "object",
+      "required": ["reason"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "Why staff should call back, in a few Mongolian words, at most 500 characters."
+        }
+      }
+    }
+  },
+  {
+    "type": "client",
+    "name": "end_call",
+    "description": "Hang up. Call it after thanking the caller and saying goodbye; say nothing after it.",
+    "expects_response": true,
+    "response_timeout_secs": 15,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "Why the call ends, a few words, at most 500 characters."
+        }
+      }
+    }
+  }
+]

@@ -57992,6 +57992,12 @@ export interface operations {
                 outcome?: "ORDERED" | "STATUS_ONLY" | "CALLBACK" | "NO_MATCH" | "ABANDONED" | "FAILED";
                 /** @description Only calls the AI answered, or not */
                 answered?: "true" | "false";
+                /** @description Started on or after this day (Ulaanbaatar) */
+                from?: string;
+                /** @description Started on or before this day (Ulaanbaatar) */
+                to?: string;
+                /** @description Only calls that placed an order, or only calls that did not */
+                hasOrder?: "true" | "false";
             };
             header?: never;
             path?: never;
