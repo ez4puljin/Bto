@@ -107,6 +107,8 @@ def load(path: Path | None = None) -> Config:
     known = {f.name for f in fields(Config)} - {"extra"}
     values = {name: raw[name] for name in known if name in raw}
     extra = {name: value for name, value in raw.items() if name not in known}
+    if isinstance(values.get("mode"), str):
+        values["mode"] = values["mode"].strip().lower()
     config = Config(**values, extra=extra)
     config.server = config.server.rstrip("/")
     return config

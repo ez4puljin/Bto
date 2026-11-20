@@ -35,7 +35,7 @@ param(
   [Parameter(Mandatory = $true)][string]$Key,
   [string]$InputDevice = '',
   [string]$OutputDevice = '',
-  [ValidateSet('', 'local', 'bluetooth', 'cable')][string]$Mode = '',
+  [string]$Mode = '',
   [string]$CallDevice = '',
   [switch]$NoDevicePrompt
 )
@@ -91,6 +91,12 @@ function Get-Checked([string]$Url, [string]$Sha, [string]$OutFile) {
 }
 
 function Install-Bridge {
+  # -Mode is accepted in any case (Bluetooth, BLUETOOTH): it is written to config.json in lower case.
+  $Mode = $Mode.Trim().ToLower()
+  if ($Mode -and @('local', 'bluetooth', 'cable') -notcontains $Mode) {
+    Write-Host "NOT INSTALLED: -Mode '$Mode' is not known. Use -Mode local or -Mode bluetooth. (Mode ni local esvel bluetooth baih yostoi.)" -ForegroundColor Red
+    return
+  }
   if ($Key -notmatch '^bpl_\d+_[A-Za-z0-9_-]{20,}$') {
     Write-Host 'NOT INSTALLED: the key does not look like a Bto phone line key (bpl_...). Copy it again from Bto.' -ForegroundColor Red
     return
@@ -177,9 +183,20 @@ function Install-Bridge {
   }
   # The checks below run the bridge, which reads config.json: write it once now.
   [IO.File]::WriteAllText($ConfigPath, ($bridgeSettings | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
+  # The bridge's own check of config.json (exit 2: a setting is wrong): stop, do not install on it.
+  $configLines = & $python -m btobridge status 2>&1
+  if ($LASTEXITCODE -eq 2) {
+    $configLines | ForEach-Object { Write-Host "     $_" }
+    Write-Host 'NOT INSTALLED: the bridge does not accept config.json (see the line above). Fix it and run the same line again.' -ForegroundColor Red
+    return
+  }
   if ($bridgeMode -eq 'bluetooth') {
     Write-Host '     Bluetooth, Phone Link, VB-Cable:'
     & $python -m btobridge doctor
+    if ($LASTEXITCODE -eq 2) {
+      Write-Host 'NOT INSTALLED: the bridge check failed on config.json (see the line above).' -ForegroundColor Red
+      return
+    }
     if (-not $NoDevicePrompt -and -not $CallDevice) {
       & $python -m btobridge devices
       Write-Host '     The CALL device is the speaker/headset Phone Link plays a call on (heard in it now).'

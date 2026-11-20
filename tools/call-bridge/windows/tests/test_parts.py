@@ -152,6 +152,17 @@ def test_config_round_trip_and_checks(tmp_path: Path) -> None:
         open_audio(Config(server="http://x", key=KEY, mode="cable"))
 
 
+def test_config_load_lowercases_mode(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    save(Config(server="http://192.168.1.250", key=KEY), path)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["mode"] = " Bluetooth "
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    config = load(path)
+    assert config.mode == "bluetooth"
+    assert config.problems() == []
+
+
 class _Handler(BaseHTTPRequestHandler):
     seen: list[dict[str, Any]] = []
     plan: list[tuple[int, dict[str, Any]]] = []

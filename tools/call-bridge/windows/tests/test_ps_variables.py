@@ -19,3 +19,12 @@ def test_no_case_only_variable_clash(name):
         seen.setdefault(n.lower(), set()).add(n)
     clashes = {k: sorted(v) for k, v in seen.items() if len(v) > 1}
     assert not clashes, f"{name}: names differing only by case: {clashes}"
+
+
+def test_installer_lowercases_and_validates_mode():
+    text = (HERE / "install.ps1").read_text(encoding="utf-8")
+    assert "ValidateSet" not in text  # case is normalised by hand, not by a parameter attribute
+    assert "$Mode = $Mode.Trim().ToLower()" in text
+    assert "NOT INSTALLED: -Mode" in text
+    assert text.index("$Mode.Trim().ToLower()") < text.index("1/6")
+    assert "NOT INSTALLED: the bridge does not accept config.json" in text
