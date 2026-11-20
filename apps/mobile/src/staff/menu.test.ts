@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Me } from '../api/session';
-import { favouritesOf, menuOf, toggledFavourites } from './menu';
+import { favouritesOf, menuOf, quickStripOf, toggledFavourites } from './menu';
 
 const person = (permissions: string[]) => ({ permissions }) as unknown as Me;
 
@@ -87,5 +87,20 @@ describe('the favourites', () => {
   it('adds at the end and takes out', () => {
     expect(toggledFavourites(['rep'], 'thanks')).toEqual(['rep', 'thanks']);
     expect(toggledFavourites(['rep', 'thanks'], 'rep')).toEqual(['thanks']);
+  });
+});
+
+describe('the quick-access strip', () => {
+  const groups = menuOf(person([]));
+
+  it('shows the chosen favourites in their order', () => {
+    const favourites = favouritesOf(['attendance', 'expiry'], groups);
+    expect(quickStripOf(favourites, '').map((item) => item.key)).toEqual(['attendance', 'expiry']);
+  });
+
+  it('is hidden while a search text is present', () => {
+    const favourites = favouritesOf(['attendance'], groups);
+    expect(quickStripOf(favourites, 'ирц')).toEqual([]);
+    expect(quickStripOf(favourites, '   ')).toHaveLength(1);
   });
 });

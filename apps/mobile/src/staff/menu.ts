@@ -137,3 +137,8 @@ export function favouritesOf(stored: unknown, groups: readonly MenuGroup[]): Men
 export function toggledFavourites(current: readonly MenuKey[], key: MenuKey): MenuKey[] {
   return current.includes(key) ? current.filter((one) => one !== key) : [...current, key];
 }
+
+/** The quick-access strip on «Цэс»: the favourites, none while a search text is present. */
+export function quickStripOf(favourites: readonly MenuItem[], search: string): MenuItem[] {
+  return search.trim() === '' ? [...favourites] : [];
+}
