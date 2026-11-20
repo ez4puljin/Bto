@@ -302,3 +302,9 @@ export {
   stockProblemSheetLines,
   stockProblemSheets,
 } from '../modules/stock-problems/schema';
+export {
+  phoneCallbacks,
+  phoneCallMessages,
+  phoneCalls,
+  phoneLines,
+} from '../modules/phone-agent/schema';

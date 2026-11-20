@@ -23,8 +23,22 @@ export const ORDER_STATUSES = [
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-/** Where an order came from; the office enters ADMIN orders. */
-export const ORDER_CHANNELS = ['ADMIN', 'CUSTOMER_APP', 'SALES_REP', 'POS'] as const;
+/**
+ * Where an order came from; the office enters ADMIN orders. PHONE_AI is the phone line's AI agent
+ * (ADR-0232): a draft a caller confirmed by voice, waiting for the office like an app order.
+ */
+export const ORDER_CHANNELS = ['ADMIN', 'CUSTOMER_APP', 'SALES_REP', 'POS', 'PHONE_AI'] as const;
+
+/**
+ * The channels whose orders come from the customer without a staff author (ADR-0079 #5, ADR-0232
+ * #8): they land only on a stage without an action, in a SALES pipeline every reader sees.
+ */
+export const UNATTENDED_CHANNELS = ['CUSTOMER_APP', 'PHONE_AI'] as const;
+export type UnattendedChannel = (typeof UNATTENDED_CHANNELS)[number];
+
+export function isUnattendedChannel(channel: OrderChannel): channel is UnattendedChannel {
+  return (UNATTENDED_CHANNELS as readonly string[]).includes(channel);
+}
 export type OrderChannel = (typeof ORDER_CHANNELS)[number];
 
 /** PICKUP: the customer collects at the warehouse; DELIVERY: a company truck brings it. */

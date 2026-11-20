@@ -59,6 +59,10 @@ declare module './job-catalog' {
     'stockproblems.morningSheets': ScheduledPayload;
     /** Sends one settlement SMS batch through WeSend, message by message (ADR-0216). */
     'notifications.sendSms': { batchId: number };
+    /** Fills one ended phone call's transcript from the provider's copy (ADR-0232 #3). */
+    'phoneagent.reconcile': { callId: number };
+    /** Every five minutes: closes the phone calls the bridge never ended (ADR-0232 #3). */
+    'phoneagent.sweep': ScheduledPayload;
   }
 }
 
@@ -142,6 +146,27 @@ const BTO_JOB_QUEUES = {
     heartbeatSeconds: 60,
     retentionSeconds: 7 * 86_400,
     deleteAfterSeconds: 7 * 86_400,
+  },
+  // One job per ended call (singletonKey = the call id). The provider needs a while to finish a
+  // conversation: a read too early fails and is tried again, a minute apart and then further.
+  'phoneagent.reconcile': {
+    policy: 'exclusive',
+    retryLimit: 6,
+    retryDelay: 60,
+    retryBackoff: true,
+    expireInSeconds: 300,
+    heartbeatSeconds: 60,
+    retentionSeconds: 7 * 86_400,
+    deleteAfterSeconds: 7 * 86_400,
+  },
+  // Every five minutes, one run at a time. No retry: the next run closes what this one missed.
+  'phoneagent.sweep': {
+    policy: 'exclusive',
+    retryLimit: 0,
+    expireInSeconds: 600,
+    heartbeatSeconds: 60,
+    retentionSeconds: 3_600,
+    deleteAfterSeconds: 86_400,
   },
 } as const satisfies Readonly<Partial<Record<JobName, QueueOptions>>>;
 

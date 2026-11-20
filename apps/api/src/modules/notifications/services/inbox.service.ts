@@ -34,20 +34,30 @@ export interface MyNotification {
   id: number;
   kind: UserNotificationKind;
   orderId: number | null;
+  /** Empty for a PHONE_CALLBACK. */
   orderNumber: string;
   customerName: string;
   orderTotal: string | null;
   invoiceNumber: string | null;
+  /** The phone call a PHONE_ORDER or PHONE_CALLBACK came from (ADR-0232 #9). */
+  callId: number | null;
+  callbackId: number | null;
+  /** The number to ring back, on a PHONE_CALLBACK. */
+  phone: string | null;
   read: boolean;
   createdAt: Date;
 }
 
-/** What the sale stored (ADR-0062 #4), read back defensively. */
+/** What the sale (ADR-0062 #4) or the phone line (ADR-0232 #9) stored, read back defensively. */
 interface SoldPayload {
   orderNumber: string;
   customerId: number | null;
+  /** The store's name by value, on the phone line's rows. */
+  customerName: string | null;
   orderTotal: string | null;
   invoiceNumber: string | null;
+  callId: number | null;
+  phone: string | null;
 }
 
 function soldPayload(value: unknown): SoldPayload {
@@ -60,8 +70,11 @@ function soldPayload(value: unknown): SoldPayload {
   return {
     orderNumber: text('orderNumber') ?? '',
     customerId: typeof record.customerId === 'number' ? record.customerId : null,
+    customerName: text('customerName'),
     orderTotal: text('orderTotal'),
     invoiceNumber: text('invoiceNumber'),
+    callId: typeof record.callId === 'number' ? record.callId : null,
+    phone: text('phone'),
   };
 }
 
@@ -130,9 +143,15 @@ export class InboxService {
           kind: row.kind,
           orderId: row.orderId,
           orderNumber: payload.orderNumber,
-          customerName: payload.customerId === null ? '' : (names.get(payload.customerId) ?? ''),
+          customerName:
+            payload.customerId === null
+              ? (payload.customerName ?? '')
+              : (names.get(payload.customerId) ?? payload.customerName ?? ''),
           orderTotal: payload.orderTotal,
           invoiceNumber: payload.invoiceNumber,
+          callId: payload.callId,
+          callbackId: row.callbackId,
+          phone: payload.phone,
           read: row.readAt !== null,
           createdAt: row.createdAt,
         };

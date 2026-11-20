@@ -142,6 +142,10 @@ export const PERMISSIONS = [
   'problems.read',
   'problems.count',
   'problems.manage',
+  // The phone AI order line (ADR-0232): the calls with their transcripts, the callbacks to work
+  // through and the searches that found nothing; the line itself, its schedule, greeting and key.
+  'phone.calls.read',
+  'phone.lines.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

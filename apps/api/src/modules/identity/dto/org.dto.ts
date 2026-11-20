@@ -255,7 +255,7 @@ export class CreateSettingDto {
 export class AuditEntryDto {
   @ApiProperty() id: number;
   @ApiProperty({ format: 'date-time' }) occurredAt: string;
-  @ApiProperty({ enum: ['STAFF', 'CUSTOMER', 'SYSTEM'] }) actorKind: string;
+  @ApiProperty({ enum: ['STAFF', 'CUSTOMER', 'SYSTEM', 'PHONE_LINE'] }) actorKind: string;
   @ApiProperty({ type: Number, nullable: true }) actorId: number | null;
   @ApiProperty({ type: String, nullable: true }) actorUsername: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Job or CLI for system actors' })

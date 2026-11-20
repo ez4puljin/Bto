@@ -348,6 +348,12 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
     'a bridge key is shown once and its PC is installed anew; added again on «Систем → Принтер» (ADR-0226)',
   ),
   'public.print_jobs': empty(HISTORY),
+  'public.phone_lines': empty(
+    'a station key is shown once and its PC is installed anew; added again on «Систем → Утасны AI шугам» (ADR-0232)',
+  ),
+  'public.phone_calls': empty(HISTORY),
+  'public.phone_call_messages': empty(HISTORY),
+  'public.phone_callbacks': empty(HISTORY),
   'public.report_views': empty('saved report views are made again'),
   'public.screen_usage': empty(HISTORY),
   'public.screen_usage_seen': empty(HISTORY),

@@ -13,7 +13,7 @@ import {
 import { normalizeName, searchKeys } from '@tugeel/shared/text';
 import { conditionDays, type SegmentCondition } from '@tugeel/shared/segments';
 import { businessDate } from '@tugeel/shared/time';
-import { and, asc, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import { idIn, onBusinessDays } from '../../../common/db/days';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -742,6 +742,40 @@ export class CustomersService implements OnModuleInit {
       .orderBy(...(searched ? [searched.rank] : []), asc(customers.name), asc(customers.id))
       .limit(limit + 1);
     return toPage(rows, limit, (row) => ({ id: row.id, rank: row.rank }));
+  }
+
+  /**
+   * The ACTIVE customers a phone number belongs to (ADR-0232 #4): the customer's own phone or one
+   * of its contacts', compared in the stored E.164 form (`normalizeMnPhone`). By id; a number two
+   * stores share answers both, and the caller decides what several mean. Empty for a number that
+   * is not a Mongolian mobile number.
+   */
+  async findByPhone(
+    phone: string,
+    executor: Db | Tx = this.db,
+  ): Promise<{ id: number; name: string }[]> {
+    const stored = normalizeMnPhone(phone);
+    if (stored === null) return [];
+    return executor
+      .select({ id: customers.id, name: customers.name })
+      .from(customers)
+      .where(
+        and(
+          eq(customers.status, 'ACTIVE'),
+          or(
+            eq(customers.phone, stored),
+            inArray(
+              customers.id,
+              executor
+                .select({ id: customerContacts.customerId })
+                .from(customerContacts)
+                .where(eq(customerContacts.phone, stored)),
+            ),
+          ),
+        ),
+      )
+      .orderBy(asc(customers.id))
+      .limit(5);
   }
 
   /** CUSTOMER_INACTIVE (409) for a deactivated customer; NOT_FOUND for an unknown one. */

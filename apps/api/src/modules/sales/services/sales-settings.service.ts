@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   formatOrderNumber,
+  isUnattendedChannel,
   ORDER_NUMBER_DEFAULTS,
   type OrderChannel,
   orderNumberPatternIssues,
@@ -15,6 +16,7 @@ import { invalid } from '../../../common/errors/app-error';
 import { type AuthContext, actorUserId, AuditService, NumberingService } from '../../identity';
 import { salesChannelDefaults, salesPipelines, salesSettings, salesStages } from '../schema';
 import { assertManager } from './sales-boards.service';
+import { unattendedStageRule } from './sales-pipelines.service';
 
 /** The counter every order number draws from, per rendered prefix (ADR-0057 #3). */
 export const ORDER_NUMBER_SCOPE = 'SO_NO';
@@ -155,13 +157,18 @@ export class SalesSettingsService {
           throw invalid('stageId', 'ofPipeline', 'a live stage of the pipeline');
         }
         // The store's seller sends from the staff app into a transfer pipeline (ADR-0126 #1).
-        if (channel === 'CUSTOMER_APP' && pipeline.kind !== 'SALES') {
+        if (isUnattendedChannel(channel) && pipeline.kind !== 'SALES') {
           throw invalid('pipelineId', 'salesPipeline', 'a sales pipeline (ADR-0126 #1)');
         }
         // App orders wait for the office (ADR-0079 #5): a stage without an action, in a pipeline
         // where the office sees them (they have no author an own-orders-only pipeline could show).
-        if (channel === 'CUSTOMER_APP' && (stage.action !== 'NONE' || pipeline.ownOrdersOnly)) {
-          throw invalid('stageId', 'customerAppStage', 'a stage without an action, seen by all');
+        // The phone AI line's orders follow the same rule (ADR-0232 #8).
+        if (isUnattendedChannel(channel) && (stage.action !== 'NONE' || pipeline.ownOrdersOnly)) {
+          throw invalid(
+            'stageId',
+            unattendedStageRule(channel),
+            'a stage without an action, seen by all',
+          );
         }
         await tx
           .insert(salesChannelDefaults)

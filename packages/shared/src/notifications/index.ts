@@ -17,8 +17,11 @@ export const NOTICE_LIMITS = {
   readMax: 200,
 } as const;
 
-/** The rep's own notifications (ADR-0062 #4): today only a sold order. */
-export const USER_NOTIFICATION_KINDS = ['ORDER_SOLD'] as const;
+/**
+ * A staff member's own notifications: a rep's order that was sold (ADR-0062 #4), and the phone AI
+ * line's new order and new callback task, told to every holder of `phone.calls.read` (ADR-0232 #9).
+ */
+export const USER_NOTIFICATION_KINDS = ['ORDER_SOLD', 'PHONE_ORDER', 'PHONE_CALLBACK'] as const;
 export type UserNotificationKind = (typeof USER_NOTIFICATION_KINDS)[number];
 
 /** Who reads a notice (ADR-0079 #8): the sales reps' app or the customers' «Bto300». */

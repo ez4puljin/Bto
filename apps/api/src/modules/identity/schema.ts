@@ -445,7 +445,7 @@ export const numberSequences = pgTable(
   ],
 );
 
-export const AUDIT_ACTOR_KINDS = ['STAFF', 'CUSTOMER', 'SYSTEM'] as const;
+export const AUDIT_ACTOR_KINDS = ['STAFF', 'CUSTOMER', 'SYSTEM', 'PHONE_LINE'] as const;
 export type AuditActorKind = (typeof AUDIT_ACTOR_KINDS)[number];
 
 /** Append-only (REVOKE + forbid_update_delete triggers in 0001_identity). */
@@ -455,7 +455,10 @@ export const auditLog = pgTable(
     id: id(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
     actorKind: text('actor_kind', { enum: AUDIT_ACTOR_KINDS }).notNull(),
-    /** users.id for STAFF, customer_users.id for CUSTOMER (ADR-0079); NULL for SYSTEM. */
+    /**
+     * users.id for STAFF, customer_users.id for CUSTOMER (ADR-0079), phone_lines.id for PHONE_LINE
+     * (ADR-0232 #5); NULL for SYSTEM.
+     */
     actorId: bigint('actor_id', { mode: 'number' }),
     /** For SYSTEM actors: the job or CLI that acted. */
     actorLabel: text('actor_label'),
@@ -469,7 +472,10 @@ export const auditLog = pgTable(
   (t) => [
     index('audit_log_entity_idx').on(t.entity, t.entityId, t.id),
     index('audit_log_actor_idx').on(t.actorId, t.id),
-    check('audit_log_actor_kind', sql`${t.actorKind} IN ('STAFF', 'CUSTOMER', 'SYSTEM')`),
+    check(
+      'audit_log_actor_kind',
+      sql`${t.actorKind} IN ('STAFF', 'CUSTOMER', 'SYSTEM', 'PHONE_LINE')`,
+    ),
     check(
       'audit_log_actor',
       sql`(${t.actorKind} = 'SYSTEM' AND ${t.actorId} IS NULL)

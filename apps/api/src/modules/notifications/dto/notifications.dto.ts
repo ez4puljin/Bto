@@ -177,13 +177,23 @@ export class MyNotificationSummaryDto {
 @ApiSchema({ name: 'MyNotification' })
 export class MyNotificationDto {
   @ApiProperty() id: number;
-  @ApiProperty({ enum: USER_NOTIFICATION_KINDS }) kind: UserNotificationKind;
+  @ApiProperty({
+    enum: USER_NOTIFICATION_KINDS,
+    description:
+      'ORDER_SOLD: the rep’s order was sold; PHONE_ORDER, PHONE_CALLBACK: the phone AI line took an order or left a callback task (ADR-0232)',
+  })
+  kind: UserNotificationKind;
   @ApiProperty({ type: Number, nullable: true }) orderId: number | null;
-  @ApiProperty() orderNumber: string;
+  @ApiProperty({ description: 'Empty for a PHONE_CALLBACK' }) orderNumber: string;
   @ApiProperty() customerName: string;
   @ApiProperty({ type: String, nullable: true, description: 'Whole MNT, frozen at the submit' })
   orderTotal: string | null;
   @ApiProperty({ type: String, nullable: true }) invoiceNumber: string | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'The phone call it came from' })
+  callId: number | null;
+  @ApiProperty({ type: Number, nullable: true }) callbackId: number | null;
+  @ApiProperty({ type: String, nullable: true, description: 'The number to ring back' })
+  phone: string | null;
   @ApiProperty() read: boolean;
   @ApiProperty({ format: 'date-time' }) createdAt: string;
 }

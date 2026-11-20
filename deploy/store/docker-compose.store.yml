@@ -38,6 +38,10 @@ x-app-env: &app-env
   # on «Тохиргоо → SMS», are sealed with this: the api seals, the worker opens them to run a check
   # or send a batch.
   ERKHET_KEY_SECRET: ${ERKHET_KEY_SECRET:?set ERKHET_KEY_SECRET in deploy/store/.env}
+  # The phone AI order line's agent at ElevenLabs (ADR-0232): the api asks a signed URL for each
+  # call, the worker reads a finished conversation. Empty: the AI answers no call.
+  ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+  ELEVENLABS_AGENT_ID: ${ELEVENLABS_AGENT_ID:-}
 
 # What every api process reads besides: the primary and, when the PC runs them, the replicas for
 # the apps and for the reports (ADR-0192). The pool size is each service's own.

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import type { Permission } from '@tugeel/shared/auth';
-import type { AuthContext, CustomerContext } from '../auth-context';
+import type { AuthContext, CustomerContext, PhoneLineActor } from '../auth-context';
 
 export const AUTHENTICATED_KEY = 'tugeel:authenticated';
 export const PERMISSIONS_KEY = 'tugeel:permissions';
@@ -34,7 +34,15 @@ export const CustomerRoute = () =>
 export interface AuthenticatedRequest {
   auth?: AuthContext;
   customer?: CustomerContext;
+  /**
+   * The phone line whose station key the request carried (ADR-0232 #3): set by the phone-agent
+   * module's guard on its `@Public()` station routes, read by the idempotency interceptor.
+   */
+  phoneLine?: PhoneLineActor;
 }
+
+/** A request of the phone line's station routes, as their guard leaves it. */
+export type PhoneLineRequest = Pick<AuthenticatedRequest, 'phoneLine'>;
 
 /** The AuthContext the guard resolved for this request; pass it on to services explicitly. */
 export const CurrentUser = createParamDecorator(

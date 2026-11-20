@@ -95,6 +95,13 @@ export const EnvSchema = z.object({
   /** Role ai_reader: the assistant's queries and saved reports run only through it. */
   AI_DATABASE_URL: unsetWhenEmpty(postgresUrl),
   /**
+   * The phone AI order line's agent at ElevenLabs (ADR-0232), api and worker: the account's key (a
+   * secret like LLM_API_KEY: never logged, sent only to the provider) and the agent's id. Without
+   * both the AI answers no call.
+   */
+  ELEVENLABS_API_KEY: unsetWhenEmpty(z.string().trim().min(1)),
+  ELEVENLABS_AGENT_ID: unsetWhenEmpty(z.string().trim().min(1)),
+  /**
    * Seals the provider key saved on the settings screen (ADR-0162): 32 random bytes in base64, a
    * secret like JWT_SECRET, api only. Without it a key can only come from LLM_API_KEY.
    */

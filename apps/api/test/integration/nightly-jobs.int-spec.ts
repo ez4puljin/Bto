@@ -526,6 +526,13 @@ describe('nightly jobs', () => {
           timezone: 'Asia/Ulaanbaatar',
           missed: 'once',
         },
+        // The phone AI order line (ADR-0232 #3): closes the calls a dead bridge left open.
+        {
+          name: 'phoneagent.sweep',
+          cron: '*/5 * * * *',
+          timezone: 'Asia/Ulaanbaatar',
+          missed: 'once',
+        },
         // The management reports' daily totals (ADR-0108 #6): every 15 minutes, day and night.
         {
           name: 'reporting.refresh',

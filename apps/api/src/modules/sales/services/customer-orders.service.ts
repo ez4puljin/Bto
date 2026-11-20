@@ -77,6 +77,15 @@ export interface CustomerOrderOrigin {
   takerName: string | null;
 }
 
+/** An order's standing as the phone AI line may say it (ADR-0232 #6): no amounts, no lines. */
+export interface CustomerOrderStatus {
+  number: string;
+  state: CustomerOrderState;
+  createdDate: string;
+  fulfilment: Fulfilment;
+  deliveryDate: string;
+}
+
 /** A store's own order with its lines, the stage stamps and a pending order's estimate. */
 export type CustomerOrderDetail = RepOrderDetail;
 
@@ -256,6 +265,44 @@ export class CustomerOrdersService {
     );
   }
 
+  /**
+   * Where the store's orders stand, for the phone AI line (ADR-0232 #6): the order with this
+   * number, or the newest `limit` without one. Only the store's own: another store's number
+   * answers nothing, exactly like a number that does not exist. No amounts.
+   */
+  async statusOf(
+    customerId: number,
+    query: { number?: string | null; limit?: number } = {},
+  ): Promise<CustomerOrderStatus[]> {
+    const number = query.number?.trim() ?? '';
+    const rows = await this.db
+      .select({
+        number: salesOrders.number,
+        status: salesOrders.status,
+        createdAt: salesOrders.createdAt,
+        fulfilment: salesOrders.fulfilment,
+        deliveryDate: salesOrders.deliveryDate,
+      })
+      .from(salesOrders)
+      .where(
+        and(
+          eq(salesOrders.customerId, customerId),
+          HAS_LINES,
+          isNotNull(salesOrders.number),
+          number === '' ? undefined : eq(salesOrders.number, number),
+        ),
+      )
+      .orderBy(desc(salesOrders.id))
+      .limit(number === '' ? Math.min(Math.max(query.limit ?? 3, 1), 5) : 1);
+    return rows.map((row) => ({
+      number: row.number ?? '',
+      state: customerOrderStateOf(row.status),
+      createdDate: businessDate(row.createdAt),
+      fulfilment: row.fulfilment,
+      deliveryDate: row.deliveryDate,
+    }));
+  }
+
   /** One of the store's orders; 404 for any other order (never "forbidden": it does not exist). */
   async detail(customerId: number, id: number): Promise<CustomerOrderDetail> {
     await this.assertOwn(customerId, id);
@@ -322,7 +369,10 @@ export class CustomerOrdersService {
 function filtersOf(filters: CustomerOrderFilters): SQL[] {
   const conditions: SQL[] = [];
   if (filters.taker === 'APP') conditions.push(eq(salesOrders.channel, 'CUSTOMER_APP'));
-  if (filters.taker === 'OFFICE') conditions.push(inArray(salesOrders.channel, ['ADMIN', 'POS']));
+  // An order the phone AI line took reads «Оффис» to the store, like one the office typed (ADR-0232).
+  if (filters.taker === 'OFFICE') {
+    conditions.push(inArray(salesOrders.channel, ['ADMIN', 'POS', 'PHONE_AI']));
+  }
   if (filters.taker === 'REP') {
     conditions.push(eq(salesOrders.channel, 'SALES_REP'));
     if (filters.repId !== undefined) conditions.push(eq(salesOrders.createdBy, filters.repId));

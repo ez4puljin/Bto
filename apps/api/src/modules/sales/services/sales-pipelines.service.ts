@@ -13,8 +13,10 @@ import {
   type StageAction,
   STAGE_RIGHTS,
   type StageRight,
+  UNATTENDED_CHANNELS,
+  type UnattendedChannel,
 } from '@tugeel/shared/sales';
-import { and, eq, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -411,9 +413,10 @@ export class SalesPipelinesService {
       .where(
         and(
           eq(salesChannelDefaults.pipelineId, pipelineId),
-          eq(salesChannelDefaults.channel, 'CUSTOMER_APP'),
+          inArray(salesChannelDefaults.channel, [...UNATTENDED_CHANNELS]),
         ),
-      );
+      )
+      .orderBy(asc(salesChannelDefaults.channel));
     if (landing) {
       throw new AppError('PIPELINE_KIND_CHANNEL', `the ${landing.channel} channel lands here`, {
         channel: landing.channel,
@@ -432,23 +435,31 @@ export class SalesPipelinesService {
     stages: readonly StageInput[],
     ownOrdersOnly: boolean,
   ): Promise<void> {
-    const [landing] = await tx
-      .select({ stageId: salesChannelDefaults.stageId })
+    // The phone AI line's orders wait for the office the same way (ADR-0232 #8).
+    const landings = await tx
+      .select({ channel: salesChannelDefaults.channel, stageId: salesChannelDefaults.stageId })
       .from(salesChannelDefaults)
       .where(
         and(
-          eq(salesChannelDefaults.channel, 'CUSTOMER_APP'),
+          inArray(salesChannelDefaults.channel, [...UNATTENDED_CHANNELS]),
           eq(salesChannelDefaults.pipelineId, pipelineId),
         ),
-      );
-    if (!landing) return;
-    const index = stages.findIndex((stage) => stage.id === landing.stageId);
-    const stage = stages[index];
-    if (stage && stage.action !== 'NONE') {
-      throw invalid(`stages.${index}.action`, 'customerAppStage', 'the app channel lands here');
-    }
-    if (ownOrdersOnly) {
-      throw invalid('ownOrdersOnly', 'customerAppStage', 'the app channel lands in this pipeline');
+      )
+      .orderBy(asc(salesChannelDefaults.channel));
+    for (const landing of landings) {
+      const rule = unattendedStageRule(landing.channel);
+      const index = stages.findIndex((stage) => stage.id === landing.stageId);
+      const stage = stages[index];
+      if (stage && stage.action !== 'NONE') {
+        throw invalid(`stages.${index}.action`, rule, `the ${landing.channel} channel lands here`);
+      }
+      if (ownOrdersOnly) {
+        throw invalid(
+          'ownOrdersOnly',
+          rule,
+          `the ${landing.channel} channel lands in this pipeline`,
+        );
+      }
     }
   }
 
@@ -701,15 +712,29 @@ export class SalesPipelinesService {
    * app does not send.
    */
   async customerAppPlacement(tx: Tx): Promise<Placement> {
+    const placement = await this.unattendedPlacement(tx, 'CUSTOMER_APP');
+    if (!placement) throw new AppError('CUSTOMER_APP_CLOSED', 'no stage takes app orders');
+    return placement;
+  }
+
+  /**
+   * Where a phone AI order lands (ADR-0232 #8): the PHONE_AI default under the same locks and the
+   * same rule as the app's. Null when nothing takes them: the phone-agent module answers its own
+   * 409 PHONE_AI_CLOSED and the line does not answer calls.
+   */
+  phoneAiPlacement(tx: Tx): Promise<Placement | null> {
+    return this.unattendedPlacement(tx, 'PHONE_AI');
+  }
+
+  private async unattendedPlacement(tx: Tx, channel: UnattendedChannel): Promise<Placement | null> {
     const [target] = await tx
       .select({
         pipelineId: salesChannelDefaults.pipelineId,
         stageId: salesChannelDefaults.stageId,
       })
       .from(salesChannelDefaults)
-      .where(eq(salesChannelDefaults.channel, 'CUSTOMER_APP'));
-    const closed = () => new AppError('CUSTOMER_APP_CLOSED', 'no stage takes app orders');
-    if (!target) throw closed();
+      .where(eq(salesChannelDefaults.channel, channel));
+    if (!target) return null;
     const [pipeline] = await tx
       .select({
         archivedAt: salesPipelines.archivedAt,
@@ -731,13 +756,22 @@ export class SalesPipelinesService {
       stage.archivedAt ||
       stage.action !== 'NONE'
     ) {
-      throw closed();
+      return null;
     }
     return target;
   }
 
   /** Whether app orders are accepted now (the app's checkout and the admin's warning). */
-  async customerAppOpen(executor: Db | Tx = this.db): Promise<boolean> {
+  customerAppOpen(executor: Db | Tx = this.db): Promise<boolean> {
+    return this.unattendedOpen('CUSTOMER_APP', executor);
+  }
+
+  /** Whether the phone AI line may take orders now (ADR-0232 #8): read without a lock. */
+  phoneAiOpen(executor: Db | Tx = this.db): Promise<boolean> {
+    return this.unattendedOpen('PHONE_AI', executor);
+  }
+
+  private async unattendedOpen(channel: UnattendedChannel, executor: Db | Tx): Promise<boolean> {
     const [row] = await executor
       .select({ stageId: salesChannelDefaults.stageId })
       .from(salesChannelDefaults)
@@ -745,7 +779,7 @@ export class SalesPipelinesService {
       .innerJoin(salesStages, eq(salesStages.id, salesChannelDefaults.stageId))
       .where(
         and(
-          eq(salesChannelDefaults.channel, 'CUSTOMER_APP'),
+          eq(salesChannelDefaults.channel, channel),
           isNull(salesPipelines.archivedAt),
           eq(salesPipelines.ownOrdersOnly, false),
           isNull(salesStages.archivedAt),
@@ -1004,4 +1038,12 @@ async function insertRoles(run: () => Promise<unknown>): Promise<void> {
     }
     throw error;
   }
+}
+
+/**
+ * The field error's rule when a save would break a customer-driven channel's landing stage: the
+ * app's (ADR-0079 #5) or the phone AI line's (ADR-0232 #8).
+ */
+export function unattendedStageRule(channel: OrderChannel): 'customerAppStage' | 'phoneAiStage' {
+  return channel === 'PHONE_AI' ? 'phoneAiStage' : 'customerAppStage';
 }

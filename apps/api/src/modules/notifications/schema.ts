@@ -32,6 +32,7 @@ import { products } from '../catalog/schema';
 import { invoices } from '../finance/schema';
 import { customerUsers, files, users } from '../identity/schema';
 import { customers } from '../partners/schema';
+import { phoneCallbacks } from '../phone-agent/schema';
 import { salesOrders } from '../sales/schema';
 
 // The tables owned by the notifications module (docs/modules/notifications.md, ADR-0062).
@@ -188,8 +189,9 @@ export const customerNotifications = pgTable(
 );
 
 /**
- * A notification addressed to one user (ADR-0062 #4): today a rep's order that was sold. The
- * payload holds what the app shows, by value (money as strings); one row per order and kind.
+ * A notification addressed to one user (ADR-0062 #4, ADR-0232 #9): a rep's order that was sold,
+ * one row per order; a phone AI order or callback, one row per recipient. The payload holds what
+ * the app shows, by value (money as strings).
  */
 export const userNotifications = pgTable(
   'user_notifications',
@@ -198,17 +200,37 @@ export const userNotifications = pgTable(
     userId: userRef('user_id').notNull(),
     kind: text('kind', { enum: USER_NOTIFICATION_KINDS }).notNull(),
     orderId: ref('order_id').references(() => salesOrders.id),
+    /** The callback task a PHONE_CALLBACK tells of (ADR-0232 #9). */
+    callbackId: ref('callback_id').references(() => phoneCallbacks.id),
     payload: jsonValue('payload').notNull(),
     createdAt: createdAt(),
     readAt: timestamp('read_at', { withTimezone: true }),
   },
   (t) => [
-    unique('user_notifications_order').on(t.kind, t.orderId),
+    // One ORDER_SOLD per order (its author); the kinds told to several people keep one row per
+    // recipient (migration 0118 replaced the table-wide unique (kind, order_id), ADR-0232 #9).
+    uniqueIndex('user_notifications_sold_order')
+      .on(t.kind, t.orderId)
+      .where(sql`${t.kind} = 'ORDER_SOLD'`),
+    uniqueIndex('user_notifications_order_user')
+      .on(t.kind, t.orderId, t.userId)
+      .where(sql`${t.orderId} IS NOT NULL`),
+    uniqueIndex('user_notifications_callback_user')
+      .on(t.kind, t.callbackId, t.userId)
+      .where(sql`${t.callbackId} IS NOT NULL`),
     index('user_notifications_user_idx').on(t.userId, t.id),
     index('user_notifications_unread_idx')
       .on(t.userId)
       .where(sql`${t.readAt} IS NULL`),
     check('user_notifications_kind', inList(t.kind, USER_NOTIFICATION_KINDS)),
+    check(
+      'user_notifications_phone_order',
+      sql`${t.kind} <> 'PHONE_ORDER' OR ${t.orderId} IS NOT NULL`,
+    ),
+    check(
+      'user_notifications_phone_callback',
+      sql`(${t.kind} = 'PHONE_CALLBACK') = (${t.callbackId} IS NOT NULL)`,
+    ),
     check(
       'user_notifications_order_required',
       sql`${t.kind} <> 'ORDER_SOLD' OR ${t.orderId} IS NOT NULL`,

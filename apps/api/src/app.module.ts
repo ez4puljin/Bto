@@ -7,6 +7,7 @@ import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
 import { HealthModule } from './health/health.module';
 import { EbarimtIntegrationModule } from './integrations/ebarimt';
+import { ElevenLabsIntegrationModule } from './integrations/elevenlabs';
 import { ErkhetIntegrationModule } from './integrations/erkhet';
 import { SmsIntegrationModule } from './integrations/sms';
 import { LlmModule } from './integrations/llm';
@@ -29,6 +30,7 @@ import { ImportsHttpModule } from './modules/imports';
 import { InventoryHttpModule } from './modules/inventory';
 import { NotificationsHttpModule } from './modules/notifications';
 import { PartnersHttpModule } from './modules/partners';
+import { PhoneAgentHttpModule } from './modules/phone-agent';
 import { PosHttpModule } from './modules/pos';
 import { PricingHttpModule } from './modules/pricing';
 import { PrintingHttpModule } from './modules/printing';
@@ -53,6 +55,7 @@ import { StockProblemsHttpModule } from './modules/stock-problems';
     ErkhetIntegrationModule,
     EbarimtIntegrationModule,
     SmsIntegrationModule,
+    ElevenLabsIntegrationModule,
     FinanceCoreModule,
     FinBridgeHttpModule,
     IdentityHttpModule,
@@ -79,6 +82,7 @@ import { StockProblemsHttpModule } from './modules/stock-problems';
     ChatHttpModule,
     PrintingHttpModule,
     StockProblemsHttpModule,
+    PhoneAgentHttpModule,
   ],
 })
 export class AppModule {}

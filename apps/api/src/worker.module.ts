@@ -6,6 +6,7 @@ import { CoreModule } from './core.module';
 import { HealthCoreModule } from './health/health.module';
 import { WorkerHealthServer } from './health/worker-health.server';
 import { EbarimtIntegrationModule } from './integrations/ebarimt';
+import { ElevenLabsIntegrationModule } from './integrations/elevenlabs';
 import { ErkhetIntegrationModule } from './integrations/erkhet';
 import { SmsIntegrationModule } from './integrations/sms';
 import { EbarimtCheckWorkerModule } from './modules/ebarimt-check';
@@ -17,6 +18,7 @@ import { IdentityWorkerModule } from './modules/identity';
 import { ImportsWorkerModule } from './modules/imports';
 import { InventoryWorkerModule } from './modules/inventory';
 import { NotificationsWorkerModule } from './modules/notifications';
+import { PhoneAgentWorkerModule } from './modules/phone-agent';
 import { ReportingWorkerModule } from './modules/reporting';
 import { StockProblemsWorkerModule } from './modules/stock-problems';
 
@@ -48,6 +50,10 @@ import { StockProblemsWorkerModule } from './modules/stock-problems';
     EbarimtCheckWorkerModule,
     // «Асуудалтай бараа» (ADR-0230): the worker builds the morning sheets at 07:00.
     StockProblemsWorkerModule,
+    // The phone AI order line (ADR-0232): the worker fills a finished call's transcript from
+    // ElevenLabs and closes the calls a dead bridge left open.
+    ElevenLabsIntegrationModule,
+    PhoneAgentWorkerModule,
   ],
   providers: [WorkerHealthServer],
 })

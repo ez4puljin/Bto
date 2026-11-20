@@ -211,6 +211,8 @@ export const customerContacts = pgTable(
   },
   (t) => [
     index('customer_contacts_customer_idx').on(t.customerId),
+    // Who is calling (ADR-0232 #4): the phone AI line finds a store by a contact's number.
+    index('customer_contacts_phone_idx').on(t.phone),
     check('customer_contacts_name', lengthCheck(t.name, 100)),
     check('customer_contacts_position', lengthCheck(t.position, 60)),
     check('customer_contacts_phone', phoneCheck(t.phone)),

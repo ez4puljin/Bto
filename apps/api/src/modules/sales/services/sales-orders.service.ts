@@ -8,6 +8,7 @@ import {
   isCancellable,
   isEditable,
   isFinished,
+  isUnattendedChannel,
   LINE_EDIT_LIMIT,
   LINE_EDIT_STATUSES,
   MANAGER_EDITABLE_STATUSES,
@@ -167,6 +168,8 @@ export interface ProductOrderInfo {
 
 /** The events of an order the store sent itself (ADR-0079 #5) are labelled with the app. */
 export const CUSTOMER_APP_LABEL = 'customer-app';
+/** The label of a status event the phone AI line wrote (ADR-0232 #5). */
+export const PHONE_AI_LABEL = 'phone-ai';
 
 const text = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim() ?? '';
@@ -916,7 +919,7 @@ export class SalesOrdersService implements OnModuleInit {
       const moveAny = ctx.permissions.has('sales.orders.moveAny');
       if (stage.pipelineId !== order.pipelineId) {
         if (!moveAny) throw invalid('stageId', 'ofPipeline', "a stage of the order's pipeline");
-        if (order.channel === 'CUSTOMER_APP' && pipeline.kind !== 'SALES') {
+        if (isUnattendedChannel(order.channel) && pipeline.kind !== 'SALES') {
           throw invalid('stageId', 'salesPipeline', 'a sales pipeline for a customer-app order');
         }
       } else if (!moveAny && stage.action !== 'CANCEL') {
@@ -1807,6 +1810,18 @@ export class SalesOrdersService implements OnModuleInit {
   }
 
   /** The order's number, drawn last in its transaction; a number met before answers 409. */
+  /**
+   * A new order's number inside the transaction that created it (ADR-0057: drawn at creation), for
+   * a caller that tells it on at once: the phone AI line reads it to the store (ADR-0232 #6).
+   */
+  async numberOf(tx: Tx, id: number): Promise<string | null> {
+    const [row] = await tx
+      .select({ number: salesOrders.number })
+      .from(salesOrders)
+      .where(eq(salesOrders.id, id));
+    return row?.number ?? null;
+  }
+
   private async numberInTx(tx: Tx, id: number): Promise<string> {
     const number = await this.settings.allocateNumber(tx);
     try {
@@ -2040,7 +2055,9 @@ export class SalesOrdersService implements OnModuleInit {
           ? actor.label
           : actor.kind === 'CUSTOMER'
             ? CUSTOMER_APP_LABEL
-            : null,
+            : actor.kind === 'PHONE_LINE'
+              ? PHONE_AI_LABEL
+              : null,
     });
   }
 }

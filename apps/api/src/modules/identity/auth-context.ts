@@ -55,14 +55,25 @@ export interface CustomerContext extends CustomerActor {
   readonly phone: string;
 }
 
-/** Who an audit row names: staff, a job, or a customer account. */
-export type AuditActor = Actor | CustomerActor;
+/**
+ * The phone AI order line acting (ADR-0232 #5): the author of a PHONE_AI order and of what a call
+ * wrote. Like `CustomerActor`, deliberately not an `Actor`: a line driven by a caller's voice never
+ * passes for a trusted staff or system caller. The audit names the line (`actor_id`).
+ */
+export interface PhoneLineActor {
+  readonly kind: 'PHONE_LINE';
+  readonly phoneLineId: number;
+  readonly requestId?: string;
+}
+
+/** Who an audit row names: staff, a job, a customer account or a phone line. */
+export type AuditActor = Actor | CustomerActor | PhoneLineActor;
 
 export function systemActor(label: string): Actor {
   return { kind: 'SYSTEM', label };
 }
 
-/** users.id of a staff actor, for `created_by` columns; NULL for system and customer actors. */
+/** users.id of a staff actor, for `created_by` columns; NULL for system, customer and phone line actors. */
 export function actorUserId(actor: AuditActor): number | null {
   return actor.kind === 'STAFF' ? actor.userId : null;
 }

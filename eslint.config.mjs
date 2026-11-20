@@ -105,7 +105,13 @@ const MODULE_DEPS = {
   // ADR-0062: sales only for the SALE_LISTENER token, its payload type and the order's foreign key.
   // ADR-0082: sales' ORDER_LISTENER, finance's PAYMENT_LISTENER, the invoice and payment foreign
   // keys and the open invoices the reminders read.
-  notifications: ['identity', 'partners', 'catalog', 'sales', 'finance'],
+  // ADR-0232 #9: phone-agent only for its PHONE_AGENT_LISTENER token, its notice types and the
+  // callback's foreign key.
+  notifications: ['identity', 'partners', 'catalog', 'sales', 'finance', 'phone-agent'],
+  // The phone AI order line (ADR-0232): the shop and the draft path of sales, a cart's prices
+  // (pricing), units (catalog), who is calling and the default address (partners); it writes only
+  // its own tables; nobody imports its services (notifications binds its listener).
+  'phone-agent': ['identity', 'catalog', 'partners', 'pricing', 'sales'],
   // ADR-0084: Bto's side of the Finance Core; identity for contexts and branches, partners for its
   // CUSTOMER_CHANGED hook. The composition roots and finance (ADR-0089: its contexts and the
   // customers' parties) import fin-bridge.

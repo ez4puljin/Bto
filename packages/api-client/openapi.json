@@ -22498,7 +22498,8 @@
                 "ADMIN",
                 "CUSTOMER_APP",
                 "SALES_REP",
-                "POS"
+                "POS",
+                "PHONE_AI"
               ]
             }
           },
@@ -22759,7 +22760,8 @@
                 "ADMIN",
                 "CUSTOMER_APP",
                 "SALES_REP",
-                "POS"
+                "POS",
+                "PHONE_AI"
               ]
             }
           },
@@ -24220,7 +24222,8 @@
                 "ADMIN",
                 "CUSTOMER_APP",
                 "SALES_REP",
-                "POS"
+                "POS",
+                "PHONE_AI"
               ]
             }
           },
@@ -50235,6 +50238,850 @@
           "stock-problems"
         ]
       }
+    },
+    "/api/v1/phone-agent/station": {
+      "get": {
+        "operationId": "PhoneStation_station",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer bpl_<line>_<secret>",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneStationStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The station's heartbeat: marks it seen and says whether the AI would answer now.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-agent/calls": {
+      "post": {
+        "operationId": "PhoneStation_start",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer bpl_<line>_<secret>",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneCallStartRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallStart"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "An incoming call: `answer: false` leaves the phone ringing for staff. The signed URL is for\nthis call only and is left out of the stored replay: an answer replayed by the\nIdempotency-Key carries none, and the bridge then does not pick up.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-agent/calls/{id}/events": {
+      "post": {
+        "operationId": "PhoneStation_events",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer bpl_<line>_<secret>",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneCallEventsRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallEventsResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The turns of the conversation in the provider's order; a batch sent twice changes nothing.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-agent/calls/{id}/tools/{name}": {
+      "post": {
+        "operationId": "PhoneStation_tool",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer bpl_<line>_<secret>",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneToolCallRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneToolAnswer"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of the agent's client tools; a refusal is a problem+json whose `code` the agent is told.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-agent/calls/{id}/end": {
+      "post": {
+        "operationId": "PhoneStation_end",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer bpl_<line>_<secret>",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneCallEndRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallEnd"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The call is over: its outcome, and the job that fills the turns never delivered.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-lines": {
+      "get": {
+        "operationId": "PhoneLines_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PhoneLine"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "phone-agent"
+        ]
+      },
+      "post": {
+        "operationId": "PhoneLines_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneLineCreateRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneLineCreated"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A new line, switched off; its key comes back this once and is never stored in the replay.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-lines/{id}": {
+      "put": {
+        "operationId": "PhoneLines_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneLineUpdateRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneLine"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The name, the working hours, the greeting, and on or off.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-lines/{id}/key": {
+      "post": {
+        "operationId": "PhoneLines_rotateKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneLineCreated"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The station's new key (the old one stops at once); shown this once.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-calls": {
+      "get": {
+        "operationId": "PhoneCalls_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ORDERED",
+                "STATUS_ONLY",
+                "CALLBACK",
+                "NO_MATCH",
+                "ABANDONED",
+                "FAILED"
+              ]
+            }
+          },
+          {
+            "name": "answered",
+            "required": false,
+            "in": "query",
+            "description": "Only calls the AI answered, or not",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-calls/{id}": {
+      "get": {
+        "operationId": "PhoneCalls_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One call with its transcript in the order it was spoken.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-callbacks": {
+      "get": {
+        "operationId": "PhoneCalls_callbacks",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "OPEN",
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "DONE",
+                "DROPPED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallbackPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-callbacks/{id}/close": {
+      "post": {
+        "operationId": "PhoneCalls_closeCallback",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneCallbackCloseRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallback"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Залгасан» or «Орхих»: only an open task closes (PHONE_CALLBACK_STATE, 409, otherwise).",
+        "tags": [
+          "phone-agent"
+        ]
+      }
+    },
+    "/api/v1/phone-searches/no-hits": {
+      "get": {
+        "operationId": "PhoneCalls_noHits",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNoHitSearchPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Олдоогүй хайлтууд»: what callers asked for and the catalog did not find.",
+        "tags": [
+          "phone-agent"
+        ]
+      }
     }
   },
   "info": {
@@ -50851,7 +51698,9 @@
           "chat.settings.manage",
           "problems.read",
           "problems.count",
-          "problems.manage"
+          "problems.manage",
+          "phone.calls.read",
+          "phone.lines.manage"
         ]
       },
       "RoleRef": {
@@ -52187,7 +53036,8 @@
             "enum": [
               "STAFF",
               "CUSTOMER",
-              "SYSTEM"
+              "SYSTEM",
+              "PHONE_LINE"
             ]
           },
           "actorId": {
@@ -71433,7 +72283,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string"
           },
@@ -72184,7 +73035,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string"
           },
@@ -73334,7 +74186,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string"
           },
@@ -73972,7 +74825,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string"
           },
@@ -73997,7 +74851,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string"
           },
@@ -75904,7 +76759,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string",
             "description": "ADMIN: an office order"
@@ -88094,16 +88950,20 @@
           },
           "kind": {
             "enum": [
-              "ORDER_SOLD"
+              "ORDER_SOLD",
+              "PHONE_ORDER",
+              "PHONE_CALLBACK"
             ],
-            "type": "string"
+            "type": "string",
+            "description": "ORDER_SOLD: the rep’s order was sold; PHONE_ORDER, PHONE_CALLBACK: the phone AI line took an order or left a callback task (ADR-0232)"
           },
           "orderId": {
             "type": "number",
             "nullable": true
           },
           "orderNumber": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty for a PHONE_CALLBACK"
           },
           "customerName": {
             "type": "string"
@@ -88116,6 +88976,20 @@
           "invoiceNumber": {
             "type": "string",
             "nullable": true
+          },
+          "callId": {
+            "type": "number",
+            "nullable": true,
+            "description": "The phone call it came from"
+          },
+          "callbackId": {
+            "type": "number",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "The number to ring back"
           },
           "read": {
             "type": "boolean"
@@ -88133,6 +89007,9 @@
           "customerName",
           "orderTotal",
           "invoiceNumber",
+          "callId",
+          "callbackId",
+          "phone",
           "read",
           "createdAt"
         ]
@@ -89666,7 +90543,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string",
             "description": "CUSTOMER_APP «Апп», ADMIN «Оффис», …"
@@ -89821,7 +90699,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string",
             "description": "CUSTOMER_APP «Апп», ADMIN «Оффис», …"
@@ -90300,7 +91179,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string",
             "description": "Who took the order"
@@ -90498,7 +91378,8 @@
               "ADMIN",
               "CUSTOMER_APP",
               "SALES_REP",
-              "POS"
+              "POS",
+              "PHONE_AI"
             ],
             "type": "string",
             "description": "Who took the order"
@@ -103184,6 +104065,788 @@
             "description": "true: approve the counted lines and leave the rest on the list; default false refuses a sheet with uncounted lines"
           }
         }
+      },
+      "PhoneStationStatus": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Off: the AI answers no call"
+          },
+          "workingHours": {
+            "type": "boolean",
+            "description": "Inside the working hours now: staff answer, the AI does not"
+          },
+          "agentConfigured": {
+            "type": "boolean",
+            "description": "The agent’s key and id are set on the server"
+          }
+        },
+        "required": [
+          "lineId",
+          "name",
+          "active",
+          "workingHours",
+          "agentConfigured"
+        ]
+      },
+      "PhoneCallStartRequestDto": {
+        "type": "object",
+        "properties": {
+          "callRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Android’s id of the call, unique per line"
+          },
+          "callerPhone": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40,
+            "description": "The caller’s number as the phone shows it; null or absent when withheld"
+          }
+        },
+        "required": [
+          "callRef"
+        ]
+      },
+      "PhoneCallStart": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "boolean",
+            "description": "false: do not pick up, the phone rings for staff"
+          },
+          "callId": {
+            "type": "number"
+          },
+          "reason": {
+            "nullable": true,
+            "enum": [
+              "WORKING_HOURS",
+              "LINE_INACTIVE",
+              "AI_CLOSED",
+              "AGENT_UNAVAILABLE"
+            ],
+            "type": "string",
+            "description": "Why not, when `answer` is false"
+          },
+          "signedUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "The conversation’s signed URL, for this call only; never stored. Null when `answer` is false and in a replayed answer (then do not pick up)"
+          },
+          "dynamicVariables": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "call_id, caller_known, store_name, can_deliver, greeting"
+          }
+        },
+        "required": [
+          "answer",
+          "callId",
+          "reason",
+          "signedUrl",
+          "dynamicVariables"
+        ]
+      },
+      "PhoneCallEventDto": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "role": {
+            "enum": [
+              "USER",
+              "AGENT"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "atMs": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 14400000,
+            "description": "Milliseconds from the call’s start"
+          }
+        },
+        "required": [
+          "seq",
+          "role",
+          "text",
+          "atMs"
+        ]
+      },
+      "PhoneCallEventsRequestDto": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneCallEventDto"
+            }
+          },
+          "conversationId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100,
+            "description": "The provider’s conversation id, once the bridge knows it"
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "PhoneCallEventsResult": {
+        "type": "object",
+        "properties": {
+          "stored": {
+            "type": "number",
+            "description": "How many of the batch were new"
+          },
+          "lastSeq": {
+            "type": "number",
+            "description": "The highest sequence number stored for the call"
+          }
+        },
+        "required": [
+          "stored",
+          "lastSeq"
+        ]
+      },
+      "PhoneToolCallRequestDto": {
+        "type": "object",
+        "properties": {
+          "afterSeq": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000,
+            "description": "Every sequence number up to this one was delivered"
+          },
+          "seq": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "The tool call’s own sequence number"
+          },
+          "atMs": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 14400000,
+            "description": "Milliseconds from the start"
+          },
+          "args": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The tool’s arguments"
+          }
+        },
+        "required": [
+          "afterSeq",
+          "seq",
+          "args"
+        ]
+      },
+      "PhoneToolAnswer": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "What the agent may say; a refusal is a problem+json with its code instead"
+          }
+        },
+        "required": [
+          "answer"
+        ]
+      },
+      "PhoneCallEndRequestDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "COMPLETED",
+              "CALLER_HANGUP",
+              "TIMEOUT",
+              "SILENCE",
+              "ERROR"
+            ],
+            "type": "string"
+          },
+          "durationS": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 14400,
+            "description": "The call’s length, seconds"
+          },
+          "conversationId": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "PhoneCallEnd": {
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "number"
+          },
+          "outcome": {
+            "nullable": true,
+            "enum": [
+              "ORDERED",
+              "STATUS_ONLY",
+              "CALLBACK",
+              "NO_MATCH",
+              "ABANDONED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "callId",
+          "outcome",
+          "orderNumber"
+        ]
+      },
+      "PhoneScheduleException": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "intervals": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "That day’s working intervals `[from, to)`, `HH:MM`; empty: the AI all day"
+          }
+        },
+        "required": [
+          "date",
+          "intervals"
+        ]
+      },
+      "PhoneSchedule": {
+        "type": "object",
+        "properties": {
+          "week": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "description": "Per ISO weekday `1` (Monday) … `7` (Sunday): the working intervals `[from, to)`, `HH:MM`, Asia/Ulaanbaatar, in which staff answer; outside them the AI answers"
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneScheduleException"
+            }
+          }
+        },
+        "required": [
+          "week",
+          "exceptions"
+        ]
+      },
+      "PhoneLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/PhoneSchedule"
+          },
+          "greeting": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "online": {
+            "type": "boolean",
+            "description": "The station called within the last two minutes"
+          },
+          "workingHours": {
+            "type": "boolean",
+            "description": "Inside the working hours now"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "active",
+          "schedule",
+          "greeting",
+          "lastSeenAt",
+          "online",
+          "workingHours",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PhoneLineCreateRequestDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "schedule": {
+            "additionalProperties": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PhoneSchedule"
+              }
+            ]
+          },
+          "greeting": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "PhoneLineCreated": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "$ref": "#/components/schemas/PhoneLine"
+          },
+          "key": {
+            "type": "string",
+            "description": "The station’s key `bpl_<line>_<secret>`, shown this once"
+          }
+        },
+        "required": [
+          "line",
+          "key"
+        ]
+      },
+      "PhoneLineUpdateRequestDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "active": {
+            "type": "boolean",
+            "description": "On: the AI answers outside the working hours"
+          },
+          "schedule": {
+            "additionalProperties": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PhoneSchedule"
+              }
+            ]
+          },
+          "greeting": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        }
+      },
+      "PhoneCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "lineId": {
+            "type": "number"
+          },
+          "lineName": {
+            "type": "string"
+          },
+          "callerPhone": {
+            "type": "string",
+            "nullable": true,
+            "description": "E.164 when a Mongolian number"
+          },
+          "callerRaw": {
+            "type": "string",
+            "nullable": true,
+            "description": "As the phone showed it"
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "answered": {
+            "type": "boolean",
+            "description": "false: the phone rang for staff"
+          },
+          "declineReason": {
+            "nullable": true,
+            "enum": [
+              "WORKING_HOURS",
+              "LINE_INACTIVE",
+              "AI_CLOSED",
+              "AGENT_UNAVAILABLE"
+            ],
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "endReason": {
+            "nullable": true,
+            "enum": [
+              "COMPLETED",
+              "CALLER_HANGUP",
+              "TIMEOUT",
+              "SILENCE",
+              "ERROR"
+            ],
+            "type": "string"
+          },
+          "durationS": {
+            "type": "number",
+            "nullable": true
+          },
+          "outcome": {
+            "nullable": true,
+            "enum": [
+              "ORDERED",
+              "STATUS_ONLY",
+              "CALLBACK",
+              "NO_MATCH",
+              "ABANDONED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "salesOrderId": {
+            "type": "number",
+            "nullable": true
+          },
+          "orderNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "costEstimate": {
+            "type": "string",
+            "nullable": true,
+            "description": "The provider’s cost figure for the conversation (its credits)"
+          },
+          "reconciled": {
+            "type": "boolean",
+            "description": "The transcript was checked against the provider’s"
+          }
+        },
+        "required": [
+          "id",
+          "lineId",
+          "lineName",
+          "callerPhone",
+          "callerRaw",
+          "customerId",
+          "customerName",
+          "answered",
+          "declineReason",
+          "startedAt",
+          "endedAt",
+          "endReason",
+          "durationS",
+          "outcome",
+          "salesOrderId",
+          "orderNumber",
+          "costEstimate",
+          "reconciled"
+        ]
+      },
+      "PhoneCallPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneCall"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PhoneCallMessage": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "number"
+          },
+          "role": {
+            "enum": [
+              "USER",
+              "AGENT",
+              "TOOL"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "The words; a tool’s name for a TOOL message"
+          },
+          "atMs": {
+            "type": "number",
+            "description": "Milliseconds from the call’s start"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "source BRIDGE or RECONCILED; for a tool: tool, args, ok, code, answer, no_hit"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "seq",
+          "role",
+          "text",
+          "atMs",
+          "meta",
+          "createdAt"
+        ]
+      },
+      "PhoneCallDetail": {
+        "type": "object",
+        "properties": {
+          "call": {
+            "$ref": "#/components/schemas/PhoneCall"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneCallMessage"
+            }
+          }
+        },
+        "required": [
+          "call",
+          "messages"
+        ]
+      },
+      "PhoneCallback": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "callId": {
+            "type": "number"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "DONE",
+              "DROPPED"
+            ],
+            "type": "string"
+          },
+          "doneBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "doneAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "callId",
+          "phone",
+          "customerId",
+          "customerName",
+          "reason",
+          "status",
+          "doneBy",
+          "doneAt",
+          "createdAt"
+        ]
+      },
+      "PhoneCallbackPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneCallback"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "PhoneCallbackCloseRequestDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "DONE",
+              "DROPPED"
+            ],
+            "type": "string",
+            "description": "Rang back, or left"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "PhoneNoHitSearch": {
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "number"
+          },
+          "seq": {
+            "type": "number"
+          },
+          "query": {
+            "type": "string",
+            "description": "What the caller asked for and the catalog did not find"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "callId",
+          "seq",
+          "query",
+          "createdAt"
+        ]
+      },
+      "PhoneNoHitSearchPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneNoHitSearch"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
       },
       "ErrorCode": {
         "type": "string",

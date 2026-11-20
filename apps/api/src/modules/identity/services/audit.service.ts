@@ -69,7 +69,9 @@ function auditRow(actor: AuditActor, entry: AuditEntry) {
         ? actor.userId
         : actor.kind === 'CUSTOMER'
           ? actor.customerUserId
-          : null,
+          : actor.kind === 'PHONE_LINE'
+            ? actor.phoneLineId
+            : null,
     actorLabel: actor.kind === 'SYSTEM' ? actor.label : null,
     action: entry.action,
     entity: entry.entity,

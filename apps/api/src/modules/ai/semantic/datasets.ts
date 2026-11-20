@@ -493,7 +493,11 @@ export const AI_DATASETS: readonly AiDataset[] = [
         'text',
         "'DRAFT', 'CONFIRMED', 'PICKING', 'PACKED', 'DELIVERED', 'INVOICED', 'CLOSED', 'CANCELLED' …",
       ),
-      col('channel', 'text', "'ADMIN' (office), 'CUSTOMER_APP', 'SALES_REP' or 'POS'"),
+      col(
+        'channel',
+        'text',
+        "'ADMIN' (office), 'CUSTOMER_APP', 'SALES_REP', 'POS' or 'PHONE_AI' (the phone line's AI agent)",
+      ),
       col('customer_id', 'bigint'),
       col('customer_code', 'text'),
       col('customer_name', 'text'),

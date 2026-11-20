@@ -26,6 +26,12 @@ export const IDEMPOTENT_KEY = 'tugeel:idempotent';
 const HTTP_CODE_METADATA = '__httpCode__';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Whose key it is: `idempotency_keys.actor_kind` and `actor_id`. */
+interface IdempotencyActor {
+  kind: 'STAFF' | 'CUSTOMER' | 'PHONE_LINE';
+  id: number;
+}
+
 export interface IdempotentOptions {
   /**
    * Top-level response fields left out of the stored replay (ADR-0045 #8: an AI answer's rows are
@@ -37,7 +43,8 @@ export interface IdempotentOptions {
 /**
  * Marks a document-creating route (ADR-0002 #6, ADR-0004 #5): the client sends a UUID
  * `Idempotency-Key`; a retry with the same key and body gets the stored response instead of a
- * second document. Use on authenticated routes only.
+ * second document. Use on authenticated routes only: a staff or customer route, or a phone line's
+ * station route behind its key guard (ADR-0232 #3).
  */
 export const Idempotent = (options: IdempotentOptions = {}) =>
   applyDecorators(
@@ -94,12 +101,15 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const http = context.switchToHttp();
     const request = http.getRequest<Request & AuthenticatedRequest>();
     const response = http.getResponse<Response>();
-    // A staff member or a customer app account (ADR-0079 #5): keys never collide across kinds.
-    const actor = request.auth
-      ? { kind: 'STAFF' as const, id: request.auth.userId }
+    // A staff member, a customer app account (ADR-0079 #5) or a phone line's station (ADR-0232
+    // #3): keys never collide across kinds.
+    const actor: IdempotencyActor | null = request.auth
+      ? { kind: 'STAFF', id: request.auth.userId }
       : request.customer
-        ? { kind: 'CUSTOMER' as const, id: request.customer.customerUserId }
-        : null;
+        ? { kind: 'CUSTOMER', id: request.customer.customerUserId }
+        : request.phoneLine
+          ? { kind: 'PHONE_LINE', id: request.phoneLine.phoneLineId }
+          : null;
     if (!actor) throw new Error('@Idempotent() needs an authenticated route');
     const key = request.headers['idempotency-key'];
     if (typeof key !== 'string' || !UUID.test(key)) {
@@ -138,7 +148,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
   }
 
   private async replay(
-    actor: { kind: 'STAFF' | 'CUSTOMER'; id: number },
+    actor: IdempotencyActor,
     key: string,
     requestHash: string,
     response: Response,

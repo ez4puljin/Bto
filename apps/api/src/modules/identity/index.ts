@@ -7,6 +7,7 @@ export {
   type AuthContext,
   type CustomerActor,
   type CustomerContext,
+  type PhoneLineActor,
   systemActor,
 } from './auth-context';
 export { CUSTOMER_ACCOUNT_GATE, type CustomerAccountGate } from './customer-account-gate';
@@ -15,6 +16,7 @@ export {
   CurrentCustomer,
   CurrentUser,
   CustomerRoute,
+  type PhoneLineRequest,
   RequirePermission,
 } from './decorators/access.decorators';
 export { IdentityHttpModule, IdentityModule, IdentityWorkerModule } from './identity.module';

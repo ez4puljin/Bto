@@ -12686,6 +12686,229 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/phone-agent/station": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The station's heartbeat: marks it seen and says whether the AI would answer now. */
+        get: operations["PhoneStation_station"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-agent/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * An incoming call: `answer: false` leaves the phone ringing for staff. The signed URL is for
+         *     this call only and is left out of the stored replay: an answer replayed by the
+         *     Idempotency-Key carries none, and the bridge then does not pick up.
+         */
+        post: operations["PhoneStation_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-agent/calls/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The turns of the conversation in the provider's order; a batch sent twice changes nothing. */
+        post: operations["PhoneStation_events"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-agent/calls/{id}/tools/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One of the agent's client tools; a refusal is a problem+json whose `code` the agent is told. */
+        post: operations["PhoneStation_tool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-agent/calls/{id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The call is over: its outcome, and the job that fills the turns never delivered. */
+        post: operations["PhoneStation_end"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PhoneLines_list"];
+        put?: never;
+        /** A new line, switched off; its key comes back this once and is never stored in the replay. */
+        post: operations["PhoneLines_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-lines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The name, the working hours, the greeting, and on or off. */
+        put: operations["PhoneLines_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-lines/{id}/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The station's new key (the old one stops at once); shown this once. */
+        post: operations["PhoneLines_rotateKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PhoneCalls_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-calls/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One call with its transcript in the order it was spoken. */
+        get: operations["PhoneCalls_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-callbacks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PhoneCalls_callbacks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-callbacks/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Залгасан» or «Орхих»: only an open task closes (PHONE_CALLBACK_STATE, 409, otherwise). */
+        post: operations["PhoneCalls_closeCallback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone-searches/no-hits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «Олдоогүй хайлтууд»: what callers asked for and the catalog did not find. */
+        get: operations["PhoneCalls_noHits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12853,7 +13076,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage" | "problems.read" | "problems.count" | "problems.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage" | "problems.read" | "problems.count" | "problems.manage" | "phone.calls.read" | "phone.lines.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -13250,7 +13473,7 @@ export interface components {
             /** Format: date-time */
             occurredAt: string;
             /** @enum {string} */
-            actorKind: "STAFF" | "CUSTOMER" | "SYSTEM";
+            actorKind: "STAFF" | "CUSTOMER" | "SYSTEM" | "PHONE_LINE";
             actorId: number | null;
             actorUsername: string | null;
             /** @description Job or CLI for system actors */
@@ -18745,7 +18968,7 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
             /** @enum {string} */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             customerId: number;
             customerCode: string;
             customerName: string;
@@ -18931,7 +19154,7 @@ export interface components {
             /** @example 20261015_0001 */
             number: string | null;
             /** @enum {string} */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             /** @enum {string} */
             status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
             customerId: number;
@@ -19249,7 +19472,7 @@ export interface components {
             /** @enum {string} */
             status: "DRAFT" | "SUBMITTED" | "APPROVAL_PENDING" | "CONFIRMED" | "PICKING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "DELIVERY_FAILED" | "INVOICED" | "CLOSED" | "CANCELLED";
             /** @enum {string} */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             customerId: number;
             customerCode: string;
             customerName: string;
@@ -19432,13 +19655,13 @@ export interface components {
         };
         SalesChannelDefault: {
             /** @enum {string} */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             pipelineId: number;
             stageId: number;
         };
         SalesChannelDefaultRequest: {
             /** @enum {string} */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             /** @description null clears the default */
             pipelineId?: number | null;
             stageId?: number | null;
@@ -19977,7 +20200,7 @@ export interface components {
              * @description ADMIN: an office order
              * @enum {string}
              */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             /** Format: date-time */
             createdAt: string;
             /**
@@ -23492,14 +23715,23 @@ export interface components {
         };
         MyNotification: {
             id: number;
-            /** @enum {string} */
-            kind: "ORDER_SOLD";
+            /**
+             * @description ORDER_SOLD: the rep’s order was sold; PHONE_ORDER, PHONE_CALLBACK: the phone AI line took an order or left a callback task (ADR-0232)
+             * @enum {string}
+             */
+            kind: "ORDER_SOLD" | "PHONE_ORDER" | "PHONE_CALLBACK";
             orderId: number | null;
+            /** @description Empty for a PHONE_CALLBACK */
             orderNumber: string;
             customerName: string;
             /** @description Whole MNT, frozen at the submit */
             orderTotal: string | null;
             invoiceNumber: string | null;
+            /** @description The phone call it came from */
+            callId: number | null;
+            callbackId: number | null;
+            /** @description The number to ring back */
+            phone: string | null;
             read: boolean;
             /** Format: date-time */
             createdAt: string;
@@ -23939,7 +24171,7 @@ export interface components {
              * @description CUSTOMER_APP «Апп», ADMIN «Оффис», …
              * @enum {string}
              */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             /** @description The rep of a SALES_REP order */
             takerName: string | null;
             /** Format: date-time */
@@ -23979,7 +24211,7 @@ export interface components {
              * @description CUSTOMER_APP «Апп», ADMIN «Оффис», …
              * @enum {string}
              */
-            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+            channel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
             /** @description The rep of a SALES_REP order */
             takerName: string | null;
             /** Format: date-time */
@@ -24136,7 +24368,7 @@ export interface components {
              * @description Who took the order
              * @enum {string|null}
              */
-            orderChannel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | null;
+            orderChannel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI" | null;
             /** @description The rep of a SALES_REP order */
             orderTakerName: string | null;
             subtotal: string;
@@ -24191,7 +24423,7 @@ export interface components {
              * @description Who took the order
              * @enum {string|null}
              */
-            orderChannel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | null;
+            orderChannel: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI" | null;
             /** @description The rep of a SALES_REP order */
             orderTakerName: string | null;
             /** @description A payment’s «Гүйлгээний утга» */
@@ -27599,6 +27831,230 @@ export interface components {
         ApproveSheetDto: {
             /** @description true: approve the counted lines and leave the rest on the list; default false refuses a sheet with uncounted lines */
             countedOnly?: boolean;
+        };
+        PhoneStationStatus: {
+            lineId: number;
+            name: string;
+            /** @description Off: the AI answers no call */
+            active: boolean;
+            /** @description Inside the working hours now: staff answer, the AI does not */
+            workingHours: boolean;
+            /** @description The agent’s key and id are set on the server */
+            agentConfigured: boolean;
+        };
+        PhoneCallStartRequestDto: {
+            /** @description Android’s id of the call, unique per line */
+            callRef: string;
+            /** @description The caller’s number as the phone shows it; null or absent when withheld */
+            callerPhone?: string | null;
+        };
+        PhoneCallStart: {
+            /** @description false: do not pick up, the phone rings for staff */
+            answer: boolean;
+            callId: number;
+            /**
+             * @description Why not, when `answer` is false
+             * @enum {string|null}
+             */
+            reason: "WORKING_HOURS" | "LINE_INACTIVE" | "AI_CLOSED" | "AGENT_UNAVAILABLE" | null;
+            /** @description The conversation’s signed URL, for this call only; never stored. Null when `answer` is false and in a replayed answer (then do not pick up) */
+            signedUrl: string | null;
+            /** @description call_id, caller_known, store_name, can_deliver, greeting */
+            dynamicVariables: {
+                [key: string]: unknown;
+            } | null;
+        };
+        PhoneCallEventDto: {
+            seq: number;
+            /** @enum {string} */
+            role: "USER" | "AGENT";
+            text: string;
+            /** @description Milliseconds from the call’s start */
+            atMs: number;
+        };
+        PhoneCallEventsRequestDto: {
+            events: components["schemas"]["PhoneCallEventDto"][];
+            /** @description The provider’s conversation id, once the bridge knows it */
+            conversationId?: string | null;
+        };
+        PhoneCallEventsResult: {
+            /** @description How many of the batch were new */
+            stored: number;
+            /** @description The highest sequence number stored for the call */
+            lastSeq: number;
+        };
+        PhoneToolCallRequestDto: {
+            /** @description Every sequence number up to this one was delivered */
+            afterSeq: number;
+            /** @description The tool call’s own sequence number */
+            seq: number;
+            /** @description Milliseconds from the start */
+            atMs?: number | null;
+            /** @description The tool’s arguments */
+            args: {
+                [key: string]: unknown;
+            };
+        };
+        PhoneToolAnswer: {
+            /** @description What the agent may say; a refusal is a problem+json with its code instead */
+            answer: {
+                [key: string]: unknown;
+            };
+        };
+        PhoneCallEndRequestDto: {
+            /** @enum {string} */
+            reason: "COMPLETED" | "CALLER_HANGUP" | "TIMEOUT" | "SILENCE" | "ERROR";
+            /** @description The call’s length, seconds */
+            durationS?: number | null;
+            conversationId?: string | null;
+        };
+        PhoneCallEnd: {
+            callId: number;
+            /** @enum {string|null} */
+            outcome: "ORDERED" | "STATUS_ONLY" | "CALLBACK" | "NO_MATCH" | "ABANDONED" | "FAILED" | null;
+            orderNumber: string | null;
+        };
+        PhoneScheduleException: {
+            /** Format: date */
+            date: string;
+            /** @description That day’s working intervals `[from, to)`, `HH:MM`; empty: the AI all day */
+            intervals: string[][];
+        };
+        PhoneSchedule: {
+            /** @description Per ISO weekday `1` (Monday) … `7` (Sunday): the working intervals `[from, to)`, `HH:MM`, Asia/Ulaanbaatar, in which staff answer; outside them the AI answers */
+            week: {
+                [key: string]: string[][];
+            };
+            exceptions: components["schemas"]["PhoneScheduleException"][];
+        };
+        PhoneLine: {
+            id: number;
+            name: string;
+            active: boolean;
+            schedule: components["schemas"]["PhoneSchedule"];
+            greeting: string | null;
+            /** Format: date-time */
+            lastSeenAt: string | null;
+            /** @description The station called within the last two minutes */
+            online: boolean;
+            /** @description Inside the working hours now */
+            workingHours: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PhoneLineCreateRequestDto: {
+            name: string;
+            schedule?: {
+                [key: string]: unknown;
+            } & components["schemas"]["PhoneSchedule"];
+            greeting?: string | null;
+        };
+        PhoneLineCreated: {
+            line: components["schemas"]["PhoneLine"];
+            /** @description The station’s key `bpl_<line>_<secret>`, shown this once */
+            key: string;
+        };
+        PhoneLineUpdateRequestDto: {
+            name?: string;
+            /** @description On: the AI answers outside the working hours */
+            active?: boolean;
+            schedule?: {
+                [key: string]: unknown;
+            } & components["schemas"]["PhoneSchedule"];
+            greeting?: string | null;
+        };
+        PhoneCall: {
+            id: number;
+            lineId: number;
+            lineName: string;
+            /** @description E.164 when a Mongolian number */
+            callerPhone: string | null;
+            /** @description As the phone showed it */
+            callerRaw: string | null;
+            customerId: number | null;
+            customerName: string | null;
+            /** @description false: the phone rang for staff */
+            answered: boolean;
+            /** @enum {string|null} */
+            declineReason: "WORKING_HOURS" | "LINE_INACTIVE" | "AI_CLOSED" | "AGENT_UNAVAILABLE" | null;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** @enum {string|null} */
+            endReason: "COMPLETED" | "CALLER_HANGUP" | "TIMEOUT" | "SILENCE" | "ERROR" | null;
+            durationS: number | null;
+            /** @enum {string|null} */
+            outcome: "ORDERED" | "STATUS_ONLY" | "CALLBACK" | "NO_MATCH" | "ABANDONED" | "FAILED" | null;
+            salesOrderId: number | null;
+            orderNumber: string | null;
+            /** @description The provider’s cost figure for the conversation (its credits) */
+            costEstimate: string | null;
+            /** @description The transcript was checked against the provider’s */
+            reconciled: boolean;
+        };
+        PhoneCallPage: {
+            data: components["schemas"]["PhoneCall"][];
+            nextCursor: string | null;
+        };
+        PhoneCallMessage: {
+            seq: number;
+            /** @enum {string} */
+            role: "USER" | "AGENT" | "TOOL";
+            /** @description The words; a tool’s name for a TOOL message */
+            text: string;
+            /** @description Milliseconds from the call’s start */
+            atMs: number;
+            /** @description source BRIDGE or RECONCILED; for a tool: tool, args, ok, code, answer, no_hit */
+            meta: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PhoneCallDetail: {
+            call: components["schemas"]["PhoneCall"];
+            messages: components["schemas"]["PhoneCallMessage"][];
+        };
+        PhoneCallback: {
+            id: number;
+            callId: number;
+            phone: string | null;
+            customerId: number | null;
+            customerName: string | null;
+            reason: string;
+            /** @enum {string} */
+            status: "OPEN" | "DONE" | "DROPPED";
+            doneBy: number | null;
+            /** Format: date-time */
+            doneAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PhoneCallbackPage: {
+            data: components["schemas"]["PhoneCallback"][];
+            nextCursor: string | null;
+        };
+        PhoneCallbackCloseRequestDto: {
+            /**
+             * @description Rang back, or left
+             * @enum {string}
+             */
+            status: "DONE" | "DROPPED";
+        };
+        PhoneNoHitSearch: {
+            callId: number;
+            seq: number;
+            /** @description What the caller asked for and the catalog did not find */
+            query: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PhoneNoHitSearchPage: {
+            data: components["schemas"]["PhoneNoHitSearch"][];
+            nextCursor: string | null;
         };
         /** @enum {string} */
         ErrorCode: "BAD_REQUEST" | "VALIDATION_FAILED" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "METHOD_NOT_ALLOWED" | "CONFLICT" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "TOO_MANY_REQUESTS" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "QUERY_TIMEOUT" | "REPORTS_BUSY" | "REPORT_VIEW_LIMIT" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_REUSED" | "IDEMPOTENCY_KEY_IN_PROGRESS" | "DUPLICATE_VALUE" | "INVALID_CREDENTIALS" | "ACCOUNT_LOCKED" | "ACCOUNT_DISABLED" | "SESSION_EXPIRED" | "PASSWORD_CODE_INVALID" | "PASSWORD_TOO_WEAK" | "CURRENT_PASSWORD_INCORRECT" | "LAST_ADMIN" | "SELF_EDIT_FORBIDDEN" | "ROLE_SYSTEM_READONLY" | "ROLE_IN_USE" | "ROLE_NAMED_ON_RECORDS" | "WAREHOUSE_KIND_NOT_ALLOWED" | "SETTING_NOT_EDITABLE" | "SETTING_MISSING" | "FILE_NOT_UPLOADED" | "FILE_KIND_MISMATCH" | "IN_USE" | "CATEGORY_CYCLE" | "CATEGORY_NOT_EMPTY" | "UNIT_FACTOR_INEXACT" | "UNIT_BASE_LOCKED" | "BARCODE_INVALID" | "BARCODE_TAKEN" | "BARCODE_AMBIGUOUS" | "TAX_ATTRIBUTES_MISSING" | "SELECTION_TOO_LARGE" | "CUSTOMER_INACTIVE" | "SUPPLIER_INACTIVE" | "EXPENSE_TYPE_INACTIVE" | "CUSTOMER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_INACTIVE" | "SUPPLIER_CATEGORY_HAS_CHILDREN" | "PRODUCT_INACTIVE" | "SKU_OUT_OF_RANGE" | "SKU_RESERVED" | "SKU_RANGE_FULL" | "SKU_RANGE_OVERLAP" | "DOC_ALREADY_POSTED" | "ALREADY_POSTED" | "STOCK_INSUFFICIENT" | "BIN_LOCKED_FOR_COUNT" | "BIN_NOT_EMPTY" | "BIN_ARCHIVED" | "DOC_STATE_INVALID" | "PRODUCT_NOT_IN_WAREHOUSE" | "PRODUCT_NO_HOME" | "PRODUCT_NOT_SELLABLE" | "STAGE_IN_USE" | "BOARD_NOT_EMPTY" | "PIPELINE_IN_USE" | "ORDER_NUMBER_TAKEN" | "CUSTOMER_APP_CLOSED" | "PRODUCT_NOT_IN_APP" | "ORDER_BELOW_MINIMUM" | "PRODUCT_OUT_OF_APP_STOCK" | "ATTENDANCE_NO_SITE" | "ATTENDANCE_OUT_OF_RANGE" | "ATTENDANCE_LOCATION_IMPRECISE" | "ATTENDANCE_ALREADY_IN" | "ATTENDANCE_NOT_IN" | "ATTENDANCE_EVENT_ORDER" | "COSTING_CLOSED" | "RECEIPT_DISCOUNT_TOO_LARGE" | "RECEIPT_FROM_ORDER" | "RECEIPT_LINES_UNCHECKED" | "RECEIPT_NOTE_MISSING" | "RECEIPT_NOTE_QTY_MISMATCH" | "RECEIPT_NOTHING_ARRIVED" | "RECEIPT_WAREHOUSE_CONFIRMED" | "RECEIPT_NOTE_AMOUNT_MISMATCH" | "ISSUE_LINES_UNCHECKED" | "ISSUE_WAREHOUSE_CONFIRMED" | "ISSUE_PARTLY_POSTED" | "ISSUE_RECIPIENT_KIND" | "ISSUE_CORRECTION_OPEN" | "ISSUE_NOT_SENT" | "PO_NOT_ARCHIVABLE" | "PO_NOT_EDITABLE" | "PO_LOAD_OVER" | "PO_SUPPLIER_EMPTY" | "PO_STATUS_INVALID" | "SALE_PRICE_NO_TERMS" | "TRANSFER_NOTHING_SHIPPED" | "TRANSFER_LINES_UNCOUNTED" | "TRANSFER_REQUEST_EMPTY" | "HR_POLL_CLOSED" | "HR_POLL_ANSWERED" | "STOCKTAKE_BINS_UNFINISHED" | "IMPORT_FILE_INVALID" | "IMPORT_STATE_INVALID" | "IMPORT_HAS_ERRORS" | "IMPORT_BUSY" | "IMPORT_REVERT_BLOCKED" | "DISCOUNT_PROGRAM_STARTED" | "DISCOUNT_PROGRAM_OVERLAP" | "PRICE_PROFILE_ARCHIVED" | "PRICE_PROFILE_IN_USE" | "SEGMENT_INVALID" | "EXPORT_TOO_LARGE" | "SEGMENT_TOO_LARGE" | "AI_NOT_CONFIGURED" | "AI_PROVIDER_FAILED" | "AI_QUERY_FAILED" | "AI_DATA_FORBIDDEN" | "AI_BUDGET_REACHED" | "AI_USER_LIMIT_REACHED" | "AI_KEY_SECRET_MISSING" | "AI_PRICE_REQUIRED" | "PICTURE_NOT_CONFIGURED" | "PICTURE_PROVIDER_FAILED" | "NOTE_READING_STATE" | "SCANNER_NOT_FOUND" | "SCANNER_FAILED" | "ERKHET_NOT_CONFIGURED" | "ERKHET_KEY_SECRET_MISSING" | "ERKHET_SYNC_RUNNING" | "ERKHET_RUN_SUPERSEDED" | "SMS_NOT_CONFIGURED" | "SMS_KEY_SECRET_MISSING" | "SMS_TEMPLATE_INVALID" | "SMS_TOO_LONG" | "UNIT_SUPERSEDED" | "PRICE_MISSING" | "DISCOUNT_OVER_CAP" | "CREDIT_BLOCKED" | "CREDIT_NEEDS_APPROVAL" | "ORDER_STATE_INVALID" | "STAGE_SKIP" | "ORDER_CHANGED" | "ORDER_ALREADY_LOADED" | "ORDER_NOT_LOADABLE" | "LOAD_UNDO_FORBIDDEN" | "EBARIMT_FILE_UNREADABLE" | "EBARIMT_FILE_COLUMNS" | "EBARIMT_FILE_EMPTY" | "EBARIMT_FILE_ROW" | "EBARIMT_FILE_MONTHS" | "EBARIMT_FILE_LIMIT" | "EBARIMT_CELL_CONFLICT" | "EBARIMT_FILE_CHANGED" | "PICK_INCOMPLETE" | "COUNT_SESSIONS_OPEN" | "COUNT_SESSION_REQUIRED" | "PICK_TAKEN" | "LINE_EDIT_PART_DONE" | "PICK_STATE_INVALID" | "PICKER_INVALID" | "PIPELINE_KIND_STAGE" | "PIPELINE_KIND_CHANNEL" | "PIPELINE_NO_TRANSFER_WAREHOUSE" | "PIPELINE_TRANSFER_STAGE_NEEDS_STORE" | "PIPELINE_TRANSFER_WAREHOUSE_INVALID" | "EBARIMT_ATTRIBUTES_MISSING" | "TIN_PENDING" | "EBARIMT_INDETERMINATE" | "PAYMENT_NOT_VERIFIED" | "INVOICE_STATE_INVALID" | "PAYMENT_STATE_INVALID" | "ALLOCATION_EXCEEDS" | "JOURNAL_UNBALANCED" | "ACCOUNT_ROLE_TAKEN" | "ACCOUNT_ROLE_MISSING" | "BANK_STATEMENT_UNREADABLE" | "BANK_STATEMENT_NO_ACCOUNT" | "BANK_STATEMENT_EMPTY" | "BANK_STATEMENT_POSTED" | "BANK_STATEMENT_UNLINKED" | "BANK_STATEMENT_CURRENCY" | "BANK_LINE_LOCKED" | "BANK_LINE_POSTED" | "BANK_LINE_INCOMPLETE" | "POS_NOT_CONFIGURED" | "POS_TOTALS_MISMATCH" | "POS_TAX_MISMATCH" | "POS_SHIFT_STATE_INVALID" | "POS_TILL_BUSY" | "POS_TILL_INACTIVE" | "POS_CASHIER_INACTIVE" | "POS_CASHIER_NOT_ON_TILL" | "POS_SUPERVISOR_NOT_ON_TILL" | "POS_PRODUCT_NOT_ON_TILL" | "POS_RETURN_EXCEEDS" | "POS_RETURN_WINDOW" | "POS_NUMBER_TAKEN" | "POS_DEV_ONLY" | "POS_PAIRING_INVALID" | "POS_DEVICE_UNKNOWN" | "EDGE_LINK_INVALID" | "EDGE_LINK_PEPPER_MISSING" | "EDGE_ALREADY_LINKED" | "EDGE_LINK_UNREACHABLE" | "POS_PIN_INVALID" | "POS_CASHIER_LOCKED" | "POS_SESSION_EXPIRED" | "POS_SNAPSHOT_MISSING" | "POS_SUPERVISOR_REQUIRED" | "POS_PARKED_LIMIT" | "POS_BUYER_REQUIRED" | "POS_CUSTOMER_REQUIRED" | "POS_CREDIT_OFFLINE_OVER_LIMIT" | "POS_VOUCHER_INVALID" | "POS_VOUCHER_USED" | "POS_VOUCHER_WITH_CREDIT" | "POS_RETURN_VOUCHER_PART" | "POS_VOUCHER_NOTHING_TO_CHECK" | "POS_CARD_PENDING" | "POS_CARD_NOT_CHARGED" | "POS_CARD_ATTEMPT_STATE" | "POS_MEMBER_NOT_FOUND" | "POS_MEMBER_BLOCKED" | "POS_MEMBER_PHONE_TAKEN" | "POS_MEMBER_PIN_INVALID" | "POS_MEMBER_LOCKED" | "POS_POINTS_INSUFFICIENT" | "POS_POINTS_WITH_CREDIT" | "POS_LOYALTY_NOTHING_TO_CHECK" | "EBARIMT_LOOKUP_UNAVAILABLE" | "EBARIMT_TAXPAYER_NOT_FOUND" | "EBARIMT_RECEIPT_STATE_INVALID" | "EBARIMT_POSAPI_UNAVAILABLE" | "EXPIRY_ITEM_EXISTS" | "EXPIRY_ITEM_CHANGED" | "EXPIRY_ITEM_ARCHIVED";
@@ -41430,7 +41886,7 @@ export interface operations {
                 warehouseId?: number;
                 /** @description Only the orders the caller entered */
                 mine?: boolean;
-                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
                 fulfilment?: "PICKUP" | "DELIVERY";
                 paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
                 deliveryFrom?: string;
@@ -41515,7 +41971,7 @@ export interface operations {
                 warehouseId?: number;
                 /** @description Only the orders the caller entered */
                 mine?: boolean;
-                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
                 fulfilment?: "PICKUP" | "DELIVERY";
                 paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
                 deliveryFrom?: string;
@@ -42340,7 +42796,7 @@ export interface operations {
                 warehouseId?: number;
                 /** @description Only the orders the caller entered */
                 mine?: boolean;
-                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS";
+                channel?: "ADMIN" | "CUSTOMER_APP" | "SALES_REP" | "POS" | "PHONE_AI";
                 fulfilment?: "PICKUP" | "DELIVERY";
                 paymentMethod?: "CASH" | "BANK_TRANSFER" | "CREDIT";
                 deliveryFrom?: string;
@@ -57198,6 +57654,489 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockProblemSheetDetailDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneStation_station: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Bearer bpl_<line>_<secret> */
+                Authorization?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneStationStatus"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneStation_start: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Bearer bpl_<line>_<secret> */
+                Authorization?: string;
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCallStartRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallStart"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneStation_events: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Bearer bpl_<line>_<secret> */
+                Authorization?: string;
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCallEventsRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallEventsResult"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneStation_tool: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Bearer bpl_<line>_<secret> */
+                Authorization?: string;
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneToolCallRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneToolAnswer"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneStation_end: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Bearer bpl_<line>_<secret> */
+                Authorization?: string;
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCallEndRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallEnd"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneLines_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneLine"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneLines_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneLineCreateRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneLineCreated"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneLines_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneLineUpdateRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneLine"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneLines_rotateKey: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneLineCreated"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneCalls_list: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                outcome?: "ORDERED" | "STATUS_ONLY" | "CALLBACK" | "NO_MATCH" | "ABANDONED" | "FAILED";
+                /** @description Only calls the AI answered, or not */
+                answered?: "true" | "false";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneCalls_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneCalls_callbacks: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+                status?: "OPEN" | "DONE" | "DROPPED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallbackPage"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneCalls_closeCallback: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCallbackCloseRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallback"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PhoneCalls_noHits: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneNoHitSearchPage"];
                 };
             };
             /** @description RFC 9457 problem details */

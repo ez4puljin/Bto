@@ -27,6 +27,7 @@ export {
   type CustomerOrderOrigin,
   type CustomerOrderPage,
   type CustomerOrderRow,
+  type CustomerOrderStatus,
   CustomerOrdersService,
   type CustomerOrderTaker,
 } from './services/customer-orders.service';
@@ -67,6 +68,7 @@ export { toRepDealDto, toRepProductDto } from './controllers/rep-mappers';
 export { SalesRepProductDto } from './dto/sales-rep.dto';
 export {
   CUSTOMER_APP_LABEL,
+  PHONE_AI_LABEL,
   type MoveResult,
   type OrderInput,
   type OrderLineInput,
