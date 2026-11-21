@@ -315,7 +315,28 @@ export class PayrollPayslipDto {
   @ApiProperty() fullName: string;
   @ApiProperty({ type: String, nullable: true }) position: string | null;
   @ApiProperty({ type: String, nullable: true }) divisionName: string | null;
-  @ApiProperty(AMOUNT) baseSalary: string;
+  @ApiProperty({
+    ...AMOUNT,
+    description:
+      'The fixed salary paid this month: the monthly salary × salaryDays ÷ salaryMonthDays for someone who joined or left inside the month',
+  })
+  baseSalary: string;
+  @ApiProperty({ ...AMOUNT, description: 'The monthly fixed salary of the terms' })
+  monthlySalary: string;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Planned workdays inside the employed span of the month (null: computed before 2026-11-21)',
+  })
+  salaryDays: number | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Planned workdays of the whole month; the salary is prorated when salaryDays is fewer',
+  })
+  salaryMonthDays: number | null;
   @ApiProperty() paysSocialInsurance: boolean;
   @ApiProperty({ description: 'False: attendance is not tracked, the attendance item is full' })
   attendanceMeasured: boolean;

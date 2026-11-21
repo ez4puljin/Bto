@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { isEmployeeLeft } from '@tugeel/shared/hr';
-import { WorkforceService } from '../../hr';
+import { isEmployeeLeft, type WeekPlan } from '@tugeel/shared/hr';
+import { HrSettingsService, WorkforceService } from '../../hr';
 
 /** An employee as payroll sees them: the card's names and dates, and whether attendance is tracked. */
 export interface PayrollPerson {
@@ -22,7 +22,10 @@ export interface PayrollPerson {
  */
 @Injectable()
 export class PayrollPeopleService {
-  constructor(private readonly workforce: WorkforceService) {}
+  constructor(
+    private readonly workforce: WorkforceService,
+    private readonly hrSettings: HrSettingsService,
+  ) {}
 
   async all(): Promise<PayrollPerson[]> {
     const cards = await this.workforce.employees();
@@ -42,6 +45,15 @@ export class PayrollPeopleService {
 
   async byId(): Promise<Map<number, PayrollPerson>> {
     return new Map((await this.all()).map((person) => [person.userId, person]));
+  }
+
+  /**
+   * Each person's week as the time report plans it (their schedule's days, else their own or the
+   * company's hours): the fixed salary is split by its workdays (ADR-0235, 2026-11-21).
+   */
+  async plans(): Promise<Map<number, WeekPlan>> {
+    const employees = await this.hrSettings.employees();
+    return new Map(employees.map((employee) => [employee.userId, employee.plan]));
   }
 }
 

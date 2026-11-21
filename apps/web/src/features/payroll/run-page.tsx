@@ -1,5 +1,6 @@
 import { Decimal, toMoney } from '@tugeel/shared/money';
 import {
+  isSalaryProrated,
   PAYROLL_AMOUNT_PATTERN,
   PAYROLL_LIMITS,
   PAYROLL_PERCENT_PATTERN,
@@ -66,12 +67,12 @@ import {
 import { cleanPercent, money, percent } from './payroll-helpers';
 import { RunStatusBadge } from './payroll-kit';
 
-// 85rem with every column; narrower, the employer's share leaves first, then the fixed salary.
+// 86rem with every column; narrower, the employer's share leaves first, then the fixed salary.
 // The name, what the person earns, the deductions and «Гарт олгох» always stay; below that the
 // table scrolls inside its card.
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'employee', kind: 'text', weight: 3, min: 13 },
-  { key: 'base', kind: 'money', width: 7.5, drop: 2 },
+  { key: 'base', kind: 'money', width: 8.5, drop: 2 },
   { key: 'attendance', kind: 'money', width: 8 },
   { key: 'work', kind: 'money', width: 7.5 },
   { key: 'gross', kind: 'money', width: 7.5 },
@@ -85,6 +86,12 @@ const COLUMNS: readonly ColumnSpec[] = [
 
 const sum = (values: readonly string[]): string =>
   toMoney(values.reduce((total, value) => total.plus(value), new Decimal(0))).toString();
+
+/** A salary split by the workdays (someone who joined or left inside the month): «11 / 22». */
+const proratedOf = (line: PayrollLine): { days: number; total: number } | null =>
+  isSalaryProrated(line.salaryDays, line.salaryMonthDays)
+    ? { days: line.salaryDays ?? 0, total: line.salaryMonthDays ?? 0 }
+    : null;
 
 const attendanceOf = (line: PayrollLine) => line.items.find((item) => item.source === 'ATTENDANCE');
 const workEarned = (line: PayrollLine): string =>
@@ -102,11 +109,18 @@ function unscoredOf(lines: readonly PayrollLine[]) {
     .filter((entry) => entry.names.length > 0);
 }
 
-function Figure(props: { label: string; value: string; strong?: boolean }) {
+function Figure(props: { label: string; value: string; strong?: boolean; note?: string | null }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <dt className="text-[0.8125rem] text-muted-foreground">{props.label}</dt>
-      <dd className={`font-mono ${props.strong ? 'font-semibold' : ''}`}>{props.value}</dd>
+      <dd className={`text-right font-mono ${props.strong ? 'font-semibold' : ''}`}>
+        {props.value}
+        {props.note ? (
+          <span className="block font-sans text-xs font-normal text-muted-foreground">
+            {props.note}
+          </span>
+        ) : null}
+      </dd>
     </div>
   );
 }
@@ -122,6 +136,7 @@ function LineDialog(props: { run: PayrollRunDetail; line: PayrollLine; onClose: 
   const adjustAction = useAction();
   const adjustKey = useRef(randomUuid());
   const manual = line.items.filter((item) => item.source === 'MANUAL');
+  const prorated = proratedOf(line);
   const [scores, setScores] = useState<Record<number, { score: string; note: string }>>(() =>
     Object.fromEntries(
       manual.map((item) => [item.id, { score: item.scorePercent ?? '', note: item.note ?? '' }]),
@@ -462,7 +477,15 @@ function LineDialog(props: { run: PayrollRunDetail; line: PayrollLine; onClose: 
           </h3>
           <dl className="grid gap-x-8 divide-y divide-border/80 rounded-xl border px-3 @container sm:grid-cols-2 sm:divide-y-0">
             <div className="divide-y divide-border/80">
-              <Figure label={t('payroll.web.line.base')} value={money(line.baseSalary)} />
+              <Figure
+                label={t('payroll.web.line.base')}
+                value={money(line.baseSalary)}
+                note={
+                  prorated
+                    ? `${t('payroll.salaryDays', prorated)} · ${t('payroll.web.line.monthlySalary', { amount: money(line.monthlySalary) })}`
+                    : null
+                }
+              />
               <Figure label={t('payroll.web.line.kpi')} value={money(line.kpiTotal)} />
               <Figure
                 label={t('payroll.web.line.taxableAdditions')}
@@ -684,6 +707,7 @@ export function PayrollRunPage() {
               {run.isPending ? <SkeletonRows columns={11} /> : null}
               {lines.map((line) => {
                 const attendance = attendanceOf(line);
+                const prorated = proratedOf(line);
                 return (
                   <LinkRow key={line.id} to={hrefWithParam(search, 'line', String(line.id))}>
                     <TableCell>
@@ -697,7 +721,14 @@ export function PayrollRunPage() {
                         </span>
                       </Link>
                     </TableCell>
-                    <TableCell className="text-right font-mono">{money(line.baseSalary)}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className="block">{money(line.baseSalary)}</span>
+                      {prorated ? (
+                        <span className="block font-sans text-xs text-muted-foreground">
+                          {t('payroll.salaryDays', prorated)}
+                        </span>
+                      ) : null}
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {attendance ? (
                         <>

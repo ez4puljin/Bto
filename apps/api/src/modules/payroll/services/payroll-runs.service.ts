@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Decimal } from '@tugeel/shared/money';
+import type { WeekPlan } from '@tugeel/shared/hr';
+import { Decimal, toMoney } from '@tugeel/shared/money';
 import {
   attendanceCounts,
   attendanceScore,
@@ -13,9 +14,12 @@ import {
   PAYROLL_LIMITS,
   PAYROLL_PERCENT_PATTERN,
   type PayrollRunStatus,
+  type PayrollSalaryDays,
   type PayrollSettings,
   payrollMonthRange,
   payslipTotals,
+  proratedSalary,
+  salaryDays,
 } from '@tugeel/shared/payroll';
 import { businessDate } from '@tugeel/shared/time';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
@@ -88,7 +92,13 @@ export interface PayrollLineView {
   fullName: string;
   position: string | null;
   divisionName: string | null;
+  /** The fixed salary paid this month: the monthly salary split by the workdays when prorated. */
   baseSalary: string;
+  /** The monthly fixed salary of the terms (the snapshot). */
+  monthlySalary: string;
+  /** Planned workdays inside the employed span, and in the whole month; null before 2026-11-21. */
+  salaryDays: number | null;
+  salaryMonthDays: number | null;
   paysSocialInsurance: boolean;
   attendanceMeasured: boolean;
   workdays: number | null;
@@ -200,6 +210,13 @@ export interface AdjustmentInput {
 /** What the attendance system says of one person's month; `measured` false = not tracked. */
 type Attendance = { measured: true; counts: PayrollAttendanceCounts } | { measured: false };
 
+/** What a recompute reads afresh for one line: attendance and the fixed salary's day counts. */
+interface LineFacts {
+  attendance: Attendance;
+  /** Null when hr knows no week plan of the person: the salary is then paid whole. */
+  salary: PayrollSalaryDays | null;
+}
+
 /** Everything read outside the transaction before a run is built or recomputed. */
 interface MonthFacts {
   settings: PayrollSettings;
@@ -207,6 +224,8 @@ interface MonthFacts {
   /** By user, for the tracked people the time report covers. */
   attendance: Map<number, PayrollAttendanceCounts>;
   attendanceTo: string | null;
+  /** Each person's week plan: the fixed salary's workdays (ADR-0235, 2026-11-21). */
+  plans: Map<number, WeekPlan>;
 }
 
 /** The advisory-lock space of this module: one lock per payroll month (YYYYMM). */
@@ -221,7 +240,8 @@ const sum = (values: readonly Decimal[]): Decimal =>
 /**
  * The monthly payroll runs (ADR-0235 #8): a DRAFT holds a line per employed person with active pay
  * terms — a snapshot of the salary and the KPI sheet — with the attendance score read from the time
- * report; HR and managers score the work-evaluation items; recomputing re-reads attendance,
+ * report and the fixed salary split by the workdays of the employed span (ADR-0235, 2026-11-21);
+ * HR and managers score the work-evaluation items; recomputing re-reads attendance, the workdays,
  * advances and the rates. APPROVED freezes it (the database refuses any change of its lines);
  * reopening needs a reason. Every write of a month runs under that month's advisory lock.
  */
@@ -389,7 +409,8 @@ export class PayrollRunsService {
   }
 
   /**
-   * Recomputes a DRAFT: attendance, advances and the rates are read again. With `refreshTerms` the
+   * Recomputes a DRAFT: attendance, the fixed salary's workdays (the employed span may have been
+   * corrected on the card), advances and the rates are read again. With `refreshTerms` the
    * snapshot follows the terms as they are now — salaries, items and who is on the run — and an
    * item that is still on the sheet keeps its score.
    */
@@ -681,9 +702,10 @@ export class PayrollRunsService {
   private async facts(month: string): Promise<MonthFacts> {
     const range = payrollMonthRange(month);
     const today = businessDate();
-    const [settings, people, report] = await Promise.all([
+    const [settings, people, plans, report] = await Promise.all([
       this.settings.get(),
       this.people.byId(),
+      this.people.plans(),
       range.from > today
         ? Promise.resolve({ rows: [] })
         : this.reports.days({ from: range.from, to: range.to }),
@@ -704,6 +726,21 @@ export class PayrollRunsService {
       people,
       attendance: new Map([...days].map(([userId, list]) => [userId, attendanceCounts(list)])),
       attendanceTo: range.from > today ? null : range.to > today ? today : range.to,
+      plans,
+    };
+  }
+
+  /**
+   * What a line reads afresh on create and recompute: the attendance counts (the time report holds
+   * only the days inside the employed span, so a newcomer is never absent before they joined) and
+   * the fixed salary's day counts from the person's own week plan and employed span.
+   */
+  private lineFactsOf(facts: MonthFacts, month: string, userId: number): LineFacts {
+    const person = facts.people.get(userId);
+    const plan = facts.plans.get(userId);
+    return {
+      attendance: this.attendanceOf(facts, userId),
+      salary: person && plan ? salaryDays(month, plan, person.employedOn, person.leftOn) : null,
     };
   }
 
@@ -848,23 +885,25 @@ export class PayrollRunsService {
         run.month,
         line,
         facts.settings,
-        this.attendanceOf(facts, line.userId),
+        this.lineFactsOf(facts, run.month, line.userId),
       );
     }
   }
 
   /**
-   * One line's arithmetic, all of it through @tugeel/shared/payroll: each item's earned amount,
-   * the adjustment lines, the month's live advances, then the totals. With `attendance` the
-   * attendance item is scored anew; without it the counts and that score stay as they were.
+   * One line's arithmetic, all of it through @tugeel/shared/payroll: the fixed salary split by the
+   * workdays, each item's earned amount, the adjustment lines, the month's live advances, then the
+   * totals. With `fresh` the attendance item is scored anew and the salary's day counts are taken
+   * again; without it the counts and that score stay as they were (the snapshot).
    */
   private async computeLineInTx(
     tx: Tx,
     month: string,
     line: LineRow,
     settings: PayrollSettings,
-    attendance?: Attendance,
+    fresh?: LineFacts,
   ): Promise<void> {
+    const attendance = fresh?.attendance;
     const [items, adjustments, advances] = await Promise.all([
       tx.select().from(payrollLineItems).where(eq(payrollLineItems.lineId, line.id)),
       tx.select().from(payrollLineAdjustments).where(eq(payrollLineAdjustments.lineId, line.id)),
@@ -910,9 +949,18 @@ export class PayrollRunsService {
           .filter((row) => row.kind === kind && row.taxable === taxable)
           .map((row) => row.amount),
       );
+    // The salary's day counts: read again on create and recompute, else the line's own.
+    const days: PayrollSalaryDays | null = fresh
+      ? fresh.salary
+      : line.salaryDays !== null && line.salaryMonthDays !== null
+        ? { days: line.salaryDays, monthDays: line.salaryMonthDays }
+        : null;
+    const salaryPaid = days
+      ? proratedSalary(line.baseSalary, days.days, days.monthDays)
+      : toMoney(line.baseSalary);
     const totals = payslipTotals(
       {
-        baseSalary: line.baseSalary,
+        baseSalary: salaryPaid,
         kpiEarned: earned,
         taxableAdditions: of('ADDITION', true),
         otherAdditions: of('ADDITION', false),
@@ -937,6 +985,10 @@ export class PayrollRunsService {
                 attendance.measured && hasAttendanceItem ? attendance.counts.lateDays : null,
             }
           : {}),
+        ...(fresh
+          ? { salaryDays: days?.days ?? null, salaryMonthDays: days?.monthDays ?? null }
+          : {}),
+        salaryPaid,
         kpiTotal: totals.kpiTotal,
         taxableAdditions: of('ADDITION', true),
         gross: totals.gross,
@@ -1084,7 +1136,10 @@ export class PayrollRunsService {
           fullName: line.fullName,
           position: line.position,
           divisionName: line.divisionName,
-          baseSalary: money(line.baseSalary),
+          baseSalary: money(line.salaryPaid ?? line.baseSalary),
+          monthlySalary: money(line.baseSalary),
+          salaryDays: line.salaryDays,
+          salaryMonthDays: line.salaryMonthDays,
           paysSocialInsurance: line.paysSocialInsurance,
           attendanceMeasured: line.attendanceMeasured,
           workdays: line.workdays,

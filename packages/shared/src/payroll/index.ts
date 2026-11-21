@@ -1,7 +1,8 @@
 /**
  * Payroll with KPI evaluation (ADR-0235): the rules the api, the web and the staff app share.
  *
- * A month's pay = fixed salary + every KPI item's earned amount (+ taxable additions) = gross;
+ * A month's pay = fixed salary (split by the planned workdays for someone who joined or left inside
+ * the month) + every KPI item's earned amount (+ taxable additions) = gross;
  * minus the employee's social insurance and income tax where they apply, minus the advances and
  * the other deductions, plus the additions that are not taxed = net. A KPI item is worth a fixed
  * amount and earns the percent it was scored (0–100). The attendance item's percent comes from the
@@ -11,8 +12,9 @@
  * decimals, and the attendance ratio is rounded to ONE decimal before the penalty (the owner's
  * example: 20 ÷ 22 = 90.9 %, − 4 % = 86.9 %, of 200,000 = 173,800).
  */
+import { weekdayIndex } from '../hr';
 import { Decimal, type DecimalInput, roundHalfUp, toMoney } from '../money';
-import { daysInMonth } from '../time';
+import { addDays, daysInMonth } from '../time';
 
 /** Where a KPI item's score comes from: the attendance system, or a person. New automatic sources are added here. */
 export const KPI_SOURCES = ['ATTENDANCE', 'MANUAL'] as const;
@@ -237,6 +239,78 @@ export function attendanceScore(
     penaltyPercent,
     scorePercent: Decimal.max(0, basePercent.minus(penaltyPercent)),
   };
+}
+
+/**
+ * A person's week as the time report plans it (Monday first): a day with a plan is a workday, null
+ * a day off — `WeekPlan` of @tugeel/shared/hr, the schedule `reportDay` reads.
+ */
+export type PayrollWeekPlan = readonly (object | null | undefined)[];
+
+/** The planned workdays of a week plan between two dates, both included (0 when `to` < `from`). */
+export function plannedWorkdays(plan: PayrollWeekPlan, from: string, to: string): number {
+  let count = 0;
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    if (plan[weekdayIndex(date)]) count += 1;
+  }
+  return count;
+}
+
+/**
+ * The part of a month a person was employed (owner 2026-11-21): from the later of the month's first
+ * day and `employedOn` to the earlier of its last day and `leftOn`; no `employedOn` = employed from
+ * before the month, no `leftOn` = still employed. Null when the person was not employed in it.
+ */
+export function employedSpan(
+  month: string,
+  employedOn: string | null,
+  leftOn: string | null,
+): { from: string; to: string } | null {
+  const range = payrollMonthRange(month);
+  const from = employedOn !== null && employedOn > range.from ? employedOn : range.from;
+  const to = leftOn !== null && leftOn < range.to ? leftOn : range.to;
+  return from <= to ? { from, to } : null;
+}
+
+/** The two day counts the fixed salary is split by. */
+export interface PayrollSalaryDays {
+  /** Planned workdays inside the employed span. */
+  days: number;
+  /** Planned workdays of the whole month. */
+  monthDays: number;
+}
+
+/**
+ * The fixed salary's day counts (ADR-0235, amended 2026-11-21): the person's planned workdays
+ * inside their employed span of the month, and in the whole month, both from their own schedule
+ * exactly as the attendance KPI counts a workday.
+ */
+export function salaryDays(
+  month: string,
+  plan: PayrollWeekPlan,
+  employedOn: string | null,
+  leftOn: string | null,
+): PayrollSalaryDays {
+  const range = payrollMonthRange(month);
+  const span = employedSpan(month, employedOn, leftOn);
+  return {
+    days: span === null ? 0 : plannedWorkdays(plan, span.from, span.to),
+    monthDays: plannedWorkdays(plan, range.from, range.to),
+  };
+}
+
+/** The fixed salary is split: the employed span holds fewer workdays than the month. */
+export function isSalaryProrated(days: number | null, monthDays: number | null): boolean {
+  return days !== null && monthDays !== null && monthDays > 0 && days < monthDays;
+}
+
+/**
+ * The fixed salary paid for the month: salary × days ÷ month days, money HALF_UP. A month without
+ * a planned workday, or a span holding all of them, pays the salary whole.
+ */
+export function proratedSalary(salary: DecimalInput, days: number, monthDays: number): Decimal {
+  if (!isSalaryProrated(days, monthDays)) return toMoney(salary);
+  return toMoney(new Decimal(salary).times(Math.max(0, days)).div(monthDays));
 }
 
 /** The monthly credit off the income tax for a taxable income. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Me } from '../api/session';
-import { isZero, mayScoreKpi, monthParts, parseScore, percentText } from './logic';
+import { isZero, mayScoreKpi, monthParts, parseScore, percentText, salaryFraction } from './logic';
 
 const person = (permissions: string[]) => ({ permissions }) as unknown as Me;
 
@@ -34,5 +34,14 @@ describe('payroll on the phone', () => {
   it('knows a zero amount', () => {
     expect(isZero('0.00')).toBe(true);
     expect(isZero('12.00')).toBe(false);
+  });
+
+  it('shows the salary’s workdays only when the month was split', () => {
+    expect(salaryFraction({ salaryDays: 11, salaryMonthDays: 22 })).toEqual({
+      days: 11,
+      total: 22,
+    });
+    expect(salaryFraction({ salaryDays: 22, salaryMonthDays: 22 })).toBeNull();
+    expect(salaryFraction({ salaryDays: null, salaryMonthDays: null })).toBeNull();
   });
 });

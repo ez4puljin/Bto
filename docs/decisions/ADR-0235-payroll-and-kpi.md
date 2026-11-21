@@ -5,6 +5,7 @@
 | Status   | Accepted                                                                                 |
 | Date     | 2026-11-20                                                                               |
 | Deciders | Owner (2026-11-20, through the brain's brief), Claude (the worker `bto-core`)            |
+| Amended  | 2026-11-21 (owner): the fixed salary is prorated by workdays — see «Amendment 2026-11-21» |
 | Amends   | ADR-0131 / ADR-0144 (hr's time report gains a reader: payroll); ADR-0165 (three new codes on the HR role); architecture §4 row 11 (payroll is its own module, not a part of `hr`) |
 
 ## Context
@@ -57,7 +58,17 @@ Attendance, the employees' cards and the time report exist (ADR-0131, ADR-0144);
 - `modules/hr/index.ts` exports `HrReportsService` and `WorkforceService`.
 - `@tugeel/shared/payroll` is a new subpath; `packages/api-client` is regenerated.
 - The web pages («Хүний нөөц → Цалин») and the staff app's «Миний цалин» follow; the staff app needs a new APK then.
-- Open for the owner (defaults taken, each changeable): the tax rates and the minimum wage; that the tax credit's step is read from the taxable income (gross − НДШ); an untracked person's full attendance item; no proration of the fixed salary for someone who joined or left inside the month; a scorer scores everybody, not only their own division; a run may be approved before its month ends.
+- Open for the owner (defaults taken, each changeable): the tax rates and the minimum wage; that the tax credit's step is read from the taxable income (gross − НДШ); an untracked person's full attendance item; ~~no proration of the fixed salary for someone who joined or left inside the month~~ (decided otherwise by the owner on 2026-11-21, see below); a scorer scores everybody, not only their own division; a run may be approved before its month ends.
+
+## Amendment 2026-11-21 (owner): the fixed salary of someone who joined or left inside the month
+
+The owner decided on 2026-11-21 that the fixed salary is split by working days; this replaces the default «no proration» of the list above. Everything else of this ADR stands.
+
+1. **Fixed salary paid** = monthly fixed salary × (the person's planned workdays inside their employed span within the month ÷ the person's planned workdays in the whole month), money two decimals HALF_UP (`proratedSalary`, `salaryDays`, `employedSpan`, `plannedWorkdays` in `@tugeel/shared/payroll`). The span runs from max(month start, `employed_on`) to min(month end, `left_on`); no `employed_on` = employed from before the month, no `left_on` = still employed. Planned workdays come from the person's own week plan (their schedule's days, else their own or the company's hours — hr's `Employee.plan`), a day with a plan being a workday exactly as the attendance KPI counts one. The owner's example is the unit test: 1,000,000₮, 22 workdays, joined with 11 of them left → 500,000₮. A person employed the whole month (or whose span holds every workday) is paid the salary whole; so is a month without a planned workday.
+2. **KPI items are not prorated**: each item keeps its full amount. The attendance KPI already counts only the days inside the employed span (hr's time report holds no day before `employed_on` or after `left_on`), so a newcomer is not absent for the days before they joined: attended ÷ planned workdays inside the span − the late penalty.
+3. **Snapshot.** The line keeps both counts (`payroll_lines.salary_days`, `salary_month_days`) and the salary paid (`salary_paid`, migration `0121_payroll_prorate`, nullable: a line computed before this rule paid `base_salary` whole). `base_salary` stays the terms' monthly salary. Create and recompute read the counts again while the run is a DRAFT (a corrected card reaches the draft on recompute); scores, free lines and advances keep them; an APPROVED line never changes (the trigger of #9).
+4. **API.** A run line and a payslip (`/me/payslips/:month`) carry `baseSalary` = the fixed salary paid (so `baseSalary + kpiTotal + taxableAdditions = gross` still holds, and the run's `totals.baseSalary` sums what is paid), `monthlySalary` = the terms' salary, and `salaryDays` / `salaryMonthDays` (null before 2026-11-21). The Excel export adds «Сарын тогтмол цалин», «Цалин бодсон ажлын өдөр» and «Сарын ажлын өдөр». The web (the run's table and the line window) and the staff app's payslip show «11 / 22 ажлын өдөр» under «Тогтмол цалин» only when the salary was split.
+5. Not modelled: a schedule that changed inside the month (the current week plan is read for every day, as the time report reads it); public holidays (none are planned by hr's schedules).
 
 ## Related
 

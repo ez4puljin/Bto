@@ -4,11 +4,16 @@ import {
   attendanceScore,
   checkPayrollSettings,
   DEFAULT_PAYROLL_SETTINGS,
+  employedSpan,
   isPayrollMonth,
+  isSalaryProrated,
   kpiEarned,
   payrollMonthRange,
   payslipTotals,
   pitCreditFor,
+  plannedWorkdays,
+  proratedSalary,
+  salaryDays,
 } from './index';
 
 const day = (status: string, lateMinutes = 0, planned = true) => ({ status, planned, lateMinutes });
@@ -191,5 +196,73 @@ describe('the settings and the month', () => {
     expect(isPayrollMonth('2026-10')).toBe(true);
     expect(isPayrollMonth('2026-13')).toBe(false);
     expect(payrollMonthRange('2026-02')).toEqual({ from: '2026-02-01', to: '2026-02-28' });
+  });
+});
+
+describe('the fixed salary of a person who joined or left inside the month', () => {
+  // Monday to Friday; October 2026 plans 22 workdays (it starts on a Thursday).
+  const work = { start: '09:00', end: '18:00', breakMinutes: 0, minutes: 540, flexible: false };
+  const weekdays = [work, work, work, work, work, null, null];
+
+  it('counts the planned workdays of the schedule', () => {
+    expect(plannedWorkdays(weekdays, '2026-10-01', '2026-10-31')).toBe(22);
+    expect(plannedWorkdays(weekdays, '2026-11-01', '2026-11-30')).toBe(21);
+    expect(plannedWorkdays(weekdays, '2026-10-16', '2026-10-31')).toBe(11);
+    expect(plannedWorkdays(weekdays, '2026-10-03', '2026-10-04')).toBe(0);
+    expect(plannedWorkdays(weekdays, '2026-10-05', '2026-10-01')).toBe(0);
+  });
+
+  it('pays the owner’s example: 1,000,000, 22 workdays, 11 of them employed → 500,000', () => {
+    expect(proratedSalary('1000000', 11, 22).toFixed(2)).toBe('500000.00');
+    // Joined on the 16th: the span holds 11 of the month's 22 workdays.
+    const joined = salaryDays('2026-10', weekdays, '2026-10-16', null);
+    expect(joined).toEqual({ days: 11, monthDays: 22 });
+    expect(isSalaryProrated(joined.days, joined.monthDays)).toBe(true);
+    expect(proratedSalary('1000000', joined.days, joined.monthDays).toFixed(2)).toBe('500000.00');
+  });
+
+  it('splits the salary of someone who left inside the month, HALF_UP to two decimals', () => {
+    expect(employedSpan('2026-10', '2024-05-01', '2026-10-09')).toEqual({
+      from: '2026-10-01',
+      to: '2026-10-09',
+    });
+    // Left on Friday the 9th: 7 of 22 workdays; 1,000,000 × 7 ÷ 22 = 318,181.818…
+    const left = salaryDays('2026-10', weekdays, '2024-05-01', '2026-10-09');
+    expect(left).toEqual({ days: 7, monthDays: 22 });
+    expect(proratedSalary('1000000', left.days, left.monthDays).toFixed(2)).toBe('318181.82');
+    // Joined and left inside the same month.
+    expect(salaryDays('2026-10', weekdays, '2026-10-12', '2026-10-16')).toEqual({
+      days: 5,
+      monthDays: 22,
+    });
+  });
+
+  it('pays a whole month whole', () => {
+    for (const [employedOn, leftOn] of [
+      [null, null],
+      ['2025-03-01', null],
+      ['2026-10-01', '2026-10-31'],
+      [null, '2026-11-15'],
+    ] as const) {
+      const counts = salaryDays('2026-10', weekdays, employedOn, leftOn);
+      expect(counts).toEqual({ days: 22, monthDays: 22 });
+      expect(isSalaryProrated(counts.days, counts.monthDays)).toBe(false);
+      expect(proratedSalary('1000000', counts.days, counts.monthDays).toFixed(2)).toBe(
+        '1000000.00',
+      );
+    }
+    // Days off before the first workday cost nothing: November 2026 starts on a Sunday.
+    expect(salaryDays('2026-11', weekdays, '2026-11-01', null)).toEqual({
+      days: 21,
+      monthDays: 21,
+    });
+    expect(salaryDays('2026-11', weekdays, '2026-11-02', null)).toEqual({
+      days: 21,
+      monthDays: 21,
+    });
+    // A month without a planned workday, and no counts at all (a line before this rule), pay whole.
+    expect(proratedSalary('1000000', 0, 0).toFixed(2)).toBe('1000000.00');
+    expect(isSalaryProrated(null, null)).toBe(false);
+    expect(employedSpan('2026-10', '2026-11-02', null)).toBeNull();
   });
 });

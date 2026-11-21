@@ -52,6 +52,9 @@ const line = (scored: boolean): Schemas['PayrollLine'] => ({
   position: 'Кассчин',
   divisionName: 'Супермаркет',
   baseSalary: '1000000.00',
+  monthlySalary: '1000000.00',
+  salaryDays: 22,
+  salaryMonthDays: 22,
   paysSocialInsurance: true,
   attendanceMeasured: true,
   workdays: 22,
@@ -181,6 +184,23 @@ describe('payroll pages (ADR-0235)', () => {
     const table = within(screen.getByRole('table'));
     expect(table.getAllByText('914,582').length).toBeGreaterThan(0);
     expect(table.getAllByText('159,225').length).toBeGreaterThan(0);
+  });
+
+  it('shows the workdays under «Тогтмол цалин» only when the salary is split', async () => {
+    const joined = run(false);
+    joined.lines = [
+      { ...line(false), baseSalary: '500000.00', salaryDays: 11, salaryMonthDays: 22 },
+      { ...line(false), id: 8, userId: 6, fullName: 'Бүтэн сар' },
+    ];
+    renderApp(
+      '/hr/payroll/runs/3',
+      signedIn(HR, { ...routes(false), 'GET /api/v1/payroll/runs/3': () => json(joined) }),
+    );
+    const table = within(await screen.findByRole('table'));
+    const fraction = mn.payroll.salaryDays.replace('{{days}}', '11').replace('{{total}}', '22');
+    expect(await table.findAllByText(fraction)).toHaveLength(1);
+    expect(table.getAllByText('500,000').length).toBeGreaterThan(0);
+    expect(table.queryByText(/22 \/ 22/)).toBeNull();
   });
 
   it('approves a fully scored run after asking', async () => {

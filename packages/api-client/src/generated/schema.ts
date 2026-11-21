@@ -19303,10 +19303,19 @@ export interface components {
             position: string | null;
             divisionName: string | null;
             /**
-             * @description Money as text, «300000» or «300000.50»
+             * @description The fixed salary paid this month: the monthly salary × salaryDays ÷ salaryMonthDays for someone who joined or left inside the month
              * @example 300000.00
              */
             baseSalary: string;
+            /**
+             * @description The monthly fixed salary of the terms
+             * @example 300000.00
+             */
+            monthlySalary: string;
+            /** @description Planned workdays inside the employed span of the month (null: computed before 2026-11-21) */
+            salaryDays: number | null;
+            /** @description Planned workdays of the whole month; the salary is prorated when salaryDays is fewer */
+            salaryMonthDays: number | null;
             paysSocialInsurance: boolean;
             /** @description False: attendance is not tracked, the attendance item is full */
             attendanceMeasured: boolean;
@@ -19703,10 +19712,19 @@ export interface components {
             position: string | null;
             divisionName: string | null;
             /**
-             * @description Money as text, «300000» or «300000.50»
+             * @description The fixed salary paid this month: the monthly salary × salaryDays ÷ salaryMonthDays for someone who joined or left inside the month
              * @example 300000.00
              */
             baseSalary: string;
+            /**
+             * @description The monthly fixed salary of the terms
+             * @example 300000.00
+             */
+            monthlySalary: string;
+            /** @description Planned workdays inside the employed span of the month (null: computed before 2026-11-21) */
+            salaryDays: number | null;
+            /** @description Planned workdays of the whole month; the salary is prorated when salaryDays is fewer */
+            salaryMonthDays: number | null;
             paysSocialInsurance: boolean;
             /** @description False: attendance is not tracked, the attendance item is full */
             attendanceMeasured: boolean;

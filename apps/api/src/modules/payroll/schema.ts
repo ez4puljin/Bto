@@ -187,7 +187,16 @@ export const payrollLines = pgTable(
     fullName: text('full_name').notNull(),
     position: text('position'),
     divisionName: text('division_name'),
+    /** The monthly fixed salary of the terms (the snapshot). */
     baseSalary: money('base_salary').notNull(),
+    /**
+     * The fixed salary paid for the month (ADR-0235, 2026-11-21): `base_salary` × `salary_days` ÷
+     * `salary_month_days`. NULL on a line computed before that rule: `base_salary` was paid.
+     */
+    salaryPaid: money('salary_paid'),
+    /** Planned workdays inside the person's employed span of the month, and in the whole month. */
+    salaryDays: integer('salary_days'),
+    salaryMonthDays: integer('salary_month_days'),
     paysSocialInsurance: boolean('pays_social_insurance').notNull(),
     /** False when the person's attendance is not tracked: the attendance item is then full. */
     attendanceMeasured: boolean('attendance_measured').notNull().default(true),
@@ -211,6 +220,11 @@ export const payrollLines = pgTable(
   (t) => [
     uniqueIndex('payroll_lines_run_user_key').on(t.runId, t.userId),
     index('payroll_lines_user_idx').on(t.userId),
+    check(
+      'payroll_lines_salary_days',
+      sql`(${t.salaryDays} IS NULL) = (${t.salaryMonthDays} IS NULL) AND (${t.salaryDays} IS NULL OR ${t.salaryDays} BETWEEN 0 AND ${t.salaryMonthDays})`,
+    ),
+    check('payroll_lines_salary_paid', sql`${t.salaryPaid} IS NULL OR ${t.salaryPaid} >= 0`),
   ],
 );
 

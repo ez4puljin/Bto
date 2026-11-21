@@ -1,3 +1,4 @@
+import { isSalaryProrated } from '@tugeel/shared/payroll';
 import type { Me } from '../api/session';
 
 // «Миний цалин» (ADR-0235): the pure parts, tested without a phone.
@@ -36,4 +37,17 @@ export function parseScore(text: string): { ok: true; value: string | null } | {
 /** A money text is zero: «0», «0.00». */
 export function isZero(value: string): boolean {
   return Number(value) === 0;
+}
+
+/**
+ * The fixed salary split by the workdays (joined or left inside the month, ADR-0235 2026-11-21):
+ * the days for «11 / 22 ажлын өдөр», or null when the month was paid whole.
+ */
+export function salaryFraction(slip: {
+  salaryDays: number | null;
+  salaryMonthDays: number | null;
+}): { days: number; total: number } | null {
+  return isSalaryProrated(slip.salaryDays, slip.salaryMonthDays)
+    ? { days: slip.salaryDays ?? 0, total: slip.salaryMonthDays ?? 0 }
+    : null;
 }

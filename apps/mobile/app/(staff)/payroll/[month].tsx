@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { problemFrom } from '../../../src/api/problem';
 import { formatMnt } from '../../../src/format/format';
 import { type Payslip, type PayslipItem, useMyPayslips } from '../../../src/payroll/api';
-import { isZero, monthParts, percentText } from '../../../src/payroll/logic';
+import { isZero, monthParts, percentText, salaryFraction } from '../../../src/payroll/logic';
 import { colors, radii, spacing, tabular, type } from '../../../src/theme/tokens';
 import { Group } from '../../../src/ui/grouped';
 import { EmptyState, ProblemText } from '../../../src/ui/kit';
@@ -86,10 +86,18 @@ function Line({
 
 function Slip({ slip, money }: { slip: Payslip; money: (value: string) => string }) {
   const { t } = useTranslation();
+  const prorated = salaryFraction(slip);
   return (
     <>
       <Group>
-        <Line label={t('payroll.app.baseSalary')} value={money(slip.baseSalary)} strong />
+        <View>
+          <Line label={t('payroll.app.baseSalary')} value={money(slip.baseSalary)} strong />
+          {prorated ? (
+            <Text style={[type.secondary, styles.fraction]}>
+              {t('payroll.salaryDays', prorated)}
+            </Text>
+          ) : null}
+        </View>
       </Group>
 
       {slip.items.length > 0 ? (
@@ -197,6 +205,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   negative: { color: colors.destructive },
+  fraction: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, marginTop: -spacing.xs },
   itemName: { paddingHorizontal: spacing.lg },
   item: { paddingHorizontal: 0, gap: 0, paddingVertical: spacing.md },
   net: {

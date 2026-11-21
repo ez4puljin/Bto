@@ -21,6 +21,9 @@ interface LineJson {
   runId: number;
   userId: number;
   baseSalary: string;
+  monthlySalary: string;
+  salaryDays: number | null;
+  salaryMonthDays: number | null;
   paysSocialInsurance: boolean;
   workdays: number | null;
   attendedDays: number | null;
@@ -60,7 +63,9 @@ interface TermsJson {
  * time report (the owner's example: 20 of 22 days with 2 late days is 86.9 % of 200,000), manual
  * scores by a manager who sees no amount, an advance deducted, an uninsured employee, recompute,
  * approval freezing the lines in the database too, reopening with a reason, and an employee
- * reading only their own approved payslip. Synthetic data; October 2026 has 22 Mon–Fri days.
+ * reading only their own approved payslip; a newcomer's fixed salary split by the workdays of the
+ * employed span and their attendance read from the day they joined, frozen at approval.
+ * Synthetic data; September and October 2026 have 22 Mon–Fri days each.
  */
 describe('payroll', () => {
   let app: NestExpressApplication;
@@ -95,14 +100,14 @@ describe('payroll', () => {
         .set(bearer(hr))
         .expect(200)
     ).body as RunJson;
-  const punchIn = (userId: number, day: number, time: string) =>
+  const punchIn = (userId: number, day: number, time: string, month = MONTH) =>
     http()
       .post('/api/v1/hr/attendance/events')
       .set(bearer(hr))
       .send({
         userId,
         kind: 'IN',
-        at: new Date(`${MONTH}-${String(day).padStart(2, '0')}T${time}:00+08:00`).toISOString(),
+        at: new Date(`${month}-${String(day).padStart(2, '0')}T${time}:00+08:00`).toISOString(),
         note: 'Тест',
       })
       .expect(201);
@@ -319,6 +324,11 @@ describe('payroll', () => {
       attendedDays: 20,
       lateDays: 2,
       advance: '300000.00',
+      // Employed the whole month: the salary whole.
+      baseSalary: '1000000.00',
+      monthlySalary: '1000000.00',
+      salaryDays: 22,
+      salaryMonthDays: 22,
     });
     // The owner's example: 20 ÷ 22 = 90.9 %, − 2 × 2 % = 86.9 %, of 200,000 = 173,800.
     expect(itemOf(line, 'ATTENDANCE')).toMatchObject({
@@ -737,5 +747,184 @@ describe('payroll', () => {
     } finally {
       await asApp.end();
     }
+  });
+
+  it('splits a newcomer’s fixed salary by the workdays and reads their attendance from the day they joined', async () => {
+    const SEPTEMBER = '2026-09';
+    const joiner = await seedUser(app);
+    const card = {
+      firstName: 'Шинэ',
+      lastName: 'Ажилтан',
+      phone: (joiner.phone ?? '').replace('+976', ''),
+      position: 'Кассчин',
+      divisionId: null,
+      employmentType: 'PERMANENT',
+      gender: null,
+      scheduleId: null,
+    };
+    const joinedOn = (employedOn: string) =>
+      http()
+        .put(`/api/v1/hr/staff/${joiner.id}`)
+        .set(bearer(hr))
+        .send({ ...card, employedOn })
+        .expect(200);
+    // Joined on Wednesday 16 September: 11 of the month's 22 Monday-to-Friday workdays.
+    await joinedOn('2026-09-16');
+    await http()
+      .put(`/api/v1/hr/employees/${joiner.id}`)
+      .set(bearer(hr))
+      .send({
+        tracked: true,
+        workStart: '09:00',
+        workEnd: '18:00',
+        graceMinutes: 10,
+        workdays: '1111100',
+        siteIds: [],
+      })
+      .expect(200);
+    await http()
+      .put(api(`/terms/${joiner.id}`))
+      .set(bearer(hr))
+      .send({
+        baseSalary: '1000000',
+        paysSocialInsurance: false,
+        items: [{ name: 'Ирц', source: 'ATTENDANCE', amount: '200000' }],
+        active: true,
+      })
+      .expect(200);
+    const weekdays = Array.from({ length: 30 }, (_, index) => index + 1).filter(
+      (day) => new Date(Date.UTC(2026, 8, day)).getUTCDay() % 6 !== 0,
+    );
+    expect(weekdays).toHaveLength(22);
+    // On time on every workday from the 16th on; nothing before it.
+    for (const day of weekdays.filter((one) => one >= 16)) {
+      await punchIn(joiner.id, day, '08:55', SEPTEMBER);
+    }
+
+    const created = await http()
+      .post(api('/runs'))
+      .set(bearer(hr))
+      .set(idempotency())
+      .send({ month: SEPTEMBER })
+      .expect(201);
+    let september = created.body as RunJson;
+    const line = lineOf(september, joiner);
+    // The owner's rule: 1,000,000 × 11 ÷ 22 = 500,000; the attendance item stays whole (200,000)
+    // and scores 11 of 11 workdays, not 11 of 22.
+    expect(line).toMatchObject({
+      baseSalary: '500000.00',
+      monthlySalary: '1000000.00',
+      salaryDays: 11,
+      salaryMonthDays: 22,
+      workdays: 11,
+      attendedDays: 11,
+      lateDays: 0,
+      gross: '700000.00',
+      net: '700000.00',
+    });
+    expect(itemOf(line, 'ATTENDANCE')).toMatchObject({
+      amount: '200000.00',
+      basePercent: '100',
+      scorePercent: '100',
+      earned: '200000.00',
+    });
+    // Someone employed the whole month is paid whole.
+    const whole = lineOf(september, insured);
+    expect(whole.salaryDays).toBe(whole.salaryMonthDays);
+    expect(whole.baseSalary).toBe(whole.monthlySalary);
+    // The run's total is the salaries paid.
+    const paid = september.lines.reduce((total, one) => total + Number(one.baseSalary), 0);
+    expect(
+      Number((september as RunJson & { totals: { baseSalary: string } }).totals.baseSalary),
+    ).toBe(paid);
+
+    // HR corrects the card; a recompute of the draft reads the span again: 8 of 22 workdays.
+    await joinedOn('2026-09-21');
+    const moved = await http()
+      .post(api(`/runs/${september.id}/recompute`))
+      .set(bearer(hr))
+      .send({})
+      .expect(200);
+    expect(lineOf(moved.body as RunJson, joiner)).toMatchObject({
+      baseSalary: '363636.36',
+      salaryDays: 8,
+      salaryMonthDays: 22,
+      workdays: 8,
+      attendedDays: 8,
+    });
+    await joinedOn('2026-09-16');
+    september = (
+      await http()
+        .post(api(`/runs/${september.id}/recompute`))
+        .set(bearer(hr))
+        .send({})
+        .expect(200)
+    ).body as RunJson;
+    expect(lineOf(september, joiner)).toMatchObject({ baseSalary: '500000.00', salaryDays: 11 });
+
+    // Approved, the line is frozen: a later change of the card moves nothing.
+    const manual = september.lines.flatMap((one) =>
+      one.items.filter((item) => item.source === 'MANUAL').map((item) => item.id),
+    );
+    if (manual.length > 0) {
+      await http()
+        .put(api(`/scoring/runs/${september.id}/scores`))
+        .set(bearer(hr))
+        .send({ scores: manual.map((itemId) => ({ itemId, scorePercent: '100' })) })
+        .expect(200);
+    }
+    await http()
+      .post(api(`/runs/${september.id}/approve`))
+      .set(bearer(hr))
+      .expect(200);
+    await joinedOn('2026-09-01');
+    await http()
+      .post(api(`/runs/${september.id}/recompute`))
+      .set(bearer(hr))
+      .send({})
+      .expect(409);
+    const approved = (
+      await http()
+        .get(api(`/runs/${september.id}`))
+        .set(bearer(hr))
+        .expect(200)
+    ).body as RunJson;
+    expect(lineOf(approved, joiner)).toMatchObject({
+      baseSalary: '500000.00',
+      monthlySalary: '1000000.00',
+      salaryDays: 11,
+      salaryMonthDays: 22,
+      net: '700000.00',
+    });
+    // The employee reads the same split on their payslip.
+    const joinerToken = (await login(app, joiner)).accessToken;
+    const slip = (
+      await http()
+        .get(api(`/me/payslips/${SEPTEMBER}`))
+        .set(bearer(joinerToken))
+        .expect(200)
+    ).body as LineJson;
+    expect(slip).toMatchObject({
+      baseSalary: '500000.00',
+      monthlySalary: '1000000.00',
+      salaryDays: 11,
+      salaryMonthDays: 22,
+    });
+    const asApp = await connectAs('app');
+    try {
+      expect(
+        await sqlStateOf(
+          asApp.query('UPDATE payroll_lines SET salary_days = 10 WHERE id = $1', [
+            lineOf(approved, joiner).id,
+          ]),
+        ),
+      ).toBe('23514');
+    } finally {
+      await asApp.end();
+    }
+    await http()
+      .get(api(`/runs/${september.id}/export.xlsx`))
+      .set(bearer(hr))
+      .expect(200);
   });
 });
