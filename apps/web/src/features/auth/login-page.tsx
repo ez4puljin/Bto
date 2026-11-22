@@ -95,6 +95,9 @@ export function LoginPage() {
         <Link to="/set-password" className="text-center text-[0.8125rem] text-link hover:underline">
           {t('auth.login.setPasswordLink')}
         </Link>
+        <Link to="/download" className="text-center text-[0.8125rem] text-link hover:underline">
+          {t('auth.login.downloadLink')}
+        </Link>
       </form>
     </AuthLayout>
   );

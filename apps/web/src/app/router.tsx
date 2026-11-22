@@ -7,6 +7,7 @@ import { RouteErrorBoundary } from '@/app/route-error-boundary';
 import { ChatPage } from '@/features/chat/chat-page';
 import { ChatSettingsPage } from '@/features/chat/settings-page';
 import { AccountPage } from '@/features/auth/account-page';
+import { AppDownloadPage } from '@/features/app-download/app-download-page';
 import { LoginPage } from '@/features/auth/login-page';
 import { SetPasswordPage } from '@/features/auth/set-password-page';
 import { BarcodeLookupPage } from '@/features/catalog/barcode-lookup-page';
@@ -180,6 +181,7 @@ import { UsagePage } from '@/features/system/usage-page';
 /** React Router 7 data mode. Exported for createMemoryRouter in tests. */
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage />, errorElement: <RouteErrorBoundary /> },
+  { path: '/download', element: <AppDownloadPage />, errorElement: <RouteErrorBoundary /> },
   { path: '/set-password', element: <SetPasswordPage />, errorElement: <RouteErrorBoundary /> },
   {
     // A document for paper, without the shell (ADR-0056 #7).
