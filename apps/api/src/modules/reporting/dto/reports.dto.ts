@@ -17,6 +17,13 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { BOARD_PERIOD_KINDS, type BoardPeriodKind } from '@tugeel/shared/reports';
+import {
+  BOARD_DIMENSIONS,
+  BOARD_ROW_KINDS,
+  type BoardDimension,
+  type BoardRowKind,
+} from '../services/profit-board.service';
 import {
   PROFIT_GROUPINGS,
   PROFIT_ROW_KINDS,
@@ -481,4 +488,168 @@ export class SupplierEntryDto {
 @ApiSchema({ name: 'SupplierEntries' })
 export class SupplierEntriesDto {
   @ApiProperty({ type: [SupplierEntryDto] }) data: SupplierEntryDto[];
+}
+
+// ---------------------------------------------------------------- profit board (ADR-0237)
+
+@ApiSchema({ name: 'ProfitBoardQuery' })
+export class ProfitBoardQueryDto {
+  @ApiProperty({ enum: BOARD_PERIOD_KINDS }) @IsIn(BOARD_PERIOD_KINDS) kind: BoardPeriodKind;
+  @ApiPropertyOptional({
+    example: '2026-Q4',
+    description: '`YYYY-MM`, `YYYY-Qn` or `YYYY` by the kind; default: the current period',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  period?: string;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) branchId?: number;
+  @ApiPropertyOptional({ enum: SALES_SOURCES })
+  @IsOptional()
+  @IsIn(SALES_SOURCES)
+  source?: SalesSource;
+}
+
+@ApiSchema({ name: 'ProfitBoardProductsQuery' })
+export class ProfitBoardProductsQueryDto extends ProfitBoardQueryDto {
+  @ApiProperty({ enum: BOARD_DIMENSIONS }) @IsIn(BOARD_DIMENSIONS) dimension: BoardDimension;
+  @ApiProperty({ enum: BOARD_ROW_KINDS }) @IsIn(BOARD_ROW_KINDS) rowKind: BoardRowKind;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) id?: number;
+  @ApiPropertyOptional({ description: 'A category row: only the products right on it' })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  own?: boolean;
+}
+
+@ApiSchema({ name: 'ProfitBoardFigures' })
+export class BoardFiguresDto {
+  @ApiProperty({ description: 'Net sales without VAT and city tax, net of returns' }) sales: string;
+  @ApiProperty({ description: 'Cost of goods sold from the stock ledger' }) cost: string;
+  @ApiProperty({ description: 'Gross profit' }) profit: string;
+  @ApiProperty({ type: String, nullable: true, example: '12.5' }) margin: string | null;
+}
+
+@ApiSchema({ name: 'ProfitBoardRow' })
+export class BoardRowDto extends BoardFiguresDto {
+  @ApiProperty({ enum: BOARD_ROW_KINDS }) kind: BoardRowKind;
+  @ApiProperty({ type: Number, nullable: true }) id: number | null;
+  @ApiProperty({ type: String, nullable: true }) name: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Percent of the whole gross profit' })
+  share: string | null;
+  @ApiProperty({ description: 'Margin under the threshold, or a loss' }) flagged: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'Supplier rows: receipt discounts' })
+  discount: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Supplier rows: profit + discounts' })
+  profitWithDiscount: string | null;
+  @ApiProperty({ type: () => [BoardRowDto], description: 'Category rows: the children' })
+  children: BoardRowDto[];
+  @ApiProperty({ description: 'A category row of the products right on the category' })
+  own: boolean;
+}
+
+@ApiSchema({ name: 'ProfitBoardOthers' })
+export class BoardOthersDto extends BoardFiguresDto {
+  @ApiProperty() count: number;
+  @ApiProperty({ type: String, nullable: true }) share: string | null;
+  @ApiProperty({ type: String, nullable: true }) discount: string | null;
+  @ApiProperty({ type: String, nullable: true }) profitWithDiscount: string | null;
+}
+
+@ApiSchema({ name: 'ProfitBoardBreakdown' })
+export class BoardBreakdownDto {
+  @ApiProperty({ type: [BoardRowDto] }) rows: BoardRowDto[];
+  @ApiProperty({ type: BoardOthersDto, nullable: true }) others: BoardOthersDto | null;
+}
+
+@ApiSchema({ name: 'ProfitBoardBreakdowns' })
+export class BoardBreakdownsDto {
+  @ApiProperty({ type: BoardBreakdownDto }) supplier: BoardBreakdownDto;
+  @ApiProperty({ type: BoardBreakdownDto }) category: BoardBreakdownDto;
+  @ApiProperty({ type: BoardBreakdownDto }) location: BoardBreakdownDto;
+  @ApiProperty({ type: BoardBreakdownDto }) rep: BoardBreakdownDto;
+  @ApiProperty({ type: BoardBreakdownDto }) branch: BoardBreakdownDto;
+}
+
+@ApiSchema({ name: 'ProfitBoardTotals' })
+export class BoardTotalsDto {
+  @ApiProperty({ type: BoardFiguresDto }) current: BoardFiguresDto;
+  @ApiProperty({ type: BoardFiguresDto }) previous: BoardFiguresDto;
+  @ApiProperty({ type: BoardFiguresDto }) lastYear: BoardFiguresDto;
+}
+
+@ApiSchema({ name: 'ProfitBoardDiscounts' })
+export class BoardDiscountsDto {
+  @ApiProperty() current: string;
+  @ApiProperty() previous: string;
+  @ApiProperty() lastYear: string;
+}
+
+@ApiSchema({ name: 'ProfitBoardBonus' })
+export class BoardBonusDto {
+  @ApiProperty() lines: number;
+  @ApiProperty({ description: 'Base units' }) qty: string;
+  @ApiProperty({ description: 'Information only: never added to profit' }) value: string;
+  @ApiProperty() unvalued: number;
+}
+
+@ApiSchema({ name: 'ProfitBoardTrendPoint' })
+export class BoardTrendPointDto extends BoardFiguresDto {
+  @ApiProperty({ example: '2026-Q4' }) period: string;
+  @ApiProperty() from: string;
+  @ApiProperty() to: string;
+}
+
+@ApiSchema({ name: 'ProfitBoardBranch' })
+export class BoardBranchDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+}
+
+@ApiSchema({ name: 'ProfitBoard' })
+export class ProfitBoardDto {
+  @ApiProperty({ enum: BOARD_PERIOD_KINDS }) kind: BoardPeriodKind;
+  @ApiProperty({ example: '2026-Q4' }) period: string;
+  @ApiProperty() running: boolean;
+  @ApiProperty({ type: ReportRangeDto }) current: ReportRangeDto;
+  @ApiProperty({ type: ReportRangeDto }) previous: ReportRangeDto;
+  @ApiProperty({ type: ReportRangeDto }) lastYear: ReportRangeDto;
+  @ApiProperty() today: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) refreshedAt: string | null;
+  @ApiProperty({ example: '8.0' }) threshold: string;
+  @ApiProperty({ enum: SALES_SOURCES }) source: SalesSource;
+  @ApiProperty({ type: Number, nullable: true }) branchId: number | null;
+  @ApiProperty({ type: BoardTotalsDto }) totals: BoardTotalsDto;
+  @ApiProperty({
+    type: BoardDiscountsDto,
+    nullable: true,
+    description: 'Receipt discounts booked as income (ADR-0236); null under a source filter',
+  })
+  discounts: BoardDiscountsDto | null;
+  @ApiProperty({ type: BoardBonusDto, nullable: true }) bonus: BoardBonusDto | null;
+  @ApiProperty({ type: [BoardTrendPointDto] }) trend: BoardTrendPointDto[];
+  @ApiProperty({ type: BoardBreakdownsDto }) breakdowns: BoardBreakdownsDto;
+  @ApiProperty({ type: [BoardBranchDto] }) branches: BoardBranchDto[];
+}
+
+@ApiSchema({ name: 'ProfitBoardProduct' })
+export class BoardProductRowDto extends BoardFiguresDto {
+  @ApiProperty() productId: number;
+  @ApiProperty() sku: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true, description: 'The base unit' }) unit: string | null;
+  @ApiProperty({ description: 'Base units' }) qty: string;
+  @ApiProperty() flagged: boolean;
+}
+
+@ApiSchema({ name: 'ProfitBoardProductsOthers' })
+export class BoardProductsOthersDto extends BoardFiguresDto {
+  @ApiProperty() count: number;
+}
+
+@ApiSchema({ name: 'ProfitBoardProducts' })
+export class BoardProductsDto extends ReportRangeDto {
+  @ApiProperty({ type: [BoardProductRowDto] }) rows: BoardProductRowDto[];
+  @ApiProperty({ type: BoardProductsOthersDto, nullable: true })
+  others: BoardProductsOthersDto | null;
 }

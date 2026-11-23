@@ -120,6 +120,7 @@ import { ProductSalesPage } from '@/features/reports/books/product-sales-page';
 import { StockBalancePage } from '@/features/reports/books/stock-balance-page';
 import { StockDocumentsPage } from '@/features/reports/books/stock-documents-page';
 import { DashboardPage, DashboardPrintPage } from '@/features/reports/dashboard-page';
+import { ProfitBoardPage } from '@/features/reports/profit-board-page';
 import { ProfitPage, ProfitPrintPage } from '@/features/reports/profit-page';
 import { StockPrintPage, StockReportPage } from '@/features/reports/stock-page';
 import { SuppliersPrintPage, SuppliersReportPage } from '@/features/reports/suppliers-page';
@@ -1200,6 +1201,11 @@ function reportRoutes(): RouteObject[] {
       element: view(<StockDocumentsPage />),
     },
     { path: 'reports/dashboard', handle: { width: 'wide' }, element: view(<DashboardPage />) },
+    {
+      path: 'reports/profit-board',
+      handle: { width: 'wide' },
+      element: margins(<ProfitBoardPage />),
+    },
     { path: 'reports/aging', handle: { width: 'wide' }, element: view(<AgingPage />) },
     { path: 'reports/profit', handle: { width: 'wide' }, element: margins(<ProfitPage />) },
     { path: 'reports/stock', handle: { width: 'wide' }, element: view(<StockReportPage />) },

@@ -1,5 +1,6 @@
 import { Decimal } from '@tugeel/shared/money';
 import {
+  discountIncome,
   entryDiscounts,
   type ReceiptCostingRow,
   type ReceiptEntryRef,
@@ -75,5 +76,35 @@ describe('the receipt discount of each payable entry (ADR-0234)', () => {
     const costing = [row(4, 40, 1, '0'), row(4, 41, 1, null)];
     const entries = [entry(400, 'GOODS_RECEIPT', '4'), entry(401, 'SUPPLIER_RETURN', '9:1')];
     expect(texts(entryDiscounts(entries, costing))).toEqual({ 400: '0.00' });
+  });
+});
+
+describe('the income a receipt line books (ADR-0236)', () => {
+  const line = (
+    amount: string,
+    docAmount: string | null,
+    discount: string | null,
+    freeGoods = false,
+  ) => ({
+    amount,
+    docAmount,
+    discountAmount: discount,
+    freeGoods,
+  });
+
+  it('is the discount without its VAT for a line costed before its discount', () => {
+    // 11,000 with VAT, 1,100 off: the cost 10,000, owed 9,900 with 900 VAT; the income 1,000.
+    expect(discountIncome(line('10000', '11000', '1100'), '10').toFixed(2)).toBe('1000.00');
+    // A product without VAT on a VAT receipt: the cost is the whole amount, the discount income.
+    expect(discountIncome(line('5500', '5500', '550'), '10').toFixed(2)).toBe('550.00');
+    // A receipt without VAT.
+    expect(discountIncome(line('2000', '2000', '100'), '0').toFixed(2)).toBe('100.00');
+  });
+
+  it('is nothing for a line costed after its discount, free goods or no discount', () => {
+    expect(discountIncome(line('9000', '11000', '1100'), '10').toFixed(2)).toBe('0.00');
+    expect(discountIncome(line('0', null, null, true), '10').toFixed(2)).toBe('0.00');
+    expect(discountIncome(line('10000', '11000', null), '10').toFixed(2)).toBe('0.00');
+    expect(discountIncome(line('10000', '11000', '0'), '10').toFixed(2)).toBe('0.00');
   });
 });

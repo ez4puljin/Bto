@@ -10,6 +10,7 @@ import { AgingService } from './services/aging.service';
 import { BookOptionsService } from './services/book-options.service';
 import { DashboardService } from './services/dashboard.service';
 import { ProductSalesService } from './services/product-sales.service';
+import { ProfitBoardService } from './services/profit-board.service';
 import { ProfitService } from './services/profit.service';
 import { RefreshService } from './services/refresh.service';
 import { ReportContext } from './services/report-context';
@@ -30,6 +31,7 @@ const SERVICES = [
   DashboardService,
   AgingService,
   ProfitService,
+  ProfitBoardService,
   StockReportService,
   SupplierReportService,
   BookOptionsService,

@@ -22,8 +22,12 @@ import {
   AgingDto,
   AgingItemsDto,
   AgingQueryDto,
+  BoardProductsDto,
   DashboardDto,
   DashboardQueryDto,
+  ProfitBoardDto,
+  ProfitBoardProductsQueryDto,
+  ProfitBoardQueryDto,
   ProfitQueryDto,
   ProfitReportDto,
   RefreshStateDto,
@@ -38,6 +42,7 @@ import {
 } from '../dto/reports.dto';
 import { AgingService } from '../services/aging.service';
 import { type Dashboard, DashboardService } from '../services/dashboard.service';
+import { type ProfitBoard, ProfitBoardService } from '../services/profit-board.service';
 import { ProfitService } from '../services/profit.service';
 import { type RefreshState, RefreshService } from '../services/refresh.service';
 import {
@@ -56,6 +61,10 @@ const STOCK_EXCEL_PAGES = 60;
 
 function stateDto(state: RefreshState): RefreshStateDto {
   return { refreshedAt: state.refreshedAt?.toISOString() ?? null, durationMs: state.durationMs };
+}
+
+function profitBoardDto(board: ProfitBoard): ProfitBoardDto {
+  return { ...board, refreshedAt: board.refreshedAt?.toISOString() ?? null };
 }
 
 function dashboardDto(report: Dashboard): DashboardDto {
@@ -79,6 +88,7 @@ export class ReportsController {
     private readonly stocks: StockReportService,
     private readonly suppliers: SupplierReportService,
     private readonly refresher: RefreshService,
+    private readonly boards: ProfitBoardService,
   ) {}
 
   @Get('refresh-state')
@@ -183,6 +193,32 @@ export class ReportsController {
       `profit-${by}-${report.from}-${report.to}`,
       `${L.profit.title} ${report.from} – ${report.to}`,
     );
+  }
+
+  /**
+   * «Ашгийн самбар» (ADR-0237): a month, quarter or year against the period before and a year
+   * earlier, the trend, the suppliers' discounts and free goods, and the gross profit by main
+   * supplier, category, warehouse, order author and branch.
+   */
+  @Get('profit-board')
+  @RequirePermission('reports.margins.view')
+  @ApiOkResponse({ type: ProfitBoardDto })
+  async profitBoard(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: ProfitBoardQueryDto,
+  ): Promise<ProfitBoardDto> {
+    return profitBoardDto(await this.boards.board(ctx, query));
+  }
+
+  /** The products behind one row of the board's breakdowns, the most profit first. */
+  @Get('profit-board/products')
+  @RequirePermission('reports.margins.view')
+  @ApiOkResponse({ type: BoardProductsDto })
+  profitBoardProducts(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: ProfitBoardProductsQueryDto,
+  ): Promise<BoardProductsDto> {
+    return this.boards.products(ctx, query);
   }
 
   /** The documents behind a sales figure (the drill-down); costs only with margins. */

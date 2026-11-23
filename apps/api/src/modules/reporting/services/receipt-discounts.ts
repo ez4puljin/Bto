@@ -1,6 +1,30 @@
-import { Decimal } from '@tugeel/shared/money';
+import { receiptDiscountOutsideCost, receiptLineVat } from '@tugeel/shared/inventory';
+import { Decimal, type DecimalInput } from '@tugeel/shared/money';
 
 const ZERO = new Decimal(0);
+
+/**
+ * What one costing row of a receipt line books as income on «Худалдан авалтын хөнгөлөлт» (ADR-0236
+ * #1), as the receipt's bill works it out (`ReceiptsService.bookFacts`): a line that keeps its
+ * discount out of its cost brings its cost plus the VAT inside what is owed for it, less what is
+ * owed — its discount without the VAT that is not taken back on it. A line costed before ADR-0236
+ * (the discount inside its cost), free goods and a line without a discount bring nothing.
+ */
+export function discountIncome(
+  row: {
+    docAmount: DecimalInput | null;
+    discountAmount: DecimalInput | null;
+    amount: DecimalInput;
+    freeGoods: boolean;
+  },
+  receiptVatRatePct: DecimalInput,
+): Decimal {
+  if (row.freeGoods) return ZERO;
+  const outside = receiptDiscountOutsideCost(row, receiptVatRatePct);
+  if (!outside || row.docAmount === null) return ZERO;
+  const owed = new Decimal(row.docAmount).minus(row.discountAmount ?? 0);
+  return new Decimal(row.amount).plus(receiptLineVat(owed, outside.vatRatePct)).minus(owed);
+}
 
 /** A payable entry of the supplier report as far as a receipt's discount is concerned (ADR-0234). */
 export interface ReceiptEntryRef {

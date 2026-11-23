@@ -10560,6 +10560,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/profit-board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * «Ашгийн самбар» (ADR-0237): a month, quarter or year against the period before and a year
+         *     earlier, the trend, the suppliers' discounts and free goods, and the gross profit by main
+         *     supplier, category, warehouse, order author and branch.
+         */
+        get: operations["Reports_profitBoard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/profit-board/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The products behind one row of the board's breakdowns, the most profit first. */
+        get: operations["Reports_profitBoardProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/sales-documents": {
         parameters: {
             query?: never;
@@ -25926,6 +25964,165 @@ export interface components {
             totals: components["schemas"]["ProfitTotals"];
             /** @description Rows beyond the first 2,000, summed */
             others: components["schemas"]["ProfitTotals"] | null;
+        };
+        ProfitBoardFigures: {
+            /** @description Net sales without VAT and city tax, net of returns */
+            sales: string;
+            /** @description Cost of goods sold from the stock ledger */
+            cost: string;
+            /** @description Gross profit */
+            profit: string;
+            /** @example 12.5 */
+            margin: string | null;
+        };
+        ProfitBoardTotals: {
+            current: components["schemas"]["ProfitBoardFigures"];
+            previous: components["schemas"]["ProfitBoardFigures"];
+            lastYear: components["schemas"]["ProfitBoardFigures"];
+        };
+        ProfitBoardDiscounts: {
+            current: string;
+            previous: string;
+            lastYear: string;
+        };
+        ProfitBoardBonus: {
+            lines: number;
+            /** @description Base units */
+            qty: string;
+            /** @description Information only: never added to profit */
+            value: string;
+            unvalued: number;
+        };
+        ProfitBoardTrendPoint: {
+            /** @description Net sales without VAT and city tax, net of returns */
+            sales: string;
+            /** @description Cost of goods sold from the stock ledger */
+            cost: string;
+            /** @description Gross profit */
+            profit: string;
+            /** @example 12.5 */
+            margin: string | null;
+            /** @example 2026-Q4 */
+            period: string;
+            from: string;
+            to: string;
+        };
+        ProfitBoardRow: {
+            /** @description Net sales without VAT and city tax, net of returns */
+            sales: string;
+            /** @description Cost of goods sold from the stock ledger */
+            cost: string;
+            /** @description Gross profit */
+            profit: string;
+            /** @example 12.5 */
+            margin: string | null;
+            /** @enum {string} */
+            kind: "SUPPLIER" | "CATEGORY" | "WAREHOUSE" | "USER" | "APP" | "POS" | "COST_ADJ" | "BRANCH" | "NONE";
+            id: number | null;
+            name: string | null;
+            /** @description Percent of the whole gross profit */
+            share: string | null;
+            /** @description Margin under the threshold, or a loss */
+            flagged: boolean;
+            /** @description Supplier rows: receipt discounts */
+            discount: string | null;
+            /** @description Supplier rows: profit + discounts */
+            profitWithDiscount: string | null;
+            /** @description Category rows: the children */
+            children: components["schemas"]["ProfitBoardRow"][];
+            /** @description A category row of the products right on the category */
+            own: boolean;
+        };
+        ProfitBoardOthers: {
+            /** @description Net sales without VAT and city tax, net of returns */
+            sales: string;
+            /** @description Cost of goods sold from the stock ledger */
+            cost: string;
+            /** @description Gross profit */
+            profit: string;
+            /** @example 12.5 */
+            margin: string | null;
+            count: number;
+            share: string | null;
+            discount: string | null;
+            profitWithDiscount: string | null;
+        };
+        ProfitBoardBreakdown: {
+            rows: components["schemas"]["ProfitBoardRow"][];
+            others: components["schemas"]["ProfitBoardOthers"] | null;
+        };
+        ProfitBoardBreakdowns: {
+            supplier: components["schemas"]["ProfitBoardBreakdown"];
+            category: components["schemas"]["ProfitBoardBreakdown"];
+            location: components["schemas"]["ProfitBoardBreakdown"];
+            rep: components["schemas"]["ProfitBoardBreakdown"];
+            branch: components["schemas"]["ProfitBoardBreakdown"];
+        };
+        ProfitBoardBranch: {
+            id: number;
+            name: string;
+        };
+        ProfitBoard: {
+            /** @enum {string} */
+            kind: "month" | "quarter" | "year";
+            /** @example 2026-Q4 */
+            period: string;
+            running: boolean;
+            current: components["schemas"]["ReportRange"];
+            previous: components["schemas"]["ReportRange"];
+            lastYear: components["schemas"]["ReportRange"];
+            today: string;
+            /** Format: date-time */
+            refreshedAt: string | null;
+            /** @example 8.0 */
+            threshold: string;
+            /** @enum {string} */
+            source: "ALL" | "WHOLESALE" | "POS";
+            branchId: number | null;
+            totals: components["schemas"]["ProfitBoardTotals"];
+            /** @description Receipt discounts booked as income (ADR-0236); null under a source filter */
+            discounts: components["schemas"]["ProfitBoardDiscounts"] | null;
+            bonus: components["schemas"]["ProfitBoardBonus"] | null;
+            trend: components["schemas"]["ProfitBoardTrendPoint"][];
+            breakdowns: components["schemas"]["ProfitBoardBreakdowns"];
+            branches: components["schemas"]["ProfitBoardBranch"][];
+        };
+        ProfitBoardProduct: {
+            /** @description Net sales without VAT and city tax, net of returns */
+            sales: string;
+            /** @description Cost of goods sold from the stock ledger */
+            cost: string;
+            /** @description Gross profit */
+            profit: string;
+            /** @example 12.5 */
+            margin: string | null;
+            productId: number;
+            sku: string;
+            name: string;
+            /** @description The base unit */
+            unit: string | null;
+            /** @description Base units */
+            qty: string;
+            flagged: boolean;
+        };
+        ProfitBoardProductsOthers: {
+            /** @description Net sales without VAT and city tax, net of returns */
+            sales: string;
+            /** @description Cost of goods sold from the stock ledger */
+            cost: string;
+            /** @description Gross profit */
+            profit: string;
+            /** @example 12.5 */
+            margin: string | null;
+            count: number;
+        };
+        ProfitBoardProducts: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-24 */
+            to: string;
+            rows: components["schemas"]["ProfitBoardProduct"][];
+            others: components["schemas"]["ProfitBoardProductsOthers"] | null;
         };
         SalesDocument: {
             /** @enum {string} */
@@ -54124,6 +54321,79 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_profitBoard: {
+        parameters: {
+            query: {
+                kind: "month" | "quarter" | "year";
+                /** @description `YYYY-MM`, `YYYY-Qn` or `YYYY` by the kind; default: the current period */
+                period?: string;
+                branchId?: number;
+                source?: "ALL" | "WHOLESALE" | "POS";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitBoard"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_profitBoardProducts: {
+        parameters: {
+            query: {
+                kind: "month" | "quarter" | "year";
+                /** @description `YYYY-MM`, `YYYY-Qn` or `YYYY` by the kind; default: the current period */
+                period?: string;
+                branchId?: number;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                dimension: "supplier" | "category" | "location" | "rep" | "branch";
+                rowKind: "SUPPLIER" | "CATEGORY" | "WAREHOUSE" | "USER" | "APP" | "POS" | "COST_ADJ" | "BRANCH" | "NONE";
+                id?: number;
+                /** @description A category row: only the products right on it */
+                own?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitBoardProducts"];
                 };
             };
             /** @description RFC 9457 problem details */

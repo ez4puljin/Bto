@@ -31,6 +31,10 @@ export type SupplierReport = Body<'/api/v1/reports/suppliers'>;
 export type SupplierReportRow = SupplierReport['rows'][number];
 export type SupplierEntries = Body<'/api/v1/reports/suppliers/{partyId}/entries'>;
 export type ReportRefreshState = Body<'/api/v1/reports/refresh-state'>;
+export type ProfitBoard = Body<'/api/v1/reports/profit-board'>;
+export type ProfitBoardRow = ProfitBoard['breakdowns']['supplier']['rows'][number];
+export type ProfitBoardBreakdown = ProfitBoard['breakdowns']['supplier'];
+export type ProfitBoardProducts = Body<'/api/v1/reports/profit-board/products'>;
 
 export type SettlementGroup = NonNullable<AgingRow['settlementGroup']>;
 export type ProfitGrouping = ProfitReport['by'];
@@ -121,6 +125,25 @@ function supplierQuery(filter: SupplierFilter) {
   };
 }
 
+/** «Ашгийн самбар»'s period and filters (ADR-0237). */
+export interface ProfitBoardFilter {
+  kind: 'month' | 'quarter' | 'year';
+  period: string;
+  branchId?: number;
+  source?: SalesSource;
+}
+
+export type ProfitBoardDimension = keyof ProfitBoard['breakdowns'];
+
+function boardQuery(filter: ProfitBoardFilter) {
+  return {
+    kind: filter.kind,
+    period: filter.period,
+    ...(filter.branchId ? { branchId: filter.branchId } : {}),
+    ...(filter.source && filter.source !== 'ALL' ? { source: filter.source } : {}),
+  };
+}
+
 /** When the daily totals were last rebuilt. */
 export function useRefreshState() {
   const api = useApiClient();
@@ -151,6 +174,54 @@ export function useDashboard(month: string | null) {
       unwrap(
         await api.GET('/api/v1/reports/dashboard', {
           params: { query: month ? { month } : {} },
+          signal,
+        }),
+      ),
+  });
+}
+
+export function useProfitBoard(filter: ProfitBoardFilter | null) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...REPORTS, 'profit-board', filter],
+    enabled: filter !== null,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/reports/profit-board', {
+          params: { query: boardQuery(filter ?? { kind: 'month', period: '' }) },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** The products behind one row of the board's breakdowns. */
+export function useProfitBoardProducts(
+  filter: ProfitBoardFilter,
+  row: {
+    dimension: ProfitBoardDimension;
+    kind: ProfitBoardRow['kind'];
+    id: number | null;
+    own: boolean;
+  } | null,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...REPORTS, 'profit-board-products', filter, row],
+    enabled: row !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/reports/profit-board/products', {
+          params: {
+            query: {
+              ...boardQuery(filter),
+              dimension: row?.dimension ?? 'supplier',
+              rowKind: row?.kind ?? 'NONE',
+              ...(row?.id ? { id: row.id } : {}),
+              ...(row?.own ? { own: true } : {}),
+            },
+          },
           signal,
         }),
       ),

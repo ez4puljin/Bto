@@ -20,6 +20,7 @@ import {
   CalendarX2,
   ChartBar,
   ChartPie,
+  ChartColumnBig,
   ClipboardCheck,
   ClipboardList,
   ClipboardPen,
@@ -649,6 +650,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         label: 'nav.reportsDashboard',
         icon: Gauge,
         permission: 'reports.view',
+      },
+      {
+        // «Ашгийн самбар» (ADR-0237): the profit dashboard, margins only.
+        to: '/reports/profit-board',
+        label: 'nav.reportsProfitBoard',
+        icon: ChartColumnBig,
+        permission: 'reports.margins.view',
       },
       {
         to: '/reports/aging',

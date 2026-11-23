@@ -41909,6 +41909,226 @@
         ]
       }
     },
+    "/api/v1/reports/profit-board": {
+      "get": {
+        "operationId": "Reports_profitBoard",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "month",
+                "quarter",
+                "year"
+              ]
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "`YYYY-MM`, `YYYY-Qn` or `YYYY` by the kind; default: the current period",
+            "schema": {
+              "maxLength": 10,
+              "example": "2026-Q4",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfitBoard"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Ашгийн самбар» (ADR-0237): a month, quarter or year against the period before and a year\nearlier, the trend, the suppliers' discounts and free goods, and the gross profit by main\nsupplier, category, warehouse, order author and branch.",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/profit-board/products": {
+      "get": {
+        "operationId": "Reports_profitBoardProducts",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "month",
+                "quarter",
+                "year"
+              ]
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "`YYYY-MM`, `YYYY-Qn` or `YYYY` by the kind; default: the current period",
+            "schema": {
+              "maxLength": 10,
+              "example": "2026-Q4",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "dimension",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "supplier",
+                "category",
+                "location",
+                "rep",
+                "branch"
+              ]
+            }
+          },
+          {
+            "name": "rowKind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SUPPLIER",
+                "CATEGORY",
+                "WAREHOUSE",
+                "USER",
+                "APP",
+                "POS",
+                "COST_ADJ",
+                "BRANCH",
+                "NONE"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "own",
+            "required": false,
+            "in": "query",
+            "description": "A category row: only the products right on it",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfitBoardProducts"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The products behind one row of the board's breakdowns, the most profit first.",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/reports/sales-documents": {
       "get": {
         "operationId": "Reports_salesDocuments",
@@ -96274,6 +96494,570 @@
           "threshold",
           "rows",
           "totals",
+          "others"
+        ]
+      },
+      "ProfitBoardFigures": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string",
+            "description": "Net sales without VAT and city tax, net of returns"
+          },
+          "cost": {
+            "type": "string",
+            "description": "Cost of goods sold from the stock ledger"
+          },
+          "profit": {
+            "type": "string",
+            "description": "Gross profit"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5"
+          }
+        },
+        "required": [
+          "sales",
+          "cost",
+          "profit",
+          "margin"
+        ]
+      },
+      "ProfitBoardTotals": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/ProfitBoardFigures"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/ProfitBoardFigures"
+          },
+          "lastYear": {
+            "$ref": "#/components/schemas/ProfitBoardFigures"
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "lastYear"
+        ]
+      },
+      "ProfitBoardDiscounts": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "string"
+          },
+          "lastYear": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "lastYear"
+        ]
+      },
+      "ProfitBoardBonus": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "number"
+          },
+          "qty": {
+            "type": "string",
+            "description": "Base units"
+          },
+          "value": {
+            "type": "string",
+            "description": "Information only: never added to profit"
+          },
+          "unvalued": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "lines",
+          "qty",
+          "value",
+          "unvalued"
+        ]
+      },
+      "ProfitBoardTrendPoint": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string",
+            "description": "Net sales without VAT and city tax, net of returns"
+          },
+          "cost": {
+            "type": "string",
+            "description": "Cost of goods sold from the stock ledger"
+          },
+          "profit": {
+            "type": "string",
+            "description": "Gross profit"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5"
+          },
+          "period": {
+            "type": "string",
+            "example": "2026-Q4"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sales",
+          "cost",
+          "profit",
+          "margin",
+          "period",
+          "from",
+          "to"
+        ]
+      },
+      "ProfitBoardRow": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string",
+            "description": "Net sales without VAT and city tax, net of returns"
+          },
+          "cost": {
+            "type": "string",
+            "description": "Cost of goods sold from the stock ledger"
+          },
+          "profit": {
+            "type": "string",
+            "description": "Gross profit"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5"
+          },
+          "kind": {
+            "enum": [
+              "SUPPLIER",
+              "CATEGORY",
+              "WAREHOUSE",
+              "USER",
+              "APP",
+              "POS",
+              "COST_ADJ",
+              "BRANCH",
+              "NONE"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "type": "number",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "share": {
+            "type": "string",
+            "nullable": true,
+            "description": "Percent of the whole gross profit"
+          },
+          "flagged": {
+            "type": "boolean",
+            "description": "Margin under the threshold, or a loss"
+          },
+          "discount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supplier rows: receipt discounts"
+          },
+          "profitWithDiscount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supplier rows: profit + discounts"
+          },
+          "children": {
+            "description": "Category rows: the children",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardRow"
+            }
+          },
+          "own": {
+            "type": "boolean",
+            "description": "A category row of the products right on the category"
+          }
+        },
+        "required": [
+          "sales",
+          "cost",
+          "profit",
+          "margin",
+          "kind",
+          "id",
+          "name",
+          "share",
+          "flagged",
+          "discount",
+          "profitWithDiscount",
+          "children",
+          "own"
+        ]
+      },
+      "ProfitBoardOthers": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string",
+            "description": "Net sales without VAT and city tax, net of returns"
+          },
+          "cost": {
+            "type": "string",
+            "description": "Cost of goods sold from the stock ledger"
+          },
+          "profit": {
+            "type": "string",
+            "description": "Gross profit"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5"
+          },
+          "count": {
+            "type": "number"
+          },
+          "share": {
+            "type": "string",
+            "nullable": true
+          },
+          "discount": {
+            "type": "string",
+            "nullable": true
+          },
+          "profitWithDiscount": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "sales",
+          "cost",
+          "profit",
+          "margin",
+          "count",
+          "share",
+          "discount",
+          "profitWithDiscount"
+        ]
+      },
+      "ProfitBoardBreakdown": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardRow"
+            }
+          },
+          "others": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardOthers"
+              }
+            ]
+          }
+        },
+        "required": [
+          "rows",
+          "others"
+        ]
+      },
+      "ProfitBoardBreakdowns": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "$ref": "#/components/schemas/ProfitBoardBreakdown"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ProfitBoardBreakdown"
+          },
+          "location": {
+            "$ref": "#/components/schemas/ProfitBoardBreakdown"
+          },
+          "rep": {
+            "$ref": "#/components/schemas/ProfitBoardBreakdown"
+          },
+          "branch": {
+            "$ref": "#/components/schemas/ProfitBoardBreakdown"
+          }
+        },
+        "required": [
+          "supplier",
+          "category",
+          "location",
+          "rep",
+          "branch"
+        ]
+      },
+      "ProfitBoardBranch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "ProfitBoard": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "month",
+              "quarter",
+              "year"
+            ],
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "example": "2026-Q4"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ReportRange"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/ReportRange"
+          },
+          "lastYear": {
+            "$ref": "#/components/schemas/ReportRange"
+          },
+          "today": {
+            "type": "string"
+          },
+          "refreshedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "threshold": {
+            "type": "string",
+            "example": "8.0"
+          },
+          "source": {
+            "enum": [
+              "ALL",
+              "WHOLESALE",
+              "POS"
+            ],
+            "type": "string"
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ProfitBoardTotals"
+          },
+          "discounts": {
+            "nullable": true,
+            "description": "Receipt discounts booked as income (ADR-0236); null under a source filter",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardDiscounts"
+              }
+            ]
+          },
+          "bonus": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardBonus"
+              }
+            ]
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardTrendPoint"
+            }
+          },
+          "breakdowns": {
+            "$ref": "#/components/schemas/ProfitBoardBreakdowns"
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardBranch"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "period",
+          "running",
+          "current",
+          "previous",
+          "lastYear",
+          "today",
+          "refreshedAt",
+          "threshold",
+          "source",
+          "branchId",
+          "totals",
+          "discounts",
+          "bonus",
+          "trend",
+          "breakdowns",
+          "branches"
+        ]
+      },
+      "ProfitBoardProduct": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string",
+            "description": "Net sales without VAT and city tax, net of returns"
+          },
+          "cost": {
+            "type": "string",
+            "description": "Cost of goods sold from the stock ledger"
+          },
+          "profit": {
+            "type": "string",
+            "description": "Gross profit"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true,
+            "description": "The base unit"
+          },
+          "qty": {
+            "type": "string",
+            "description": "Base units"
+          },
+          "flagged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sales",
+          "cost",
+          "profit",
+          "margin",
+          "productId",
+          "sku",
+          "name",
+          "unit",
+          "qty",
+          "flagged"
+        ]
+      },
+      "ProfitBoardProductsOthers": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "type": "string",
+            "description": "Net sales without VAT and city tax, net of returns"
+          },
+          "cost": {
+            "type": "string",
+            "description": "Cost of goods sold from the stock ledger"
+          },
+          "profit": {
+            "type": "string",
+            "description": "Gross profit"
+          },
+          "margin": {
+            "type": "string",
+            "nullable": true,
+            "example": "12.5"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sales",
+          "cost",
+          "profit",
+          "margin",
+          "count"
+        ]
+      },
+      "ProfitBoardProducts": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-24"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardProduct"
+            }
+          },
+          "others": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardProductsOthers"
+              }
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
           "others"
         ]
       },

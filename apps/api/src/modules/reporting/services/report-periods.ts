@@ -1,3 +1,14 @@
+import {
+  type BoardPeriodKind,
+  boardPeriodOf,
+  boardPeriodRange,
+  boardPeriodStart,
+  boardPosition,
+  boardTrendLength,
+  isBoardPeriodKey,
+  lastYearBoardPeriod,
+  shiftBoardPeriod,
+} from '@tugeel/shared/reports';
 import { addDays, addMonths, isIsoDate } from '@tugeel/shared/time';
 import { invalid } from '../../../common/errors/app-error';
 
@@ -74,4 +85,55 @@ export function checkedRange(from: string, to: string): DateRange {
 export function daysIn(range: DateRange): number {
   const ms = Date.parse(`${range.to}T00:00:00Z`) - Date.parse(`${range.from}T00:00:00Z`);
   return Math.round(ms / 86_400_000) + 1;
+}
+
+/** «Ашгийн самбар»'s period with the one before it and the same one a year earlier (ADR-0237). */
+export interface BoardPeriods {
+  kind: BoardPeriodKind;
+  period: string;
+  current: DateRange;
+  previous: DateRange;
+  lastYear: DateRange;
+  /** True while the period runs: the comparisons then take the same days of theirs. */
+  running: boolean;
+}
+
+/**
+ * A month, quarter or year as of `today`: a running one counts to today and compares the same
+ * position in the period before and a year earlier (as the dashboard's month, ADR-0108 #11); an
+ * ended one compares whole periods. A period after today's is refused.
+ */
+export function boardPeriods(kind: BoardPeriodKind, period: string, today: string): BoardPeriods {
+  if (!isBoardPeriodKey(kind, period)) throw invalid('period', 'pattern', `a ${kind} period`);
+  const now = boardPeriodOf(kind, today);
+  if (boardPeriodStart(kind, period) > boardPeriodStart(kind, now)) {
+    throw invalid('period', 'range', 'a period up to the current one');
+  }
+  const running = period === now;
+  const asOf = running ? boardPosition(kind, today) : null;
+  return {
+    kind,
+    period,
+    current: boardPeriodRange(kind, period, asOf),
+    previous: boardPeriodRange(kind, shiftBoardPeriod(kind, period, -1), asOf),
+    lastYear: boardPeriodRange(kind, lastYearBoardPeriod(kind, period), asOf),
+    running,
+  };
+}
+
+/**
+ * The trend's periods ending with `period`, oldest first (12 months, 8 quarters or 5 years), each
+ * whole except a running last one, which ends today.
+ */
+export function boardTrend(
+  kind: BoardPeriodKind,
+  period: string,
+  today: string,
+): { period: string; range: DateRange }[] {
+  const count = boardTrendLength(kind);
+  return Array.from({ length: count }, (_, index) => {
+    const key = shiftBoardPeriod(kind, period, index - count + 1);
+    const range = boardPeriodRange(kind, key, null);
+    return { period: key, range: range.to > today ? { from: range.from, to: today } : range };
+  });
 }

@@ -13,6 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatTugrik } from '@/lib/money';
+import { useShortAmount } from './chart-format';
 
 /*
  * The report charts (ADR-0108), drawn by Recharts with the page's colour tokens only (`var(--…)`),
@@ -25,20 +26,6 @@ const GRID = 'var(--border)';
 /** A chart number from a NUMERIC string: geometry only, never arithmetic. */
 const plotted = (value: string | null): number =>
   value === null ? 0 : new Decimal(value).toNumber();
-
-/** Axis ticks in thousands, millions or billions («12 мян», «1.5 сая»). */
-function useShortAmount(): (value: number) => string {
-  const { t } = useTranslation();
-  return (value) => {
-    const abs = Math.abs(value);
-    if (abs >= 1_000_000_000)
-      return t('reports.common.billions', { value: (value / 1_000_000_000).toFixed(1) });
-    if (abs >= 1_000_000)
-      return t('reports.common.millions', { value: (value / 1_000_000).toFixed(1) });
-    if (abs >= 1_000) return t('reports.common.thousands', { value: Math.round(value / 1_000) });
-    return String(Math.round(value));
-  };
-}
 
 /** The chart's frame: a fixed height, the full width, a start size for the first paint. */
 function Frame(props: {
