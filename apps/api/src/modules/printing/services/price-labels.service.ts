@@ -11,6 +11,9 @@ import { type PrintJobView, PrintJobsService } from './print-jobs.service';
 import { type PrintStation, PrintStationsService } from './print-stations.service';
 import { type LabelItem, TillPricesService } from './till-prices.service';
 
+/** The right over the store's tills: its holder prints for every active till (owner 2026-11-20). */
+const MANAGE = 'pos.manage';
+
 /** A till a staff member prints labels for. */
 export interface LabelTill {
   id: number;
@@ -27,8 +30,9 @@ export interface LabelOrder {
 
 /**
  * Price labels from the staff app (ADR-0226 #1, #3): who may print (a staff member a till names
- * as its cashier), the till's products at the till's prices, and the labels as ESC/POS bytes —
- * returned to the phone for its Bluetooth printer, or queued for a print station.
+ * as its cashier, or the holder of `pos.manage` at any active till), the till's products at the
+ * till's prices, and the labels as ESC/POS bytes — returned to the phone for its Bluetooth
+ * printer, or queued for a print station.
  */
 @Injectable()
 export class PriceLabelsService {
@@ -42,10 +46,19 @@ export class PriceLabelsService {
 
   /**
    * The caller's tills: active tills that name them as a cashier, in the till's own list
-   * (ADR-0124) or in theirs (owner 2026-11-17), and that both lists admit. None: PRINT_NO_TILL.
+   * (ADR-0124) or in theirs (owner 2026-11-17), and that both lists admit; every active till for
+   * the holder of `pos.manage`, the right over the store's tills (owner 2026-11-20). None:
+   * PRINT_NO_TILL.
    */
   async tillsOf(ctx: AuthContext): Promise<LabelTill[]> {
     const all = await this.tills.list();
+    if (ctx.permissions.has(MANAGE)) {
+      const active = all.filter((till) => till.status === 'ACTIVE');
+      if (active.length === 0) {
+        throw new PrintError('PRINT_NO_TILL', 'no active till');
+      }
+      return active.map(labelTill);
+    }
     const own = (await this.cashiers.tillsByCashier()).get(ctx.userId) ?? [];
     const mine = all.filter((till) => {
       if (till.status !== 'ACTIVE') return false;
@@ -93,7 +106,7 @@ export class PriceLabelsService {
     return this.bytes(till, order, widthDots);
   }
 
-  /** Printers a staff member with a till may send labels to: every active one. */
+  /** Printers a staff member with a till (or `pos.manage`) may send labels to: every active one. */
   async stationsFor(ctx: AuthContext): Promise<PrintStation[]> {
     await this.tillsOf(ctx);
     return this.stations.list({ activeOnly: true });

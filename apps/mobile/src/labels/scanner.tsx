@@ -20,9 +20,11 @@ import { Text } from '../ui/text';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e', 'itf14', 'code128'] as const;
 
-/** What a read did: the product's name and price, or nothing found for the code. */
+/** A scan's answer: the product added, or not, with the server's words when it said why. */
 export type ScanOutcome =
-  { found: true; name: string; price: string } | { found: false; code: string } | null;
+  | { found: true; name: string; price: string }
+  | { found: false; code: string; message?: string }
+  | null;
 
 /**
  * The camera over the page, kept open read after read (the shop's scan closes after one): each
@@ -125,7 +127,7 @@ export function LabelScanner({
                   ? t('mobile.labels.scanAim')
                   : outcome.found
                     ? t('mobile.labels.scanAdded', { name: outcome.name, price: outcome.price })
-                    : t('mobile.labels.scanNotFound', { code: outcome.code })}
+                    : (outcome.message ?? t('mobile.labels.scanNotFound', { code: outcome.code }))}
               </Text>
             </View>
             <Text style={[type.bodyStrong, styles.total]}>

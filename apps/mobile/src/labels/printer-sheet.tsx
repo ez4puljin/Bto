@@ -7,7 +7,6 @@ import { problemFrom } from '../api/problem';
 import { colors, spacing, type } from '../theme/tokens';
 import { PillButton, Segmented } from '../ui/controls';
 import { Group, Row } from '../ui/grouped';
-import { ProblemText } from '../ui/kit';
 import { Sheet, SheetClose, SheetHeader } from '../ui/sheet';
 import { Text } from '../ui/text';
 import { fetchStations } from './api';
@@ -18,6 +17,7 @@ import {
   pairedPrinters,
 } from './bluetooth';
 import type { PrinterChoice } from './prefs';
+import { LabelProblem } from './problem-text';
 
 type Paired =
   | { status: 'loading' }
@@ -138,7 +138,7 @@ export function PrinterSheet({
           <ActivityIndicator color={colors.primary} />
         ) : stations.error ? (
           <View style={styles.gap}>
-            <ProblemText problem={problemFrom(stations.error)} />
+            <LabelProblem problem={problemFrom(stations.error)} />
             <PillButton
               title={t('mobile.labels.refresh')}
               variant="soft"

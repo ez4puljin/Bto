@@ -408,4 +408,58 @@ describe('price labels and print jobs', () => {
     // A cashier no till names has no labels.
     await http().get('/api/v1/price-labels/tills').set(bearer(token)).expect(403);
   });
+
+  it('offers every active till to the holder of pos.manage, cashier of none (owner 2026-11-20)', async () => {
+    // A third till, closed: not offered even to pos.manage.
+    const closed = (
+      await store.pos
+        .createTill({
+          edgeNodeId: store.node.id,
+          warehouseId: store.store.id,
+          code: 'К3',
+          name: 'Касс 3',
+          printerHost: null,
+        })
+        .expect(201)
+    ).body as TillJson;
+    await store.pos.updateTill(closed.id, { status: 'INACTIVE' }).expect(200);
+
+    const active = (await store.pos.tills())
+      .filter((till) => till.status === 'ACTIVE')
+      .map((till) => till.id)
+      .sort((a, b) => a - b);
+    const offered = (
+      (await http().get('/api/v1/price-labels/tills').set(bearer(admin)).expect(200)).body as {
+        id: number;
+      }[]
+    )
+      .map((till) => till.id)
+      .sort((a, b) => a - b);
+    expect(offered).toEqual(active);
+    expect(offered).toEqual(expect.arrayContaining([store.till.id, other.id]));
+    expect(offered).not.toContain(closed.id);
+
+    // It prints on the second till, which names no cashier, at that till's products.
+    const soapThere = (await labelsOf(admin, other.id, 'саван').expect(200)).body as {
+      productId: number;
+    }[];
+    expect(soapThere.map((item) => item.productId)).toEqual([soap.id]);
+    const made = (
+      await http()
+        .post('/api/v1/price-labels/escpos')
+        .set(bearer(admin))
+        .send({ tillId: other.id, items: [{ productId: soap.id, copies: 2 }] })
+        .expect(200)
+    ).body as { labels: number };
+    expect(made.labels).toBe(2);
+    await http().get('/api/v1/print-stations').set(bearer(admin)).expect(200);
+    // The closed till stays shut to it.
+    const shut = await labelsOf(admin, closed.id, 'саван').expect(403);
+    expect(shut.body).toMatchObject({ code: 'PRINT_TILL_NOT_YOURS' });
+
+    // Staff without pos.manage and named by no till still have none.
+    const refused = await http().get('/api/v1/price-labels/tills').set(bearer(office)).expect(403);
+    expect(refused.body).toMatchObject({ code: 'PRINT_NO_TILL' });
+    await labelsOf(office, other.id, 'саван').expect(403);
+  });
 });

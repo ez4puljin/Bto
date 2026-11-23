@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { isErrorCode } from '@tugeel/shared/errors';
 import { useRouter } from 'expo-router';
 import { Bluetooth, Monitor, ScanLine, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { type AppProblem, problemFrom } from '../../../src/api/problem';
+import { problemFrom } from '../../../src/api/problem';
 import { formatMnt } from '../../../src/format/format';
 import { fetchTills, productByBarcode, searchProducts } from '../../../src/labels/api';
 import { BluetoothError } from '../../../src/labels/bluetooth';
@@ -24,6 +23,8 @@ import {
 } from '../../../src/labels/list';
 import { EMPTY_PREFS, type LabelPrefs, prefsFrom, prefsKey } from '../../../src/labels/prefs';
 import { PrintFailure, printLabels } from '../../../src/labels/print';
+import { hasErrorText } from '../../../src/labels/problem';
+import { LabelProblem, ProblemBox, useLabelProblemText } from '../../../src/labels/problem-text';
 import { ProductCard } from '../../../src/labels/product-card';
 import { PrinterSheet } from '../../../src/labels/printer-sheet';
 import { LabelScanner, type ScanOutcome } from '../../../src/labels/scanner';
@@ -33,15 +34,18 @@ import { useSignedIn } from '../../../src/state/session';
 import { colors, spacing, type } from '../../../src/theme/tokens';
 import { ChoiceChip, PillButton, SearchField } from '../../../src/ui/controls';
 import { Group, Row } from '../../../src/ui/grouped';
-import { EmptyState, ProblemText } from '../../../src/ui/kit';
+import { EmptyState } from '../../../src/ui/kit';
 import { Page, SectionHeader } from '../../../src/ui/layout';
-import { FooterBar, Notice } from '../../../src/ui/staff-kit';
+import { FooterBar } from '../../../src/ui/staff-kit';
 import { StoreHeader } from '../../../src/ui/store-header';
 import { Text } from '../../../src/ui/text';
 import { useToast } from '../../../src/ui/toast';
 
-/** What went wrong in words: the printer's own failure, or the server's problem. */
-type Failure = { text: string; detail?: string } | { problem: AppProblem };
+/** What went wrong in words: the printer's or the server's, with the printer's own words. */
+interface Failure {
+  text: string;
+  detail?: string;
+}
 
 /**
  * «Үнийн шошго»: a seller prints price labels of their till's products — found by name, code or
@@ -53,6 +57,7 @@ export default function LabelsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const toast = useToast();
+  const problemText = useLabelProblemText();
   const { server, me, session } = useSignedIn();
   const client = session.client;
 
@@ -125,8 +130,8 @@ export default function LabelsScreen() {
       const changed = addProduct(latest.current, product, 1);
       saveList(changed.list);
       return { found: true, name: product.name, price: formatMnt(product.price) };
-    } catch {
-      return { found: false, code };
+    } catch (error) {
+      return { found: false, code, message: problemText(problemFrom(error)) };
     }
   };
 
@@ -146,13 +151,13 @@ export default function LabelsScreen() {
       } else if (error instanceof PrintFailure) {
         setFailure({
           text:
-            error.code && isErrorCode(error.code)
-              ? t(`errors.${error.code}`)
+            error.code && hasErrorText(error.code)
+              ? problemText({ code: error.code, status: 0 })
               : t(`mobile.labels.errors.${error.failure}`),
           ...(error.detail ? { detail: error.detail } : {}),
         });
       } else {
-        setFailure({ problem: problemFrom(error) });
+        setFailure({ text: problemText(problemFrom(error)) });
       }
     } finally {
       setPrinting(null);
@@ -201,7 +206,7 @@ export default function LabelsScreen() {
           <ActivityIndicator color={colors.primary} />
         ) : tills.error ? (
           <View style={styles.gap}>
-            <ProblemText problem={problemFrom(tills.error)} />
+            <LabelProblem problem={problemFrom(tills.error)} />
             <PillButton
               title={t('mobile.labels.refresh')}
               variant="soft"
@@ -268,20 +273,16 @@ export default function LabelsScreen() {
             />
 
             {failure ? (
-              'problem' in failure ? (
-                <ProblemText problem={failure.problem} />
-              ) : (
-                <Notice tone="bad">
-                  {failure.detail ? `${failure.text}\n${failure.detail}` : failure.text}
-                </Notice>
-              )
+              <ProblemBox
+                text={failure.detail ? `${failure.text}\n${failure.detail}` : failure.text}
+              />
             ) : null}
 
             {searching ? (
               results.isFetching && !results.data ? (
                 <ActivityIndicator color={colors.primary} />
               ) : results.error ? (
-                <ProblemText problem={problemFrom(results.error)} />
+                <LabelProblem problem={problemFrom(results.error)} />
               ) : (results.data ?? []).length === 0 ? (
                 <Text style={[type.body, styles.hint]}>{t('mobile.labels.noResults')}</Text>
               ) : (
