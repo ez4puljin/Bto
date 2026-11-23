@@ -7,6 +7,7 @@ import { ReportViewsController } from './controllers/report-views.controller';
 import { ReportsController } from './controllers/reports.controller';
 import { ReportingRefreshJob } from './jobs/refresh.job';
 import { AgingService } from './services/aging.service';
+import { BoardLedgerService } from './services/board-ledger.service';
 import { BookOptionsService } from './services/book-options.service';
 import { DashboardService } from './services/dashboard.service';
 import { ProductSalesService } from './services/product-sales.service';
@@ -32,6 +33,7 @@ const SERVICES = [
   AgingService,
   ProfitService,
   ProfitBoardService,
+  BoardLedgerService,
   StockReportService,
   SupplierReportService,
   BookOptionsService,

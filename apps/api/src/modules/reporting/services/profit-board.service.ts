@@ -6,6 +6,14 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { invalid } from '../../../common/errors/app-error';
 import type { AuthContext } from '../../identity';
+import {
+  type BoardExpenseEntries,
+  type BoardExpenseEntriesQuery,
+  type BoardExpenses,
+  BoardLedgerService,
+  type BoardPeriodKey,
+  type LedgerSums,
+} from './board-ledger.service';
 import type { SalesSource } from './profit.service';
 import { receiptDiscountEntries } from './receipt-discount-entries';
 import { RefreshService } from './refresh.service';
@@ -107,6 +115,22 @@ export interface BoardTrendPoint extends BoardFigures {
   period: string;
   from: string;
   to: string;
+  /** Net profit (ADR-0238); null under a source filter. */
+  netProfit: string | null;
+}
+
+/** What the books add to the gross profit in a period (ADR-0238). */
+export interface BoardResult {
+  /** «Бусад орлого»: the INCOME accounts off the sales row. */
+  otherIncome: string;
+  /** «Урсгал зардал»: the operating expense accounts (class 7). */
+  expenses: string;
+  /** Gross profit + supplier discounts + other income − operating expenses. */
+  operatingProfit: string;
+  /** «Татвар»: the income tax expense. */
+  tax: string;
+  /** Operating profit − tax. */
+  netProfit: string;
 }
 
 export interface BoardBonus {
@@ -130,6 +154,10 @@ export interface ProfitBoard extends BoardPeriods {
   /** The suppliers' receipt discounts booked as income in each period; null under a source filter. */
   discounts: { current: string; previous: string; lastYear: string } | null;
   bonus: BoardBonus | null;
+  /** Other income, operating expenses, operating profit, tax and net profit; null under a source filter. */
+  results: Record<BoardPeriodKey, BoardResult> | null;
+  /** The operating expenses by the chart's groups down to the accounts; null under a source filter. */
+  expenses: BoardExpenses | null;
   trend: BoardTrendPoint[];
   breakdowns: Record<BoardDimension, BoardBreakdown>;
   branches: { id: number; name: string }[];
@@ -191,6 +219,18 @@ const CATEGORY_TREE = sql`WITH RECURSIVE tree AS (
     SELECT k.id, t.top_id, CASE WHEN t.depth = 0 THEN k.id ELSE t.child_id END, t.depth + 1
       FROM public.categories k JOIN tree t ON k.parent_id = t.id)`;
 
+/** Operating and net profit from the gross profit, the discounts and the books (ADR-0238). */
+function result(grossProfit: Decimal, discount: Decimal, books: LedgerSums): BoardResult {
+  const operating = grossProfit.plus(discount).plus(books.otherIncome).minus(books.expenses);
+  return {
+    otherIncome: money(books.otherIncome),
+    expenses: money(books.expenses),
+    operatingProfit: money(operating),
+    tax: money(books.tax),
+    netProfit: money(operating.minus(books.tax)),
+  };
+}
+
 function figures(sales: Decimal, cost: Decimal): BoardFigures {
   const profit = sales.minus(cost);
   return {
@@ -215,6 +255,7 @@ export class ProfitBoardService {
     @Inject(DB) private readonly db: Db,
     private readonly context: ReportContext,
     private readonly refresh: RefreshService,
+    private readonly ledger: BoardLedgerService,
   ) {}
 
   async board(ctx: AuthContext, filter: BoardFilter): Promise<ProfitBoard> {
@@ -233,6 +274,7 @@ export class ProfitBoardService {
       bonus,
       branches,
       state,
+      books,
     ] = await Promise.all([
       this.totals(periods, filter),
       this.trend(periods, filter, scope.today),
@@ -243,6 +285,7 @@ export class ProfitBoardService {
       withDiscounts ? this.bonus(periods.current, branchId) : null,
       this.branches(branchId),
       this.refresh.state(),
+      withDiscounts ? this.books(scope.company, periods, branchId, scope.today) : null,
     ]);
     const totalProfit = totals.current.sales.minus(totals.current.cost);
     const flag = (sales: Decimal, cost: Decimal) => {
@@ -338,10 +381,22 @@ export class ProfitBoardService {
       }),
     );
 
-    const discountTotal = (list: typeof discounts) =>
-      money(
-        (list ?? []).reduce((sum, item) => (item.inRange ? sum.plus(item.discount) : sum), ZERO),
-      );
+    const discountSum = (list: typeof discounts) =>
+      (list ?? []).reduce((sum, item) => (item.inRange ? sum.plus(item.discount) : sum), ZERO);
+    const discountTotal = (list: typeof discounts) => money(discountSum(list));
+    const discountOf: Record<BoardPeriodKey, Decimal> = {
+      current: discountSum(discounts),
+      previous: discountSum(previousDiscounts),
+      lastYear: discountSum(lastYearDiscounts),
+    };
+    const results = books
+      ? (Object.fromEntries(
+          (['current', 'previous', 'lastYear'] as const).map((key) => [
+            key,
+            result(totals[key].sales.minus(totals[key].cost), discountOf[key], books.results[key]),
+          ]),
+        ) as Record<BoardPeriodKey, BoardResult>)
+      : null;
 
     return {
       ...periods,
@@ -363,7 +418,18 @@ export class ProfitBoardService {
           }
         : null,
       bonus,
-      trend,
+      results,
+      expenses: books?.expenses ?? null,
+      trend: trend.map((point) => {
+        if (!books) return { ...point, netProfit: null };
+        const sums = books.trend.sums.get(point.period);
+        const discount = books.trend.discounts.get(point.period) ?? ZERO;
+        const profit = new Decimal(point.profit);
+        return {
+          ...point,
+          netProfit: sums ? result(profit, discount, sums).netProfit : money(profit.plus(discount)),
+        };
+      }),
       breakdowns: {
         supplier: bounded(supplierRows),
         category: bounded(categoryRows),
@@ -420,6 +486,58 @@ export class ProfitBoardService {
         };
       }),
       others: rest.length > 0 ? { ...figures(restSales, restCost), count: rest.length } : null,
+    };
+  }
+
+  /**
+   * The entries behind one row of the operating expenses in the period, newest first (ADR-0238);
+   * none under a source filter.
+   */
+  async expenseEntries(
+    ctx: AuthContext,
+    query: BoardFilter & BoardExpenseEntriesQuery,
+  ): Promise<BoardExpenseEntries> {
+    const scope = await this.context.scope(ctx);
+    const periods = this.periodsOf(query, scope.today);
+    // An expense belongs to no sales channel: under a source filter the books are hidden, as on the board.
+    if ((query.source ?? 'ALL') !== 'ALL') {
+      return { ...periods.current, rows: [], more: false, total: money(ZERO) };
+    }
+    return this.ledger.entries(scope.company, periods.current, query.branchId ?? null, query);
+  }
+
+  /**
+   * What the books add (ADR-0238): the three periods' other income, expenses and tax, the expense
+   * tree, and by trend period the same with the suppliers' discounts.
+   */
+  private async books(
+    company: string,
+    periods: BoardPeriods,
+    branchId: number | null,
+    today: string,
+  ) {
+    const points = boardTrend(periods.kind, periods.period, today);
+    const range = {
+      from: points[0]?.range.from ?? periods.current.from,
+      to: points.at(-1)?.range.to ?? periods.current.to,
+    };
+    const chart = await this.ledger.chart(company);
+    const [amounts, sums, discounts] = await Promise.all([
+      this.ledger.amounts(company, chart, periods, branchId),
+      this.ledger.trend(company, chart, range, PERIOD_LABEL[periods.kind], branchId),
+      this.discounts(company, range, branchId),
+    ]);
+    const byPeriod = new Map<string, Decimal>();
+    for (const item of discounts) {
+      if (!item.inRange) continue;
+      const point = points.find((p) => p.range.from <= item.date && item.date <= p.range.to);
+      if (!point) continue;
+      byPeriod.set(point.period, (byPeriod.get(point.period) ?? ZERO).plus(item.discount));
+    }
+    return {
+      results: this.ledger.results(chart, amounts),
+      expenses: this.ledger.expenses(chart, amounts, branchId),
+      trend: { sums, discounts: byPeriod },
     };
   }
 
@@ -505,7 +623,7 @@ export class ProfitBoardService {
     periods: BoardPeriods,
     filter: BoardFilter,
     today: string,
-  ): Promise<BoardTrendPoint[]> {
+  ): Promise<Omit<BoardTrendPoint, 'netProfit'>[]> {
     const points = boardTrend(periods.kind, periods.period, today);
     const first = points[0]?.range.from ?? periods.current.from;
     const last = points.at(-1)?.range.to ?? periods.current.to;

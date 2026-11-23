@@ -10598,6 +10598,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/profit-board/expense-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The journal lines behind one row of the board's operating expenses (ADR-0238), newest first. */
+        get: operations["Reports_profitBoardExpenseEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/sales-documents": {
         parameters: {
             query?: never;
@@ -25993,6 +26010,53 @@ export interface components {
             value: string;
             unvalued: number;
         };
+        ProfitBoardResult: {
+            /** @description «Бусад орлого»: INCOME accounts off the sales row */
+            otherIncome: string;
+            /** @description «Урсгал зардал»: the operating expense accounts */
+            expenses: string;
+            /** @description Gross profit + supplier discounts + other income − expenses */
+            operatingProfit: string;
+            /** @description «Татвар»: the income tax expense */
+            tax: string;
+            /** @description Operating profit − tax */
+            netProfit: string;
+        };
+        ProfitBoardResults: {
+            current: components["schemas"]["ProfitBoardResult"];
+            previous: components["schemas"]["ProfitBoardResult"];
+            lastYear: components["schemas"]["ProfitBoardResult"];
+        };
+        /** @enum {string} */
+        ProfitBoardExpenseRowKind: "GROUP" | "ACCOUNT" | "NONE";
+        ProfitBoardExpenseRow: {
+            kind: components["schemas"]["ProfitBoardExpenseRowKind"];
+            /** @description The group or account; null: no group */
+            id: number | null;
+            code: string | null;
+            name: string | null;
+            amount: string;
+            /** @description The period before */
+            previous: string;
+            /** @description The same period a year earlier */
+            lastYear: string;
+            /** @description Percent of the operating expenses */
+            share: string | null;
+            children: components["schemas"]["ProfitBoardExpenseRow"][];
+        };
+        ProfitBoardAmounts: {
+            current: string;
+            previous: string;
+            lastYear: string;
+        };
+        ProfitBoardExpenses: {
+            rows: components["schemas"]["ProfitBoardExpenseRow"][];
+            total: components["schemas"]["ProfitBoardAmounts"];
+            /** @description With a branch: the operating expenses without a branch («Нийтлэг») */
+            common: components["schemas"]["ProfitBoardAmounts"] | null;
+            /** @description Expense lines in the current period */
+            lines: number;
+        };
         ProfitBoardTrendPoint: {
             /** @description Net sales without VAT and city tax, net of returns */
             sales: string;
@@ -26006,6 +26070,8 @@ export interface components {
             period: string;
             from: string;
             to: string;
+            /** @description Net profit (ADR-0238); null under a source filter */
+            netProfit: string | null;
         };
         ProfitBoardRow: {
             /** @description Net sales without VAT and city tax, net of returns */
@@ -26083,6 +26149,9 @@ export interface components {
             /** @description Receipt discounts booked as income (ADR-0236); null under a source filter */
             discounts: components["schemas"]["ProfitBoardDiscounts"] | null;
             bonus: components["schemas"]["ProfitBoardBonus"] | null;
+            /** @description From the books (ADR-0238); null under a source filter */
+            results: components["schemas"]["ProfitBoardResults"] | null;
+            expenses: components["schemas"]["ProfitBoardExpenses"] | null;
             trend: components["schemas"]["ProfitBoardTrendPoint"][];
             breakdowns: components["schemas"]["ProfitBoardBreakdowns"];
             branches: components["schemas"]["ProfitBoardBranch"][];
@@ -26123,6 +26192,35 @@ export interface components {
             to: string;
             rows: components["schemas"]["ProfitBoardProduct"][];
             others: components["schemas"]["ProfitBoardProductsOthers"] | null;
+        };
+        /** @enum {string} */
+        ProfitBoardExpenseEntryKind: "GROUP" | "ACCOUNT" | "NONE" | "COMMON";
+        ProfitBoardExpenseEntry: {
+            lineId: number;
+            entryId: number;
+            date: string;
+            /** @description The document number, else the journal entry number */
+            number: string;
+            /** @description The source document type */
+            source: string | null;
+            description: string | null;
+            accountId: number;
+            accountCode: string;
+            accountName: string;
+            partyName: string | null;
+            branchId: number | null;
+            branchName: string | null;
+            amount: string;
+        };
+        ProfitBoardExpenseEntries: {
+            /** @example 2026-10-01 */
+            from: string;
+            /** @example 2026-10-24 */
+            to: string;
+            rows: components["schemas"]["ProfitBoardExpenseEntry"][];
+            /** @description More lines stand behind the row than are listed (500) */
+            more: boolean;
+            total: string;
         };
         SalesDocument: {
             /** @enum {string} */
@@ -54394,6 +54492,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfitBoardProducts"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Reports_profitBoardExpenseEntries: {
+        parameters: {
+            query: {
+                kind: "month" | "quarter" | "year";
+                /** @description `YYYY-MM`, `YYYY-Qn` or `YYYY` by the kind; default: the current period */
+                period?: string;
+                branchId?: number;
+                source?: "ALL" | "WHOLESALE" | "POS";
+                /** @description A group, an account, the accounts without a group, or the branch-less lines */
+                rowKind: components["schemas"]["ProfitBoardExpenseEntryKind"];
+                id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitBoardExpenseEntries"];
                 };
             };
             /** @description RFC 9457 problem details */

@@ -42129,6 +42129,108 @@
         ]
       }
     },
+    "/api/v1/reports/profit-board/expense-entries": {
+      "get": {
+        "operationId": "Reports_profitBoardExpenseEntries",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "month",
+                "quarter",
+                "year"
+              ]
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "`YYYY-MM`, `YYYY-Qn` or `YYYY` by the kind; default: the current period",
+            "schema": {
+              "maxLength": 10,
+              "example": "2026-Q4",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "WHOLESALE",
+                "POS"
+              ]
+            }
+          },
+          {
+            "name": "rowKind",
+            "required": true,
+            "in": "query",
+            "description": "A group, an account, the accounts without a group, or the branch-less lines",
+            "schema": {
+              "$ref": "#/components/schemas/ProfitBoardExpenseEntryKind"
+            }
+          },
+          {
+            "name": "id",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfitBoardExpenseEntries"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The journal lines behind one row of the board's operating expenses (ADR-0238), newest first.",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/reports/sales-documents": {
       "get": {
         "operationId": "Reports_salesDocuments",
@@ -96588,6 +96690,176 @@
           "unvalued"
         ]
       },
+      "ProfitBoardResult": {
+        "type": "object",
+        "properties": {
+          "otherIncome": {
+            "type": "string",
+            "description": "«Бусад орлого»: INCOME accounts off the sales row"
+          },
+          "expenses": {
+            "type": "string",
+            "description": "«Урсгал зардал»: the operating expense accounts"
+          },
+          "operatingProfit": {
+            "type": "string",
+            "description": "Gross profit + supplier discounts + other income − expenses"
+          },
+          "tax": {
+            "type": "string",
+            "description": "«Татвар»: the income tax expense"
+          },
+          "netProfit": {
+            "type": "string",
+            "description": "Operating profit − tax"
+          }
+        },
+        "required": [
+          "otherIncome",
+          "expenses",
+          "operatingProfit",
+          "tax",
+          "netProfit"
+        ]
+      },
+      "ProfitBoardResults": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/ProfitBoardResult"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/ProfitBoardResult"
+          },
+          "lastYear": {
+            "$ref": "#/components/schemas/ProfitBoardResult"
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "lastYear"
+        ]
+      },
+      "ProfitBoardExpenseRowKind": {
+        "type": "string",
+        "enum": [
+          "GROUP",
+          "ACCOUNT",
+          "NONE"
+        ]
+      },
+      "ProfitBoardExpenseRow": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardExpenseRowKind"
+              }
+            ]
+          },
+          "id": {
+            "type": "number",
+            "nullable": true,
+            "description": "The group or account; null: no group"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "string",
+            "description": "The period before"
+          },
+          "lastYear": {
+            "type": "string",
+            "description": "The same period a year earlier"
+          },
+          "share": {
+            "type": "string",
+            "nullable": true,
+            "description": "Percent of the operating expenses"
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardExpenseRow"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "code",
+          "name",
+          "amount",
+          "previous",
+          "lastYear",
+          "share",
+          "children"
+        ]
+      },
+      "ProfitBoardAmounts": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "string"
+          },
+          "lastYear": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "lastYear"
+        ]
+      },
+      "ProfitBoardExpenses": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardExpenseRow"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/ProfitBoardAmounts"
+          },
+          "common": {
+            "nullable": true,
+            "description": "With a branch: the operating expenses without a branch («Нийтлэг»)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardAmounts"
+              }
+            ]
+          },
+          "lines": {
+            "type": "number",
+            "description": "Expense lines in the current period"
+          }
+        },
+        "required": [
+          "rows",
+          "total",
+          "common",
+          "lines"
+        ]
+      },
       "ProfitBoardTrendPoint": {
         "type": "object",
         "properties": {
@@ -96617,6 +96889,11 @@
           },
           "to": {
             "type": "string"
+          },
+          "netProfit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Net profit (ADR-0238); null under a source filter"
           }
         },
         "required": [
@@ -96626,7 +96903,8 @@
           "margin",
           "period",
           "from",
-          "to"
+          "to",
+          "netProfit"
         ]
       },
       "ProfitBoardRow": {
@@ -96904,6 +97182,25 @@
               }
             ]
           },
+          "results": {
+            "nullable": true,
+            "description": "From the books (ADR-0238); null under a source filter",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardResults"
+              }
+            ]
+          },
+          "expenses": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardExpenses"
+              }
+            ]
+          },
           "trend": {
             "type": "array",
             "items": {
@@ -96935,6 +97232,8 @@
           "totals",
           "discounts",
           "bonus",
+          "results",
+          "expenses",
           "trend",
           "breakdowns",
           "branches"
@@ -97059,6 +97358,114 @@
           "to",
           "rows",
           "others"
+        ]
+      },
+      "ProfitBoardExpenseEntryKind": {
+        "type": "string",
+        "enum": [
+          "GROUP",
+          "ACCOUNT",
+          "NONE",
+          "COMMON"
+        ]
+      },
+      "ProfitBoardExpenseEntry": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "number"
+          },
+          "entryId": {
+            "type": "number"
+          },
+          "date": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string",
+            "description": "The document number, else the journal entry number"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "The source document type"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountId": {
+            "type": "number"
+          },
+          "accountCode": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "partyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "branchId": {
+            "type": "number",
+            "nullable": true
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lineId",
+          "entryId",
+          "date",
+          "number",
+          "source",
+          "description",
+          "accountId",
+          "accountCode",
+          "accountName",
+          "partyName",
+          "branchId",
+          "branchName",
+          "amount"
+        ]
+      },
+      "ProfitBoardExpenseEntries": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-10-24"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfitBoardExpenseEntry"
+            }
+          },
+          "more": {
+            "type": "boolean",
+            "description": "More lines stand behind the row than are listed (500)"
+          },
+          "total": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "more",
+          "total"
         ]
       },
       "SalesDocument": {

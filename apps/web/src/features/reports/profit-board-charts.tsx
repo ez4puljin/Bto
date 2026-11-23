@@ -50,16 +50,23 @@ export interface TrendBar {
   sales: string;
   profit: string;
   margin: string | null;
+  /** Net profit (ADR-0238); null under a source filter. */
+  netProfit: string | null;
 }
 
-/** Net sales and gross profit as bars, the margin as a line on its own axis. */
+/**
+ * Net sales and gross profit as bars, the net profit as a line on their axis (when the books are
+ * read), the margin as a line on its own axis.
+ */
 export function BoardTrendChart(props: { points: readonly TrendBar[]; label: string }) {
   const { t } = useTranslation();
   const short = useShortAmount();
   const sales = t('reports.board.columns.sales');
   const profit = t('reports.board.columns.profit');
   const margin = t('reports.board.columns.margin');
+  const net = t('reports.board.columns.netProfit');
   const { points } = props;
+  const withNet = points.some((point) => point.netProfit !== null);
   return (
     <EChart
       label={props.label}
@@ -72,7 +79,7 @@ export function BoardTrendChart(props: { points: readonly TrendBar[]; label: str
           itemWidth: 12,
           itemHeight: 8,
           textStyle: { color: colors.muted, fontSize: 12 },
-          data: [sales, profit, margin],
+          data: withNet ? [sales, profit, net, margin] : [sales, profit, margin],
         },
         tooltip: {
           trigger: 'axis',
@@ -84,6 +91,9 @@ export function BoardTrendChart(props: { points: readonly TrendBar[]; label: str
               `<b>${escapeHtml(point.label.replace('\n', ' '))}</b>`,
               `${escapeHtml(sales)}: <b>${escapeHtml(formatTugrik(point.sales))}</b>`,
               `${escapeHtml(profit)}: <b>${escapeHtml(formatTugrik(point.profit))}</b>`,
+              ...(point.netProfit === null
+                ? []
+                : [`${escapeHtml(net)}: <b>${escapeHtml(formatTugrik(point.netProfit))}</b>`]),
               `${escapeHtml(margin)}: <b>${escapeHtml(marginText(point.margin))}</b>`,
             ].join('<br/>');
           },
@@ -127,6 +137,22 @@ export function BoardTrendChart(props: { points: readonly TrendBar[]; label: str
             animationDelay: (index: number) => index * 40 + 20,
             data: points.map((point) => plotted(point.profit)),
           },
+          ...(withNet
+            ? [
+                {
+                  name: net,
+                  type: 'line',
+                  smooth: true,
+                  symbol: 'circle',
+                  symbolSize: 7,
+                  lineStyle: { width: 2.5, color: colors.series[3] },
+                  itemStyle: { color: colors.series[3] },
+                  data: points.map((point) =>
+                    point.netProfit === null ? null : plotted(point.netProfit),
+                  ),
+                },
+              ]
+            : []),
           {
             name: margin,
             type: 'line',
@@ -142,11 +168,16 @@ export function BoardTrendChart(props: { points: readonly TrendBar[]; label: str
       })}
     >
       <FigureTable
-        head={[t('reports.board.period'), sales, profit, margin]}
+        head={
+          withNet
+            ? [t('reports.board.period'), sales, profit, net, margin]
+            : [t('reports.board.period'), sales, profit, margin]
+        }
         rows={points.map((point) => [
           point.label.replace('\n', ' '),
           formatTugrik(point.sales),
           formatTugrik(point.profit),
+          ...(withNet ? [point.netProfit === null ? '' : formatTugrik(point.netProfit)] : []),
           marginText(point.margin),
         ])}
       />
@@ -156,7 +187,7 @@ export function BoardTrendChart(props: { points: readonly TrendBar[]; label: str
 
 /**
  * One step of the profit's structure: a `total` stands from zero, a `change` floats from where the
- * last step ended. Later phases add operating expenses, taxes and net profit as more steps.
+ * last step ended.
  */
 export interface WaterfallStep {
   key: string;
@@ -165,7 +196,10 @@ export interface WaterfallStep {
   value: string;
 }
 
-/** «Ашгийн бүтэц»: net sales → − cost → gross profit → + discounts → gross profit with them. */
+/**
+ * «Ашгийн бүтэц»: net sales → − cost → gross profit → + discounts → + other income → − operating
+ * expenses → operating profit → − tax → net profit (ADR-0238), as the page lists the steps.
+ */
 export function WaterfallChart(props: { steps: readonly WaterfallStep[]; label: string }) {
   const { t } = useTranslation();
   const short = useShortAmount();
@@ -331,6 +365,77 @@ export function RankBars(props: { rows: readonly RankBar[]; label: string }) {
       <FigureTable
         head={[t('reports.board.columns.name'), t('reports.board.columns.profit')]}
         rows={rows.map((row) => [row.label, tip(row)])}
+      />
+    </EChart>
+  );
+}
+
+export interface ShareSlice {
+  key: string;
+  label: string;
+  amount: string;
+  share: string | null;
+}
+
+/** The operating expenses' top-level groups as a ring, each with its share (ADR-0238). */
+export function ExpenseShareChart(props: { slices: readonly ShareSlice[]; label: string }) {
+  const { t } = useTranslation();
+  const { slices } = props;
+  const tip = (slice: ShareSlice) =>
+    slice.share === null
+      ? formatTugrik(slice.amount)
+      : `${formatTugrik(slice.amount)} · ${slice.share}%`;
+  return (
+    <EChart
+      label={props.label}
+      height={260}
+      option={(colors) => ({
+        tooltip: {
+          trigger: 'item',
+          formatter: (point: { dataIndex: number }) => {
+            const slice = slices[point.dataIndex];
+            return slice ? `${escapeHtml(slice.label)}: <b>${escapeHtml(tip(slice))}</b>` : '';
+          },
+        },
+        legend: {
+          bottom: 0,
+          left: 'center',
+          itemWidth: 10,
+          itemHeight: 10,
+          textStyle: { color: colors.muted, fontSize: 11 },
+          formatter: (name: string) => (name.length > 22 ? `${name.slice(0, 21)}…` : name),
+        },
+        series: [
+          {
+            type: 'pie',
+            radius: ['48%', '72%'],
+            center: ['50%', '42%'],
+            avoidLabelOverlap: true,
+            itemStyle: { borderColor: colors.surface, borderWidth: 2, borderRadius: 4 },
+            label: {
+              show: true,
+              color: colors.foreground,
+              fontSize: 11,
+              formatter: (point: { dataIndex: number }) => {
+                const slice = slices[point.dataIndex];
+                return slice?.share ? `${slice.share}%` : '';
+              },
+            },
+            data: slices.map((slice, index) => ({
+              name: slice.label,
+              value: Math.max(0, plotted(slice.amount)),
+              itemStyle: { color: colors.series[index % colors.series.length] },
+            })),
+          },
+        ],
+      })}
+    >
+      <FigureTable
+        head={[
+          t('reports.board.expenses.columns.name'),
+          t('reports.board.expenses.columns.amount'),
+        ]}
+        rows={slices.map((slice) => [slice.label, tip(slice)])}
       />
     </EChart>
   );

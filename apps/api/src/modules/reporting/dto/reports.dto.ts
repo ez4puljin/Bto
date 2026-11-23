@@ -19,6 +19,12 @@ import {
 } from 'class-validator';
 import { BOARD_PERIOD_KINDS, type BoardPeriodKind } from '@tugeel/shared/reports';
 import {
+  BOARD_EXPENSE_ENTRY_KINDS,
+  BOARD_EXPENSE_ROW_KINDS,
+  type BoardExpenseEntryKind,
+  type BoardExpenseRowKind,
+} from '../services/board-ledger.service';
+import {
   BOARD_DIMENSIONS,
   BOARD_ROW_KINDS,
   type BoardDimension,
@@ -598,6 +604,70 @@ export class BoardTrendPointDto extends BoardFiguresDto {
   @ApiProperty({ example: '2026-Q4' }) period: string;
   @ApiProperty() from: string;
   @ApiProperty() to: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Net profit (ADR-0238); null under a source filter',
+  })
+  netProfit: string | null;
+}
+
+@ApiSchema({ name: 'ProfitBoardResult' })
+export class BoardResultDto {
+  @ApiProperty({ description: '«Бусад орлого»: INCOME accounts off the sales row' })
+  otherIncome: string;
+  @ApiProperty({ description: '«Урсгал зардал»: the operating expense accounts' }) expenses: string;
+  @ApiProperty({ description: 'Gross profit + supplier discounts + other income − expenses' })
+  operatingProfit: string;
+  @ApiProperty({ description: '«Татвар»: the income tax expense' }) tax: string;
+  @ApiProperty({ description: 'Operating profit − tax' }) netProfit: string;
+}
+
+@ApiSchema({ name: 'ProfitBoardResults' })
+export class BoardResultsDto {
+  @ApiProperty({ type: BoardResultDto }) current: BoardResultDto;
+  @ApiProperty({ type: BoardResultDto }) previous: BoardResultDto;
+  @ApiProperty({ type: BoardResultDto }) lastYear: BoardResultDto;
+}
+
+@ApiSchema({ name: 'ProfitBoardAmounts' })
+export class BoardAmountsDto {
+  @ApiProperty() current: string;
+  @ApiProperty() previous: string;
+  @ApiProperty() lastYear: string;
+}
+
+@ApiSchema({ name: 'ProfitBoardExpenseRow' })
+export class BoardExpenseRowDto {
+  @ApiProperty({ enum: BOARD_EXPENSE_ROW_KINDS, enumName: 'ProfitBoardExpenseRowKind' })
+  kind: BoardExpenseRowKind;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'The group or account; null: no group',
+  })
+  id: number | null;
+  @ApiProperty({ type: String, nullable: true }) code: string | null;
+  @ApiProperty({ type: String, nullable: true }) name: string | null;
+  @ApiProperty() amount: string;
+  @ApiProperty({ description: 'The period before' }) previous: string;
+  @ApiProperty({ description: 'The same period a year earlier' }) lastYear: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Percent of the operating expenses' })
+  share: string | null;
+  @ApiProperty({ type: () => [BoardExpenseRowDto] }) children: BoardExpenseRowDto[];
+}
+
+@ApiSchema({ name: 'ProfitBoardExpenses' })
+export class BoardExpensesDto {
+  @ApiProperty({ type: [BoardExpenseRowDto] }) rows: BoardExpenseRowDto[];
+  @ApiProperty({ type: BoardAmountsDto }) total: BoardAmountsDto;
+  @ApiProperty({
+    type: BoardAmountsDto,
+    nullable: true,
+    description: 'With a branch: the operating expenses without a branch («Нийтлэг»)',
+  })
+  common: BoardAmountsDto | null;
+  @ApiProperty({ description: 'Expense lines in the current period' }) lines: number;
 }
 
 @ApiSchema({ name: 'ProfitBoardBranch' })
@@ -627,6 +697,13 @@ export class ProfitBoardDto {
   })
   discounts: BoardDiscountsDto | null;
   @ApiProperty({ type: BoardBonusDto, nullable: true }) bonus: BoardBonusDto | null;
+  @ApiProperty({
+    type: BoardResultsDto,
+    nullable: true,
+    description: 'From the books (ADR-0238); null under a source filter',
+  })
+  results: BoardResultsDto | null;
+  @ApiProperty({ type: BoardExpensesDto, nullable: true }) expenses: BoardExpensesDto | null;
   @ApiProperty({ type: [BoardTrendPointDto] }) trend: BoardTrendPointDto[];
   @ApiProperty({ type: BoardBreakdownsDto }) breakdowns: BoardBreakdownsDto;
   @ApiProperty({ type: [BoardBranchDto] }) branches: BoardBranchDto[];
@@ -652,4 +729,43 @@ export class BoardProductsDto extends ReportRangeDto {
   @ApiProperty({ type: [BoardProductRowDto] }) rows: BoardProductRowDto[];
   @ApiProperty({ type: BoardProductsOthersDto, nullable: true })
   others: BoardProductsOthersDto | null;
+}
+
+@ApiSchema({ name: 'ProfitBoardExpenseEntriesQuery' })
+export class ProfitBoardExpenseEntriesQueryDto extends ProfitBoardQueryDto {
+  @ApiProperty({
+    enum: BOARD_EXPENSE_ENTRY_KINDS,
+    enumName: 'ProfitBoardExpenseEntryKind',
+    description: 'A group, an account, the accounts without a group, or the branch-less lines',
+  })
+  @IsIn(BOARD_EXPENSE_ENTRY_KINDS)
+  rowKind: BoardExpenseEntryKind;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) id?: number;
+}
+
+@ApiSchema({ name: 'ProfitBoardExpenseEntry' })
+export class BoardExpenseEntryDto {
+  @ApiProperty() lineId: number;
+  @ApiProperty() entryId: number;
+  @ApiProperty() date: string;
+  @ApiProperty({ description: 'The document number, else the journal entry number' })
+  number: string;
+  @ApiProperty({ type: String, nullable: true, description: 'The source document type' })
+  source: string | null;
+  @ApiProperty({ type: String, nullable: true }) description: string | null;
+  @ApiProperty() accountId: number;
+  @ApiProperty() accountCode: string;
+  @ApiProperty() accountName: string;
+  @ApiProperty({ type: String, nullable: true }) partyName: string | null;
+  @ApiProperty({ type: Number, nullable: true }) branchId: number | null;
+  @ApiProperty({ type: String, nullable: true }) branchName: string | null;
+  @ApiProperty() amount: string;
+}
+
+@ApiSchema({ name: 'ProfitBoardExpenseEntries' })
+export class BoardExpenseEntriesDto extends ReportRangeDto {
+  @ApiProperty({ type: [BoardExpenseEntryDto] }) rows: BoardExpenseEntryDto[];
+  @ApiProperty({ description: 'More lines stand behind the row than are listed (500)' })
+  more: boolean;
+  @ApiProperty() total: string;
 }

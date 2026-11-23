@@ -3,7 +3,13 @@ import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ADMIN_ME, findSidebar, json, type Me, renderApp, signedIn } from '@/test/render-app';
-import type { ProfitBoard, ProfitBoardProducts, ProfitBoardRow } from './api';
+import type {
+  ProfitBoard,
+  ProfitBoardExpenseEntries,
+  ProfitBoardExpenseRow,
+  ProfitBoardProducts,
+  ProfitBoardRow,
+} from './api';
 import { REFRESH_STATE } from './report-fixtures';
 
 const b = mn.reports.board;
@@ -39,6 +45,33 @@ const figures = (sales: string, cost: string, profit: string, margin: string | n
   margin,
 });
 
+const expenseRow = (
+  fields: Partial<ProfitBoardExpenseRow> & Pick<ProfitBoardExpenseRow, 'kind' | 'amount'>,
+): ProfitBoardExpenseRow => ({
+  id: null,
+  code: null,
+  name: null,
+  previous: '0.00',
+  lastYear: '0.00',
+  share: null,
+  children: [],
+  ...fields,
+});
+
+const result = (
+  otherIncome: string,
+  expenses: string,
+  operating: string,
+  tax: string,
+  net: string,
+) => ({
+  otherIncome,
+  expenses,
+  operatingProfit: operating,
+  tax,
+  netProfit: net,
+});
+
 const BOARD: ProfitBoard = {
   kind: 'quarter',
   period: '2026-Q4',
@@ -58,18 +91,81 @@ const BOARD: ProfitBoard = {
   },
   discounts: { current: '15000.00', previous: '10000.00', lastYear: '0.00' },
   bonus: { lines: 2, qty: '24', value: '36000.00', unvalued: 0 },
+  // 200,000 + 15,000 + 5,000 − 120,000 = 100,000 operating; − 10,000 tax = 90,000 net.
+  results: {
+    current: result('5000.00', '120000.00', '100000.00', '10000.00', '90000.00'),
+    previous: result('0.00', '100000.00', '70000.00', '0.00', '70000.00'),
+    lastYear: result('0.00', '0.00', '0.00', '0.00', '0.00'),
+  },
+  expenses: {
+    rows: [
+      expenseRow({
+        kind: 'GROUP',
+        id: 45,
+        code: '70',
+        name: 'Ерөнхий удирдлагын зардал',
+        amount: '100000.00',
+        previous: '80000.00',
+        share: '83.3',
+        children: [
+          expenseRow({
+            kind: 'GROUP',
+            id: 48,
+            code: '7020',
+            name: 'Материалын зардал',
+            amount: '100000.00',
+            previous: '80000.00',
+            share: '83.3',
+            children: [
+              expenseRow({
+                kind: 'ACCOUNT',
+                id: 702008,
+                code: '702008',
+                name: 'Цахилгааны зардал',
+                amount: '100000.00',
+                previous: '80000.00',
+                share: '83.3',
+              }),
+            ],
+          }),
+        ],
+      }),
+      expenseRow({
+        kind: 'NONE',
+        amount: '20000.00',
+        previous: '20000.00',
+        share: '16.7',
+        children: [
+          expenseRow({
+            kind: 'ACCOUNT',
+            id: 740201,
+            code: '740201',
+            name: 'Барааны дутагдал, хорогдол',
+            amount: '20000.00',
+            previous: '20000.00',
+            share: '16.7',
+          }),
+        ],
+      }),
+    ],
+    total: { current: '120000.00', previous: '100000.00', lastYear: '0.00' },
+    common: null,
+    lines: 4,
+  },
   trend: [
     {
       period: '2026-Q3',
       from: '2026-07-01',
       to: '2026-09-30',
       ...figures('900000.00', '700000.00', '200000.00', '22.2'),
+      netProfit: '120000.00',
     },
     {
       period: '2026-Q4',
       from: '2026-10-01',
       to: '2026-11-23',
       ...figures('1000000.00', '800000.00', '200000.00', '20.0'),
+      netProfit: '90000.00',
     },
   ],
   breakdowns: {
@@ -178,6 +274,18 @@ const REFRESH = {
 
 const queryOf = (request: Request) => new URL(request.url).searchParams;
 
+/** «Урсгал зардал» names both a tile (a section) and the card below the charts. */
+const expenseTile = () =>
+  within(
+    screen
+      .getAllByRole('region', { name: b.tiles.expenses })
+      .find((el) => el.tagName === 'SECTION') ?? document.body,
+  );
+const expenseCard = () =>
+  screen
+    .queryAllByRole('region', { name: b.expenses.title })
+    .find((el) => el.tagName !== 'SECTION');
+
 describe('«Ашгийн самбар» (ADR-0237)', () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -217,7 +325,22 @@ describe('«Ашгийн самбар» (ADR-0237)', () => {
     expect(bonus.getByText(b.tiles.bonusHint)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: b.trend })).toBeInTheDocument();
     const waterfall = within(screen.getByRole('region', { name: b.waterfall }));
-    expect(waterfall.getByText(b.waterfallNote)).toBeInTheDocument();
+    // The structure runs on to the net profit: every step in the figures' table.
+    for (const [label, amount] of [
+      [b.tiles.discounts, '15,000₮'],
+      [b.steps.otherIncome, '5,000₮'],
+      [b.tiles.expenses, '-120,000₮'],
+      [b.tiles.operatingProfit, '100,000₮'],
+      [b.steps.tax, '-10,000₮'],
+      [b.tiles.netProfit, '90,000₮'],
+    ] as const) {
+      const cell = waterfall.getByRole('cell', { name: label });
+      expect(within(cell.closest('tr') as HTMLElement).getByText(amount)).toBeInTheDocument();
+    }
+    expect(waterfall.queryByRole('cell', { name: b.tiles.profitWithDiscounts })).toBeNull();
+    const trend = within(screen.getByRole('region', { name: b.trend }));
+    expect(trend.getByRole('columnheader', { name: b.columns.netProfit })).toBeInTheDocument();
+    expect(trend.getByText('90,000₮')).toBeInTheDocument();
 
     const breakdown = within(screen.getByRole('region', { name: b.breakdown }));
     expect(breakdown.getByRole('tab', { name: b.tabs.supplier })).toHaveAttribute(
@@ -312,5 +435,130 @@ describe('«Ашгийн самбар» (ADR-0237)', () => {
     renderApp('/reports/profit-board?kind=quarter&period=2026-Q4&tab=location', fetchMock);
     const breakdown = within(await screen.findByRole('region', { name: b.breakdown }));
     expect(breakdown.getByText(b.empty)).toBeInTheDocument();
+  });
+
+  it('shows the expenses, operating and net profit from the books, and the entries of a row', async () => {
+    const user = userEvent.setup();
+    const ENTRIES: ProfitBoardExpenseEntries = {
+      from: '2026-10-01',
+      to: '2026-11-23',
+      rows: [
+        {
+          lineId: 1,
+          entryId: 9,
+          date: '2026-11-05',
+          number: 'Ж-20261105-0001',
+          source: null,
+          description: 'Цахилгааны төлбөр',
+          accountId: 702008,
+          accountCode: '702008',
+          accountName: 'Цахилгааны зардал',
+          partyName: 'Эрчим хүч ХК',
+          branchId: null,
+          branchName: null,
+          amount: '100000.00',
+        },
+      ],
+      more: false,
+      total: '100000.00',
+    };
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REFRESH,
+      'GET /api/v1/reports/profit-board': () => json(BOARD),
+      'GET /api/v1/reports/profit-board/expense-entries': () => json(ENTRIES),
+    });
+    renderApp('/reports/profit-board?kind=quarter&period=2026-Q4', fetchMock);
+    await screen.findAllByRole('region', { name: b.tiles.expenses });
+    const tile = expenseTile();
+    expect(tile.getByText('120,000₮')).toBeInTheDocument();
+    expect(tile.queryByText(b.tiles.expensesNone)).toBeNull();
+    const operating = within(screen.getByRole('region', { name: b.tiles.operatingProfit }));
+    expect(operating.getByText('100,000₮')).toBeInTheDocument();
+    expect(
+      operating.getByText(b.tiles.otherIncomeLine.replace('{{amount}}', '5,000₮')),
+    ).toBeInTheDocument();
+    // 90,000 against 70,000 before: up 28.6%.
+    const net = within(screen.getByRole('region', { name: b.tiles.netProfit }));
+    expect(net.getByText('90,000₮')).toBeInTheDocument();
+    expect(net.getByText('28.6%')).toHaveClass('text-success');
+    expect(net.getByText(b.tiles.taxLine.replace('{{amount}}', '10,000₮'))).toBeInTheDocument();
+
+    const card = within(expenseCard() ?? document.body);
+    expect(card.getAllByRole('columnheader', { name: b.expenses.columns.name })).not.toHaveLength(
+      0,
+    );
+    expect(card.getByRole('columnheader', { name: b.expenses.columns.change })).toBeInTheDocument();
+    expect(card.getByRole('button', { name: b.expenses.noGroup })).toBeInTheDocument();
+    expect(card.queryByText(b.expenses.common)).toBeNull();
+    // Group → sub-group → account.
+    await user.click(
+      card.getByRole('button', { name: `${b.expenses.expand}: Ерөнхий удирдлагын зардал` }),
+    );
+    await user.click(card.getByRole('button', { name: `${b.expenses.expand}: Материалын зардал` }));
+    await user.click(card.getByRole('button', { name: '702008 Цахилгааны зардал' }));
+    const sheet = within(await screen.findByRole('dialog'));
+    expect(await sheet.findByText('Цахилгааны төлбөр')).toBeInTheDocument();
+    expect(sheet.getByText('Эрчим хүч ХК')).toBeInTheDocument();
+    expect(
+      sheet.getByRole('columnheader', { name: b.expenses.entries.description }),
+    ).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find(
+        (entry) => new URL(entry.url).pathname === '/api/v1/reports/profit-board/expense-entries',
+      );
+    expect(request && Object.fromEntries(queryOf(request))).toMatchObject({
+      kind: 'quarter',
+      period: '2026-Q4',
+      rowKind: 'ACCOUNT',
+      id: '702008',
+    });
+  });
+
+  it('shows the branch-less expenses apart under a branch, and says when none are recorded', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REFRESH,
+      'GET /api/v1/reports/profit-board': () =>
+        json({
+          ...BOARD,
+          branchId: 2,
+          expenses: {
+            rows: [],
+            total: { current: '0.00', previous: '0.00', lastYear: '0.00' },
+            common: { current: '45000.00', previous: '0.00', lastYear: '0.00' },
+            lines: 0,
+          },
+        }),
+    });
+    renderApp('/reports/profit-board?kind=quarter&period=2026-Q4&branch=2', fetchMock);
+    await screen.findAllByRole('region', { name: b.expenses.title });
+    const card = within(expenseCard() ?? document.body);
+    expect(card.getByText(b.expenses.empty)).toBeInTheDocument();
+    expect(card.getByRole('button', { name: b.expenses.common })).toBeInTheDocument();
+    expect(card.getByText(b.expenses.commonHint)).toBeInTheDocument();
+    expect(card.getByText('45,000₮')).toBeInTheDocument();
+    expect(expenseTile().getByText(b.tiles.expensesNone)).toBeInTheDocument();
+  });
+
+  it('hides the books under a source filter', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REFRESH,
+      'GET /api/v1/reports/profit-board': () =>
+        json({
+          ...BOARD,
+          source: 'POS',
+          discounts: null,
+          bonus: null,
+          results: null,
+          expenses: null,
+          trend: BOARD.trend.map((point) => ({ ...point, netProfit: null })),
+        }),
+    });
+    renderApp('/reports/profit-board?kind=quarter&period=2026-Q4&source=POS', fetchMock);
+    const net = within(await screen.findByRole('region', { name: b.tiles.netProfit }));
+    expect(net.getByText(b.tiles.bySource)).toBeInTheDocument();
+    expect(expenseCard()).toBeUndefined();
+    const waterfall = within(screen.getByRole('region', { name: b.waterfall }));
+    expect(waterfall.queryByRole('cell', { name: b.tiles.netProfit })).toBeNull();
   });
 });

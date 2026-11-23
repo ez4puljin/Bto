@@ -35,6 +35,14 @@ export type ProfitBoard = Body<'/api/v1/reports/profit-board'>;
 export type ProfitBoardRow = ProfitBoard['breakdowns']['supplier']['rows'][number];
 export type ProfitBoardBreakdown = ProfitBoard['breakdowns']['supplier'];
 export type ProfitBoardProducts = Body<'/api/v1/reports/profit-board/products'>;
+export type ProfitBoardExpenses = NonNullable<ProfitBoard['expenses']>;
+export type ProfitBoardExpenseRow = ProfitBoardExpenses['rows'][number];
+export type ProfitBoardExpenseEntries = Body<'/api/v1/reports/profit-board/expense-entries'>;
+/** What the entries behind the expenses are asked for: a row of the tree, or the branch-less lines. */
+export interface ProfitBoardExpenseTarget {
+  kind: ProfitBoardExpenseRow['kind'] | 'COMMON';
+  id: number | null;
+}
 
 export type SettlementGroup = NonNullable<AgingRow['settlementGroup']>;
 export type ProfitGrouping = ProfitReport['by'];
@@ -413,4 +421,31 @@ export function useReportDownloads() {
         ),
     }),
   };
+}
+
+/** The journal lines behind one row of the board's operating expenses (ADR-0238). */
+export function useProfitBoardExpenseEntries(
+  filter: ProfitBoardFilter,
+  row: ProfitBoardExpenseTarget | null,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...REPORTS, 'profit-board-expense-entries', filter, row],
+    enabled: row !== null,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/reports/profit-board/expense-entries', {
+          params: {
+            query: {
+              kind: filter.kind,
+              period: filter.period,
+              ...(filter.branchId ? { branchId: filter.branchId } : {}),
+              rowKind: row?.kind ?? 'NONE',
+              ...(row?.id ? { id: row.id } : {}),
+            },
+          },
+          signal,
+        }),
+      ),
+  });
 }

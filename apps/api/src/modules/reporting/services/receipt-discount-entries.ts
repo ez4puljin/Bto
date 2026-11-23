@@ -3,7 +3,7 @@ import { type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../../../common/db/db.types';
 import { discountIncome, entryDiscounts, receiptOfEntry } from './receipt-discounts';
 import type { DateRange } from './report-periods';
-import { dec, decOrNull, int, intOrNull, rowsOf, textOrNull } from './report-sql';
+import { dec, decOrNull, int, intOrNull, rowsOf, scalar, textOrNull } from './report-sql';
 
 /**
  * What a receipt's discount is measured as:
@@ -17,6 +17,8 @@ export interface ReceiptDiscountEntry {
   entryId: number;
   partyId: number;
   supplierId: number | null;
+  /** The entry's date. */
+  date: string;
   /** The entry is dated in the range (the others only measure a re-costing's change). */
   inRange: boolean;
   discount: Decimal;
@@ -50,7 +52,7 @@ export async function receiptDiscountEntries(
              AND e.source_doc_type IN ${RECEIPT_DOC_TYPES}
              AND e.source_doc_id ~ '^[0-9]+(:[0-9]+)?$')
         SELECT r.entry_id, r.party_id, r.supplier_id, r.source_doc_type, r.source_doc_id, r.is_reversal,
-               r.entry_date BETWEEN ${range.from}::date AND ${range.to}::date AS in_range
+               r.entry_date::text AS entry_date, r.entry_date BETWEEN ${range.from}::date AND ${range.to}::date AS in_range
           FROM receipts r
          WHERE r.receipt_key IN (
                  SELECT p.receipt_key FROM receipts p
@@ -110,6 +112,7 @@ export async function receiptDiscountEntries(
     entryId: int(row.entry_id),
     partyId: int(row.party_id),
     supplierId: intOrNull(row.supplier_id),
+    date: scalar(row.entry_date).slice(0, 10),
     inRange: row.in_range === true,
     discount: discounts.get(int(row.entry_id)) ?? dec(0),
   }));

@@ -43,6 +43,7 @@ import {
   useProfitBoard,
   useProfitBoardProducts,
 } from './api';
+import { ExpenseEntriesSheet, ExpensesCard, type OpenExpense } from './profit-board-expenses';
 import {
   BoardTrendChart,
   RankBars,
@@ -264,7 +265,7 @@ const wholeTugrik = (value: string) => formatTugrik(new Decimal(value).toFixed(0
 
 function Tiles({ data }: { data: ProfitBoard }) {
   const { t } = useTranslation();
-  const { totals, discounts, bonus } = data;
+  const { totals, discounts, bonus, results, expenses } = data;
   const vsPrevious = t('reports.board.vsPrevious');
   const vsLastYear = t('reports.board.vsLastYear');
   const compare = (
@@ -298,6 +299,73 @@ function Tiles({ data }: { data: ProfitBoard }) {
       string | null,
     ];
   const bySource = t('reports.board.tiles.bySource');
+  const result = (pick: (figures: NonNullable<ProfitBoard['results']>['current']) => string) =>
+    results
+      ? ([pick(results.current), pick(results.previous), pick(results.lastYear)] as [
+          string,
+          string,
+          string,
+        ])
+      : null;
+  const resultTile = (
+    key: string,
+    title: string,
+    values: [string, string, string] | null,
+    options: { sense: Sense; lines?: string[]; hint?: string; loss?: boolean },
+  ) => (
+    <BoardTile
+      key={key}
+      title={title}
+      value={values ? wholeTugrik(values[0]) : NONE}
+      tone={options.loss && values && new Decimal(values[0]).lt(0) ? 'destructive' : 'default'}
+      lines={values ? options.lines : []}
+      hint={values ? options.hint : bySource}
+      deltas={values ? compare(key, values, options.sense) : []}
+    />
+  );
+  const common = expenses?.common;
+  const books: ReactNode[] = [
+    resultTile(
+      'expenses',
+      t('reports.board.tiles.expenses'),
+      result((r) => r.expenses),
+      {
+        sense: 'neutral',
+        lines: common
+          ? [t('reports.board.tiles.commonLine', { amount: wholeTugrik(common.current) })]
+          : [],
+        hint: expenses && expenses.lines === 0 ? t('reports.board.tiles.expensesNone') : undefined,
+      },
+    ),
+    resultTile(
+      'operatingProfit',
+      t('reports.board.tiles.operatingProfit'),
+      result((r) => r.operatingProfit),
+      {
+        sense: 'good',
+        loss: true,
+        lines: results
+          ? [
+              t('reports.board.tiles.otherIncomeLine', {
+                amount: wholeTugrik(results.current.otherIncome),
+              }),
+            ]
+          : [],
+      },
+    ),
+    resultTile(
+      'netProfit',
+      t('reports.board.tiles.netProfit'),
+      result((r) => r.netProfit),
+      {
+        sense: 'good',
+        loss: true,
+        lines: results
+          ? [t('reports.board.tiles.taxLine', { amount: wholeTugrik(results.current.tax) })]
+          : [],
+      },
+    ),
+  ];
   const tiles: ReactNode[] = [
     <BoardTile
       key="sales"
@@ -400,11 +468,12 @@ function Tiles({ data }: { data: ProfitBoard }) {
       hint={bonus ? t('reports.board.tiles.bonusHint') : bySource}
     />,
   ];
-  // The result first (four tiles), then what stands beside it; each group fills its row and the
-  // later phases' expenses, taxes and net profit join as more tiles.
+  // The gross result first (four tiles), then what the books make of it (expenses, operating and
+  // net profit, ADR-0238), then what stands beside it; each group fills its row.
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 @5xl:grid-cols-4">{tiles.slice(0, 4)}</div>
+      <div className="grid grid-cols-3 gap-3">{books}</div>
       <div className="grid grid-cols-3 gap-3">{tiles.slice(4)}</div>
     </div>
   );
@@ -437,7 +506,9 @@ function Charts({ data }: { data: ProfitBoard }) {
     sales: point.sales,
     profit: point.profit,
     margin: point.margin,
+    netProfit: point.netProfit,
   }));
+  const results = data.results?.current ?? null;
   const { current } = data.totals;
   const steps: WaterfallStep[] = [
     { key: 'sales', label: t('reports.board.tiles.sales'), kind: 'total', value: current.sales },
@@ -448,7 +519,7 @@ function Charts({ data }: { data: ProfitBoard }) {
       value: new Decimal(current.cost).negated().toFixed(2),
     },
     { key: 'profit', label: t('reports.board.tiles.profit'), kind: 'total', value: current.profit },
-    ...(data.discounts
+    ...(data.discounts && results
       ? ([
           {
             key: 'discounts',
@@ -457,10 +528,34 @@ function Charts({ data }: { data: ProfitBoard }) {
             value: data.discounts.current,
           },
           {
-            key: 'withDiscounts',
-            label: t('reports.board.tiles.profitWithDiscounts'),
+            key: 'otherIncome',
+            label: t('reports.board.steps.otherIncome'),
+            kind: 'change',
+            value: results.otherIncome,
+          },
+          {
+            key: 'expenses',
+            label: t('reports.board.tiles.expenses'),
+            kind: 'change',
+            value: new Decimal(results.expenses).negated().toFixed(2),
+          },
+          {
+            key: 'operatingProfit',
+            label: t('reports.board.tiles.operatingProfit'),
             kind: 'total',
-            value: plus(current.profit, data.discounts.current),
+            value: results.operatingProfit,
+          },
+          {
+            key: 'tax',
+            label: t('reports.board.steps.tax'),
+            kind: 'change',
+            value: new Decimal(results.tax).negated().toFixed(2),
+          },
+          {
+            key: 'netProfit',
+            label: t('reports.board.tiles.netProfit'),
+            kind: 'total',
+            value: results.netProfit,
           },
         ] satisfies WaterfallStep[])
       : []),
@@ -470,7 +565,7 @@ function Charts({ data }: { data: ProfitBoard }) {
       <ChartCard title={t('reports.board.trend')}>
         <BoardTrendChart points={points} label={t('reports.board.trend')} />
       </ChartCard>
-      <ChartCard title={t('reports.board.waterfall')} note={t('reports.board.waterfallNote')}>
+      <ChartCard title={t('reports.board.waterfall')}>
         <WaterfallChart steps={steps} label={t('reports.board.waterfall')} />
       </ChartCard>
     </div>
@@ -829,8 +924,9 @@ function ProductsSheet(props: {
 /**
  * «Тайлан → Ашгийн самбар» (ADR-0237): a month, quarter or year's net sales, cost of goods sold,
  * gross profit and margin against the period before and the same one a year earlier, the trend, the
- * profit's structure with the suppliers' discounts, and the gross profit by supplier, category,
- * warehouse, rep and branch, each row opening its products. Only for `reports.margins.view`.
+ * profit's structure with the suppliers' discounts, the operating expenses, other income and tax
+ * from the books down to operating and net profit (ADR-0238), and the gross profit by supplier,
+ * category, warehouse, rep and branch, each row opening its products. Only for `reports.margins.view`.
  */
 export function ProfitBoardPage() {
   const { t } = useTranslation();
@@ -838,6 +934,7 @@ export function ProfitBoardPage() {
   const { filter, current, tab, update } = useBoardFilter();
   const board = useProfitBoard(filter);
   const [open, setOpen] = useState<OpenRow | null>(null);
+  const [expense, setExpense] = useState<OpenExpense | null>(null);
   const data = board.data;
   const sourceLabel = t('reports.profit.sources.label');
   return (
@@ -905,6 +1002,7 @@ export function ProfitBoardPage() {
         <>
           <Tiles data={data} />
           <Charts data={data} />
+          {data.expenses ? <ExpensesCard expenses={data.expenses} onOpen={setExpense} /> : null}
           <Breakdowns
             data={data}
             tab={tab}
@@ -927,6 +1025,12 @@ export function ProfitBoardPage() {
         filter={filter}
         range={data ? data.current : null}
         onClose={() => setOpen(null)}
+      />
+      <ExpenseEntriesSheet
+        open={expense}
+        filter={filter}
+        range={data ? data.current : null}
+        onClose={() => setExpense(null)}
       />
     </div>
   );

@@ -22,10 +22,12 @@ import {
   AgingDto,
   AgingItemsDto,
   AgingQueryDto,
+  BoardExpenseEntriesDto,
   BoardProductsDto,
   DashboardDto,
   DashboardQueryDto,
   ProfitBoardDto,
+  ProfitBoardExpenseEntriesQueryDto,
   ProfitBoardProductsQueryDto,
   ProfitBoardQueryDto,
   ProfitQueryDto,
@@ -219,6 +221,17 @@ export class ReportsController {
     @Query() query: ProfitBoardProductsQueryDto,
   ): Promise<BoardProductsDto> {
     return this.boards.products(ctx, query);
+  }
+
+  /** The journal lines behind one row of the board's operating expenses (ADR-0238), newest first. */
+  @Get('profit-board/expense-entries')
+  @RequirePermission('reports.margins.view')
+  @ApiOkResponse({ type: BoardExpenseEntriesDto })
+  profitBoardExpenseEntries(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: ProfitBoardExpenseEntriesQueryDto,
+  ): Promise<BoardExpenseEntriesDto> {
+    return this.boards.expenseEntries(ctx, query);
   }
 
   /** The documents behind a sales figure (the drill-down); costs only with margins. */
