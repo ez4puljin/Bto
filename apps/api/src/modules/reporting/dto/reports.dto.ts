@@ -616,8 +616,15 @@ export class BoardTrendPointDto extends BoardFiguresDto {
 export class BoardResultDto {
   @ApiProperty({ description: '«Бусад орлого»: INCOME accounts off the sales row' })
   otherIncome: string;
+  @ApiProperty({
+    description:
+      '«НӨАТ хасуулах» discounts by their documents, reversals netted (ADR-0241); never in expenses',
+  })
+  vatWaiverDiscounts: string;
   @ApiProperty({ description: '«Урсгал зардал»: the operating expense accounts' }) expenses: string;
-  @ApiProperty({ description: 'Gross profit + supplier discounts + other income − expenses' })
+  @ApiProperty({
+    description: 'Gross profit + supplier discounts + other income − waiver discounts − expenses',
+  })
   operatingProfit: string;
   @ApiProperty({ description: '«Татвар»: the income tax expense' }) tax: string;
   @ApiProperty({ description: 'Operating profit − tax' }) netProfit: string;
@@ -670,6 +677,26 @@ export class BoardExpensesDto {
   @ApiProperty({ description: 'Expense lines in the current period' }) lines: number;
 }
 
+@ApiSchema({ name: 'ProfitBoardVatWaived' })
+export class BoardVatWaivedDto {
+  @ApiProperty({ description: 'Sales whose live VAT waiver is dated in the period' }) count: number;
+  @ApiProperty({ description: 'Their invoices’ total, VAT included' }) total: string;
+  @ApiProperty({ description: 'The VAT inside them' }) vat: string;
+  @ApiProperty({ description: 'The discount their waivers gave' }) discount: string;
+  @ApiProperty({
+    description: 'The period’s wholesale invoices’ total (by invoice date, not VOID)',
+  })
+  wholesaleTotal: string;
+  @ApiProperty({ description: 'Of those invoices, the total of the ones with a POSTED waiver now' })
+  wholesaleWaived: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'wholesaleWaived in percent of wholesaleTotal (never above 100)',
+  })
+  share: string | null;
+}
+
 @ApiSchema({ name: 'ProfitBoardBranch' })
 export class BoardBranchDto {
   @ApiProperty() id: number;
@@ -704,6 +731,13 @@ export class ProfitBoardDto {
   })
   results: BoardResultsDto | null;
   @ApiProperty({ type: BoardExpensesDto, nullable: true }) expenses: BoardExpensesDto | null;
+  @ApiProperty({
+    type: BoardVatWaivedDto,
+    nullable: true,
+    description:
+      '«НӨАТ аваагүй борлуулалт» (ADR-0241), information only; null under the POS source filter',
+  })
+  vatWaived: BoardVatWaivedDto | null;
   @ApiProperty({ type: [BoardTrendPointDto] }) trend: BoardTrendPointDto[];
   @ApiProperty({ type: BoardBreakdownsDto }) breakdowns: BoardBreakdownsDto;
   @ApiProperty({ type: [BoardBranchDto] }) branches: BoardBranchDto[];

@@ -97660,13 +97660,17 @@
             "type": "string",
             "description": "«Бусад орлого»: INCOME accounts off the sales row"
           },
+          "vatWaiverDiscounts": {
+            "type": "string",
+            "description": "«НӨАТ хасуулах» discounts by their documents, reversals netted (ADR-0241); never in expenses"
+          },
           "expenses": {
             "type": "string",
             "description": "«Урсгал зардал»: the operating expense accounts"
           },
           "operatingProfit": {
             "type": "string",
-            "description": "Gross profit + supplier discounts + other income − expenses"
+            "description": "Gross profit + supplier discounts + other income − waiver discounts − expenses"
           },
           "tax": {
             "type": "string",
@@ -97679,6 +97683,7 @@
         },
         "required": [
           "otherIncome",
+          "vatWaiverDiscounts",
           "expenses",
           "operatingProfit",
           "tax",
@@ -97821,6 +97826,49 @@
           "total",
           "common",
           "lines"
+        ]
+      },
+      "ProfitBoardVatWaived": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Sales whose live VAT waiver is dated in the period"
+          },
+          "total": {
+            "type": "string",
+            "description": "Their invoices’ total, VAT included"
+          },
+          "vat": {
+            "type": "string",
+            "description": "The VAT inside them"
+          },
+          "discount": {
+            "type": "string",
+            "description": "The discount their waivers gave"
+          },
+          "wholesaleTotal": {
+            "type": "string",
+            "description": "The period’s wholesale invoices’ total (by invoice date, not VOID)"
+          },
+          "wholesaleWaived": {
+            "type": "string",
+            "description": "Of those invoices, the total of the ones with a POSTED waiver now"
+          },
+          "share": {
+            "type": "string",
+            "nullable": true,
+            "description": "wholesaleWaived in percent of wholesaleTotal (never above 100)"
+          }
+        },
+        "required": [
+          "count",
+          "total",
+          "vat",
+          "discount",
+          "wholesaleTotal",
+          "wholesaleWaived",
+          "share"
         ]
       },
       "ProfitBoardTrendPoint": {
@@ -98164,6 +98212,16 @@
               }
             ]
           },
+          "vatWaived": {
+            "nullable": true,
+            "description": "«НӨАТ аваагүй борлуулалт» (ADR-0241), information only; null under the POS source filter",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProfitBoardVatWaived"
+              }
+            ]
+          },
           "trend": {
             "type": "array",
             "items": {
@@ -98197,6 +98255,7 @@
           "bonus",
           "results",
           "expenses",
+          "vatWaived",
           "trend",
           "breakdowns",
           "branches"

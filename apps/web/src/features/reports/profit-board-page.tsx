@@ -44,6 +44,7 @@ import {
   useProfitBoardProducts,
 } from './api';
 import { ExpenseEntriesSheet, ExpensesCard, type OpenExpense } from './profit-board-expenses';
+import { VatWaivedCard } from './profit-board-vat-waived';
 import {
   BoardTrendChart,
   RankBars,
@@ -509,6 +510,12 @@ function Charts({ data }: { data: ProfitBoard }) {
     netProfit: point.netProfit,
   }));
   const results = data.results?.current ?? null;
+  // «НӨАТ хасуулах» (ADR-0241): its own step when the period or a comparison has any.
+  const waivers =
+    data.results !== null &&
+    [data.results.current, data.results.previous, data.results.lastYear].some(
+      (result) => !new Decimal(result.vatWaiverDiscounts).isZero(),
+    );
   const { current } = data.totals;
   const steps: WaterfallStep[] = [
     { key: 'sales', label: t('reports.board.tiles.sales'), kind: 'total', value: current.sales },
@@ -533,6 +540,16 @@ function Charts({ data }: { data: ProfitBoard }) {
             kind: 'change',
             value: results.otherIncome,
           },
+          ...(waivers
+            ? ([
+                {
+                  key: 'vatWaiver',
+                  label: t('reports.board.steps.vatWaiver'),
+                  kind: 'change',
+                  value: new Decimal(results.vatWaiverDiscounts).negated().toFixed(2),
+                },
+              ] satisfies WaterfallStep[])
+            : []),
           {
             key: 'expenses',
             label: t('reports.board.tiles.expenses'),
@@ -1003,6 +1020,7 @@ export function ProfitBoardPage() {
           <Tiles data={data} />
           <Charts data={data} />
           {data.expenses ? <ExpensesCard expenses={data.expenses} onOpen={setExpense} /> : null}
+          {data.vatWaived ? <VatWaivedCard waived={data.vatWaived} /> : null}
           <Breakdowns
             data={data}
             tab={tab}

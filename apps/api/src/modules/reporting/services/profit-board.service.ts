@@ -15,6 +15,7 @@ import {
   type LedgerSums,
 } from './board-ledger.service';
 import type { SalesSource } from './profit.service';
+import { type BoardVatWaived, vatWaived, waiverDiscounts, waiverTrend } from './board-vat-waivers';
 import { receiptDiscountEntries } from './receipt-discount-entries';
 import { RefreshService } from './refresh.service';
 import { ReportContext } from './report-context';
@@ -123,9 +124,14 @@ export interface BoardTrendPoint extends BoardFigures {
 export interface BoardResult {
   /** «Бусад орлого»: the INCOME accounts off the sales row. */
   otherIncome: string;
+  /**
+   * «Борлуулалтын хөнгөлөлт (НӨАТ-ын оронд)»: the discounts of «НӨАТ хасуулах» by their documents,
+   * reversals netted by their own date (ADR-0241); never also in `expenses` or `otherIncome`.
+   */
+  vatWaiverDiscounts: string;
   /** «Урсгал зардал»: the operating expense accounts (class 7). */
   expenses: string;
-  /** Gross profit + supplier discounts + other income − operating expenses. */
+  /** Gross profit + supplier discounts + other income − waiver discounts − operating expenses. */
   operatingProfit: string;
   /** «Татвар»: the income tax expense. */
   tax: string;
@@ -158,6 +164,11 @@ export interface ProfitBoard extends BoardPeriods {
   results: Record<BoardPeriodKey, BoardResult> | null;
   /** The operating expenses by the chart's groups down to the accounts; null under a source filter. */
   expenses: BoardExpenses | null;
+  /**
+   * «НӨАТ аваагүй борлуулалт» (ADR-0241): the current period's sales whose VAT receipt was waived,
+   * information only; null under the supermarket filter (a waiver is a wholesale invoice's).
+   */
+  vatWaived: BoardVatWaived | null;
   trend: BoardTrendPoint[];
   breakdowns: Record<BoardDimension, BoardBreakdown>;
   branches: { id: number; name: string }[];
@@ -219,11 +230,24 @@ const CATEGORY_TREE = sql`WITH RECURSIVE tree AS (
     SELECT k.id, t.top_id, CASE WHEN t.depth = 0 THEN k.id ELSE t.child_id END, t.depth + 1
       FROM public.categories k JOIN tree t ON k.parent_id = t.id)`;
 
-/** Operating and net profit from the gross profit, the discounts and the books (ADR-0238). */
-function result(grossProfit: Decimal, discount: Decimal, books: LedgerSums): BoardResult {
-  const operating = grossProfit.plus(discount).plus(books.otherIncome).minus(books.expenses);
+/**
+ * Operating and net profit from the gross profit, the supplier discounts, the waiver discounts
+ * (ADR-0241) and the books (ADR-0238).
+ */
+function result(
+  grossProfit: Decimal,
+  discount: Decimal,
+  books: LedgerSums,
+  waivers: Decimal,
+): BoardResult {
+  const operating = grossProfit
+    .plus(discount)
+    .plus(books.otherIncome)
+    .minus(waivers)
+    .minus(books.expenses);
   return {
     otherIncome: money(books.otherIncome),
+    vatWaiverDiscounts: money(waivers),
     expenses: money(books.expenses),
     operatingProfit: money(operating),
     tax: money(books.tax),
@@ -275,6 +299,7 @@ export class ProfitBoardService {
       branches,
       state,
       books,
+      waived,
     ] = await Promise.all([
       this.totals(periods, filter),
       this.trend(periods, filter, scope.today),
@@ -286,6 +311,7 @@ export class ProfitBoardService {
       this.branches(branchId),
       this.refresh.state(),
       withDiscounts ? this.books(scope.company, periods, branchId, scope.today) : null,
+      source === 'POS' ? null : vatWaived(this.db, periods.current, branchId),
     ]);
     const totalProfit = totals.current.sales.minus(totals.current.cost);
     const flag = (sales: Decimal, cost: Decimal) => {
@@ -393,7 +419,12 @@ export class ProfitBoardService {
       ? (Object.fromEntries(
           (['current', 'previous', 'lastYear'] as const).map((key) => [
             key,
-            result(totals[key].sales.minus(totals[key].cost), discountOf[key], books.results[key]),
+            result(
+              totals[key].sales.minus(totals[key].cost),
+              discountOf[key],
+              books.results[key],
+              books.waivers[key],
+            ),
           ]),
         ) as Record<BoardPeriodKey, BoardResult>)
       : null;
@@ -420,14 +451,19 @@ export class ProfitBoardService {
       bonus,
       results,
       expenses: books?.expenses ?? null,
+      vatWaived: waived,
       trend: trend.map((point) => {
         if (!books) return { ...point, netProfit: null };
-        const sums = books.trend.sums.get(point.period);
+        const sums = books.trend.sums.get(point.period) ?? {
+          otherIncome: ZERO,
+          expenses: ZERO,
+          tax: ZERO,
+        };
         const discount = books.trend.discounts.get(point.period) ?? ZERO;
-        const profit = new Decimal(point.profit);
+        const waivers = books.trend.waivers.get(point.period) ?? ZERO;
         return {
           ...point,
-          netProfit: sums ? result(profit, discount, sums).netProfit : money(profit.plus(discount)),
+          netProfit: result(new Decimal(point.profit), discount, sums, waivers).netProfit,
         };
       }),
       breakdowns: {
@@ -508,7 +544,7 @@ export class ProfitBoardService {
 
   /**
    * What the books add (ADR-0238): the three periods' other income, expenses and tax, the expense
-   * tree, and by trend period the same with the suppliers' discounts.
+   * tree, the waiver discounts (ADR-0241), and by trend period the same with the suppliers' discounts.
    */
   private async books(
     company: string,
@@ -522,10 +558,12 @@ export class ProfitBoardService {
       to: points.at(-1)?.range.to ?? periods.current.to,
     };
     const chart = await this.ledger.chart(company);
-    const [amounts, sums, discounts] = await Promise.all([
+    const [amounts, sums, discounts, waivers, waiversByPeriod] = await Promise.all([
       this.ledger.amounts(company, chart, periods, branchId),
       this.ledger.trend(company, chart, range, PERIOD_LABEL[periods.kind], branchId),
       this.discounts(company, range, branchId),
+      waiverDiscounts(this.db, company, periods, branchId),
+      waiverTrend(this.db, company, range, PERIOD_LABEL[periods.kind], branchId),
     ]);
     const byPeriod = new Map<string, Decimal>();
     for (const item of discounts) {
@@ -537,7 +575,8 @@ export class ProfitBoardService {
     return {
       results: this.ledger.results(chart, amounts),
       expenses: this.ledger.expenses(chart, amounts, branchId),
-      trend: { sums, discounts: byPeriod },
+      waivers,
+      trend: { sums, discounts: byPeriod, waivers: waiversByPeriod },
     };
   }
 

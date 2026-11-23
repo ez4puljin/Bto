@@ -26274,9 +26274,11 @@ export interface components {
         ProfitBoardResult: {
             /** @description «Бусад орлого»: INCOME accounts off the sales row */
             otherIncome: string;
+            /** @description «НӨАТ хасуулах» discounts by their documents, reversals netted (ADR-0241); never in expenses */
+            vatWaiverDiscounts: string;
             /** @description «Урсгал зардал»: the operating expense accounts */
             expenses: string;
-            /** @description Gross profit + supplier discounts + other income − expenses */
+            /** @description Gross profit + supplier discounts + other income − waiver discounts − expenses */
             operatingProfit: string;
             /** @description «Татвар»: the income tax expense */
             tax: string;
@@ -26317,6 +26319,22 @@ export interface components {
             common: components["schemas"]["ProfitBoardAmounts"] | null;
             /** @description Expense lines in the current period */
             lines: number;
+        };
+        ProfitBoardVatWaived: {
+            /** @description Sales whose live VAT waiver is dated in the period */
+            count: number;
+            /** @description Their invoices’ total, VAT included */
+            total: string;
+            /** @description The VAT inside them */
+            vat: string;
+            /** @description The discount their waivers gave */
+            discount: string;
+            /** @description The period’s wholesale invoices’ total (by invoice date, not VOID) */
+            wholesaleTotal: string;
+            /** @description Of those invoices, the total of the ones with a POSTED waiver now */
+            wholesaleWaived: string;
+            /** @description wholesaleWaived in percent of wholesaleTotal (never above 100) */
+            share: string | null;
         };
         ProfitBoardTrendPoint: {
             /** @description Net sales without VAT and city tax, net of returns */
@@ -26413,6 +26431,8 @@ export interface components {
             /** @description From the books (ADR-0238); null under a source filter */
             results: components["schemas"]["ProfitBoardResults"] | null;
             expenses: components["schemas"]["ProfitBoardExpenses"] | null;
+            /** @description «НӨАТ аваагүй борлуулалт» (ADR-0241), information only; null under the POS source filter */
+            vatWaived: components["schemas"]["ProfitBoardVatWaived"] | null;
             trend: components["schemas"]["ProfitBoardTrendPoint"][];
             breakdowns: components["schemas"]["ProfitBoardBreakdowns"];
             branches: components["schemas"]["ProfitBoardBranch"][];

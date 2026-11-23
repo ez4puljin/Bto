@@ -64,8 +64,10 @@ const result = (
   operating: string,
   tax: string,
   net: string,
+  vatWaiverDiscounts = '0.00',
 ) => ({
   otherIncome,
+  vatWaiverDiscounts,
   expenses,
   operatingProfit: operating,
   tax,
@@ -96,6 +98,15 @@ const BOARD: ProfitBoard = {
     current: result('5000.00', '120000.00', '100000.00', '10000.00', '90000.00'),
     previous: result('0.00', '100000.00', '70000.00', '0.00', '70000.00'),
     lastYear: result('0.00', '0.00', '0.00', '0.00', '0.00'),
+  },
+  vatWaived: {
+    count: 0,
+    total: '0.00',
+    vat: '0.00',
+    discount: '0.00',
+    wholesaleTotal: '600000.00',
+    wholesaleWaived: '0.00',
+    share: '0.0',
   },
   expenses: {
     rows: [
@@ -338,6 +349,10 @@ describe('«Ашгийн самбар» (ADR-0237)', () => {
       expect(within(cell.closest('tr') as HTMLElement).getByText(amount)).toBeInTheDocument();
     }
     expect(waterfall.queryByRole('cell', { name: b.tiles.profitWithDiscounts })).toBeNull();
+    // No waiver in the period or its comparisons: no step of its own; the card says so.
+    expect(waterfall.queryByRole('cell', { name: b.steps.vatWaiver })).toBeNull();
+    const waivedCard = within(screen.getByRole('region', { name: b.vatWaived.title }));
+    expect(waivedCard.getByText(b.vatWaived.empty)).toBeInTheDocument();
     const trend = within(screen.getByRole('region', { name: b.trend }));
     expect(trend.getByRole('columnheader', { name: b.columns.netProfit })).toBeInTheDocument();
     expect(trend.getByText('90,000₮')).toBeInTheDocument();
@@ -551,6 +566,7 @@ describe('«Ашгийн самбар» (ADR-0237)', () => {
           bonus: null,
           results: null,
           expenses: null,
+          vatWaived: null,
           trend: BOARD.trend.map((point) => ({ ...point, netProfit: null })),
         }),
     });
@@ -560,5 +576,75 @@ describe('«Ашгийн самбар» (ADR-0237)', () => {
     expect(expenseCard()).toBeUndefined();
     const waterfall = within(screen.getByRole('region', { name: b.waterfall }));
     expect(waterfall.queryByRole('cell', { name: b.tiles.netProfit })).toBeNull();
+    expect(screen.queryByRole('region', { name: b.vatWaived.title })).toBeNull();
+  });
+
+  it('shows the VAT waivers as a step of the structure and the sales that took no VAT receipt', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REFRESH,
+      'GET /api/v1/reports/profit-board': () =>
+        json({
+          ...BOARD,
+          // 200,000 + 15,000 + 5,000 − 2,000 − 120,000 = 98,000 operating; − 10,000 = 88,000 net.
+          results: {
+            ...BOARD.results,
+            current: result('5000.00', '120000.00', '98000.00', '10000.00', '88000.00', '2000.00'),
+          },
+          vatWaived: {
+            count: 3,
+            total: '100000.00',
+            vat: '9090.91',
+            discount: '2000.00',
+            // Of the period's invoices, those waived now: 90,000 of 600,000.
+            wholesaleTotal: '600000.00',
+            wholesaleWaived: '90000.00',
+            share: '15.0',
+          },
+        }),
+    });
+    renderApp('/reports/profit-board?kind=quarter&period=2026-Q4', fetchMock);
+    const waterfall = within(await screen.findByRole('region', { name: b.waterfall }));
+    const labels = waterfall.getAllByRole('cell').map((cell) => cell.textContent);
+    const at = (label: string) => labels.indexOf(label);
+    expect(at(b.steps.vatWaiver)).toBeGreaterThan(at(b.steps.otherIncome));
+    expect(at(b.steps.vatWaiver)).toBeLessThan(at(b.tiles.expenses));
+    for (const [label, amount] of [
+      [b.steps.vatWaiver, '-2,000₮'],
+      [b.tiles.operatingProfit, '98,000₮'],
+      [b.tiles.netProfit, '88,000₮'],
+    ] as const) {
+      const cell = waterfall.getByRole('cell', { name: label });
+      expect(within(cell.closest('tr') as HTMLElement).getByText(amount)).toBeInTheDocument();
+    }
+    const card = within(screen.getByRole('region', { name: b.vatWaived.title }));
+    expect(card.getByText(b.vatWaived.hint)).toBeInTheDocument();
+    for (const [label, value] of [
+      [b.vatWaived.count, '3'],
+      [b.vatWaived.total, '100,000₮'],
+      [b.vatWaived.vat, '9,090.91₮'],
+      [b.vatWaived.discount, '2,000₮'],
+      [b.vatWaived.share, '15.0%'],
+    ] as const) {
+      const term = card.getByText(label);
+      expect(within(term.parentElement as HTMLElement).getByText(value)).toBeInTheDocument();
+    }
+  });
+
+  it('keeps the waiver step when only a comparison period has one', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...REFRESH,
+      'GET /api/v1/reports/profit-board': () =>
+        json({
+          ...BOARD,
+          results: {
+            ...BOARD.results,
+            previous: result('0.00', '100000.00', '69000.00', '0.00', '69000.00', '1000.00'),
+          },
+        }),
+    });
+    renderApp('/reports/profit-board?kind=quarter&period=2026-Q4', fetchMock);
+    const waterfall = within(await screen.findByRole('region', { name: b.waterfall }));
+    const cell = waterfall.getByRole('cell', { name: b.steps.vatWaiver });
+    expect(within(cell.closest('tr') as HTMLElement).getByText('0₮')).toBeInTheDocument();
   });
 });

@@ -147,6 +147,17 @@ const between = (range: DateRange) =>
 
 const idArray = (ids: readonly number[]) => sql`${`{${ids.join(',')}}`}::bigint[]`;
 
+/**
+ * The source document type of a «НӨАТ хасуулах» entry and of its reversal (ADR-0240: the core's
+ * REVERSE copies the original's source onto the mirror document). The board counts these lines
+ * once, as the waiver discounts (`board-vat-waivers.ts`, ADR-0241), so they never count again in
+ * the expense tree, the other income or the tax, whatever the customer's counter account.
+ */
+export const VAT_WAIVER_DOC_TYPE = 'VAT_WAIVER';
+
+/** Leaves out the waivers' lines (alias `l`). */
+const notWaiver = sql`l.source_doc_type IS DISTINCT FROM ${VAT_WAIVER_DOC_TYPE}`;
+
 @Injectable()
 export class BoardLedgerService {
   constructor(@Inject(DB) private readonly db: Db) {}
@@ -239,7 +250,7 @@ export class BoardLedgerService {
                  count(*) FILTER (WHERE ${between(c)}) AS c_lines
             FROM reporting.ledger_lines l
            WHERE l.company_code = ${company} AND l.account_id = ANY(${idArray(ids)})
-             AND (${between(c)} OR ${between(p)} OR ${between(y)}) AND ${branch}
+             AND (${between(c)} OR ${between(p)} OR ${between(y)}) AND ${branch} AND ${notWaiver}
            GROUP BY 1, 2`,
     );
     return rows.map((row) => ({
@@ -429,7 +440,7 @@ export class BoardLedgerService {
       sql`SELECT to_char(l.entry_date, ${label}) AS period, l.account_id, sum(l.amount) AS amount
             FROM reporting.ledger_lines l
            WHERE l.company_code = ${company} AND ${between(range)}
-             AND l.account_id = ANY(${idArray(ids)})
+             AND l.account_id = ANY(${idArray(ids)}) AND ${notWaiver}
              AND ${branchId === null ? sql`TRUE` : sql`l.branch_id = ${branchId}`}
            GROUP BY 1, 2`,
     );
@@ -488,7 +499,7 @@ export class BoardLedgerService {
           ? sql`TRUE`
           : sql`l.branch_id = ${branchId}`;
     const where = sql`l.company_code = ${company} AND ${between(range)}
-                      AND l.account_id = ANY(${idArray(ids)}) AND ${branch}`;
+                      AND l.account_id = ANY(${idArray(ids)}) AND ${branch} AND ${notWaiver}`;
     const [rows, totals] = await Promise.all([
       rowsOf(
         this.db,

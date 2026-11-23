@@ -36,6 +36,7 @@ export type ProfitBoardRow = ProfitBoard['breakdowns']['supplier']['rows'][numbe
 export type ProfitBoardBreakdown = ProfitBoard['breakdowns']['supplier'];
 export type ProfitBoardProducts = Body<'/api/v1/reports/profit-board/products'>;
 export type ProfitBoardExpenses = NonNullable<ProfitBoard['expenses']>;
+export type ProfitBoardVatWaived = NonNullable<ProfitBoard['vatWaived']>;
 export type ProfitBoardExpenseRow = ProfitBoardExpenses['rows'][number];
 export type ProfitBoardExpenseEntries = Body<'/api/v1/reports/profit-board/expense-entries'>;
 /** What the entries behind the expenses are asked for: a row of the tree, or the branch-less lines. */

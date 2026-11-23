@@ -16,6 +16,7 @@ interface Figures {
 }
 interface ResultJson {
   otherIncome: string;
+  vatWaiverDiscounts: string;
   expenses: string;
   operatingProfit: string;
   tax: string;
@@ -256,6 +257,7 @@ describe('profit board: expenses from the books', () => {
     expect(report.running).toBe(false);
     expect(report.results?.current).toEqual({
       otherIncome: '200000.00',
+      vatWaiverDiscounts: '0.00',
       expenses: '1320000.00',
       operatingProfit: '-1120000.00',
       tax: '50000.00',
