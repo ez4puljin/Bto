@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -9,7 +10,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Decimal } from '@tugeel/shared/money';
 import {
   type AuthContext,
@@ -30,6 +31,8 @@ import {
   DateRangeQueryDto,
   GlAccountDto,
   GlAccountGroupDto,
+  GlAccountGroupPatchDto,
+  GlAccountGroupRequestDto,
   GlAccountPatchDto,
   GlAccountRequestDto,
   GlAccountRoleRequestDto,
@@ -86,6 +89,48 @@ export class GlAccountsController {
   @ApiOkResponse({ type: [GlAccountGroupDto] })
   groups(): Promise<GlAccountGroupDto[]> {
     return this.imports.chartGroups();
+  }
+
+  /** A group made by hand (ADR-0239), after its siblings. */
+  @Post('groups')
+  @RequirePermission(SETTINGS)
+  @ApiCreatedResponse({ type: GlAccountGroupDto })
+  createGroup(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: GlAccountGroupRequestDto,
+  ): Promise<GlAccountGroupDto> {
+    return this.accounts.createGroup(ctx, {
+      code: body.code,
+      name: body.name,
+      parentId: body.parentId ?? null,
+    });
+  }
+
+  /** Renames a group or moves it under another (ADR-0239); its code stays. */
+  @Put('groups/:id')
+  @RequirePermission(SETTINGS)
+  @ApiOkResponse({ type: GlAccountGroupDto })
+  updateGroup(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: GlAccountGroupPatchDto,
+  ): Promise<GlAccountGroupDto> {
+    return this.accounts.updateGroup(ctx, id, {
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.parentId !== undefined ? { parentId: body.parentId } : {}),
+    });
+  }
+
+  /** Deletes a group with no account and no sub-group (ADR-0239: it is made inactive). */
+  @Delete('groups/:id')
+  @HttpCode(204)
+  @RequirePermission(SETTINGS)
+  @ApiNoContentResponse()
+  async deleteGroup(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<void> {
+    await this.accounts.deleteGroup(ctx, id);
   }
 
   /** A whole chart with its tree, in one transaction (ADR-0148). */

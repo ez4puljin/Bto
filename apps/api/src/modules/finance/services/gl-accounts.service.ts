@@ -12,6 +12,7 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import {
+  type FinAccountGroupView,
   type FinAccountView,
   FinChartService,
   FinJournalReader,
@@ -46,6 +47,8 @@ export interface GlAccountInput {
   kind?: GlAccountKind;
   journal?: AccountJournal;
   currency?: string;
+  /** Its group in the chart's tree (ADR-0239); left out or null: none. */
+  groupId?: number | null;
 }
 
 export interface GlAccountPatch {
@@ -55,6 +58,21 @@ export interface GlAccountPatch {
   status?: AccountStatus;
   journal?: AccountJournal;
   currency?: string;
+  /** Null takes it out of its group. */
+  groupId?: number | null;
+}
+
+/** A group of the chart made by hand (ADR-0239). */
+export interface GlAccountGroupInput {
+  code: string;
+  name: string;
+  parentId: number | null;
+}
+
+export interface GlAccountGroupPatch {
+  name?: string;
+  /** Null: a root group. */
+  parentId?: number | null;
 }
 
 /** An account with its turnover and balance up to a date (debit − credit; negative = credit). */
@@ -160,6 +178,7 @@ export class GlAccountsService {
         kind,
         ...(input.journal !== undefined ? { journal: input.journal } : {}),
         ...(input.currency !== undefined ? { currency: input.currency } : {}),
+        groupId: input.groupId ?? null,
       });
       await ensureReceiptCounterKeysInTx(
         tx,
@@ -172,7 +191,14 @@ export class GlAccountsService {
         action: 'CREATE',
         entity: 'gl_accounts',
         entityId: row.id,
-        after: { code, name, kind, journal: row.journal, currency: row.currency },
+        after: {
+          code,
+          name,
+          kind,
+          journal: row.journal,
+          currency: row.currency,
+          groupId: row.groupId,
+        },
       });
       await this.chart.ensureMoneyAccountInTx(tx, this.books.user(ctx), {
         company: await this.books.company(),
@@ -196,6 +222,7 @@ export class GlAccountsService {
         ...(patch.status !== undefined ? { status: patch.status } : {}),
         ...(patch.journal !== undefined ? { journal: patch.journal } : {}),
         ...(patch.currency !== undefined ? { currency: patch.currency } : {}),
+        ...(patch.groupId !== undefined ? { groupId: patch.groupId } : {}),
       };
       const changed = await this.chart.updateAccountInTx(tx, this.books.user(ctx), {
         company: await this.books.company(),
@@ -212,11 +239,48 @@ export class GlAccountsService {
         action: 'UPDATE',
         entity: 'gl_accounts',
         entityId: id,
-        before: { code: before.code, name: before.name, kind: before.kind, status: before.status },
+        before: {
+          code: before.code,
+          name: before.name,
+          kind: before.kind,
+          status: before.status,
+          groupId: before.groupId,
+        },
         after: set,
       });
       return toGlAccount(after, role);
     });
+  }
+
+  /** A group made by hand under `parentId` (ADR-0239); the core audits it. */
+  async createGroup(ctx: AuthContext, input: GlAccountGroupInput): Promise<FinAccountGroupView> {
+    const company = await this.books.company();
+    return inTransaction(this.db, (tx) =>
+      this.chart.createGroupInTx(tx, this.books.user(ctx), { company, ...input }),
+    );
+  }
+
+  /** Renames a group or moves it (ADR-0239); 404 when the company has no such active group. */
+  async updateGroup(
+    ctx: AuthContext,
+    id: number,
+    patch: GlAccountGroupPatch,
+  ): Promise<FinAccountGroupView> {
+    const company = await this.books.company();
+    const group = await inTransaction(this.db, (tx) =>
+      this.chart.updateGroupInTx(tx, this.books.user(ctx), { company, id, patch }),
+    );
+    if (!group) throw notFound('gl_account_group', id);
+    return group;
+  }
+
+  /** Deletes an empty group (ADR-0239: made inactive); 404 when there is no such active group. */
+  async deleteGroup(ctx: AuthContext, id: number): Promise<void> {
+    const company = await this.books.company();
+    const done = await inTransaction(this.db, (tx) =>
+      this.chart.deleteGroupInTx(tx, this.books.user(ctx), { company, id }),
+    );
+    if (!done) throw notFound('gl_account_group', id);
   }
 
   /**

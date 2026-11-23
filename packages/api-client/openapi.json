@@ -29583,6 +29583,144 @@
         "tags": [
           "finance"
         ]
+      },
+      "post": {
+        "operationId": "GlAccounts_createGroup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlAccountGroupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlAccountGroup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A group made by hand (ADR-0239), after its siblings.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/gl-accounts/groups/{id}": {
+      "put": {
+        "operationId": "GlAccounts_updateGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlAccountGroupPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlAccountGroup"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renames a group or moves it under another (ADR-0239); its code stays.",
+        "tags": [
+          "finance"
+        ]
+      },
+      "delete": {
+        "operationId": "GlAccounts_deleteGroup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deletes a group with no account and no sub-group (ADR-0239: it is made inactive).",
+        "tags": [
+          "finance"
+        ]
       }
     },
     "/api/v1/gl-accounts/chart": {
@@ -82484,6 +82622,44 @@
           "status"
         ]
       },
+      "GlAccountGroupRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "7011",
+            "description": "Unique in the company; fixed once made"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Null: a root group"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "parentId"
+        ]
+      },
+      "GlAccountGroupPatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "parentId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Moves it there; null: a root group; left out: stays"
+          }
+        }
+      },
       "ChartGroupRow": {
         "type": "object",
         "properties": {
@@ -82884,6 +83060,11 @@
               "ZAR"
             ],
             "type": "string"
+          },
+          "groupId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Its group (ADR-0239)"
           }
         },
         "required": [
@@ -82964,6 +83145,11 @@
               "ZAR"
             ],
             "type": "string"
+          },
+          "groupId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Moves it to this group (ADR-0239); null: no group; left out: stays"
           }
         }
       },

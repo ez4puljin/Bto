@@ -65,6 +65,8 @@ const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
+/** A group's code: the core's code shape (ADR-0239). */
+const GROUP_CODE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
 const STATUSES = ['ACTIVE', 'INACTIVE'] as const;
 type AccountStatus = (typeof STATUSES)[number];
 
@@ -173,6 +175,42 @@ export class GlAccountGroupDto {
   @ApiProperty({ enum: STATUSES }) status: AccountStatus;
 }
 
+@ApiSchema({ name: 'GlAccountGroupRequest' })
+export class GlAccountGroupRequestDto {
+  @ApiProperty({ example: '7011', description: 'Unique in the company; fixed once made' })
+  @Transform(trimmed)
+  @IsString()
+  @Matches(GROUP_CODE)
+  code: string;
+  @ApiProperty({ maxLength: 200 })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(200)
+  name: string;
+  @ApiProperty({ type: Number, nullable: true, description: 'Null: a root group' })
+  @IsOptional()
+  @IsInt()
+  parentId: number | null;
+}
+
+@ApiSchema({ name: 'GlAccountGroupPatch' })
+export class GlAccountGroupPatchDto {
+  @ApiPropertyOptional({ maxLength: 200 })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(200)
+  name?: string;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Moves it there; null: a root group; left out: stays',
+  })
+  @IsOptional()
+  @IsInt()
+  parentId?: number | null;
+}
+
 @ApiSchema({ name: 'ChartGroupRow' })
 export class ChartGroupRowDto {
   @ApiProperty() @IsString() @MaxLength(64) code: string;
@@ -265,6 +303,10 @@ export class GlAccountRequestDto {
   @IsOptional()
   @IsIn(ACCOUNT_CURRENCIES)
   currency?: AccountCurrency;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Its group (ADR-0239)' })
+  @IsOptional()
+  @IsInt()
+  groupId?: number | null;
 }
 
 @ApiSchema({ name: 'GlAccountPatch' })
@@ -289,6 +331,14 @@ export class GlAccountPatchDto {
   @IsOptional()
   @IsIn(ACCOUNT_CURRENCIES)
   currency?: AccountCurrency;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Moves it to this group (ADR-0239); null: no group; left out: stays',
+  })
+  @IsOptional()
+  @IsInt()
+  groupId?: number | null;
 }
 
 @ApiSchema({ name: 'GlAccountRoleRequest' })

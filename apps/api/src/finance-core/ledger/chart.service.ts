@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CODE_PATTERN, type FinPermission } from '@tugeel/fin-contract';
-import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { recordFinAudit } from '../audit/fin-audit';
 import { type CompanyScope, type FinExecutor, resolveCompany } from '../context/authorize';
 import type { FinCallContext } from '../context/call-context';
@@ -176,8 +176,13 @@ export const FIN_RULES_FROM_START = '2000-01-01';
 /** pg_advisory_xact_lock key per company for rule changes (the role dialog's check-then-insert). */
 const RULES_LOCK = 72_026_132;
 
+/** pg_advisory_xact_lock key per company for changes of the group tree (a move's cycle check). */
+const GROUPS_LOCK = 72_026_134;
+
 const READ: FinPermission[] = ['finance.read'];
 const CHART_WRITE: FinPermission[] = ['finance.config.manage', 'finance.journal.manage'];
+/** One group made, renamed, moved or deleted by hand (ADR-0239), as the whole-tree upsert's route. */
+const GROUP_WRITE: FinPermission[] = ['finance.config.manage', 'finance.settings.manage'];
 const RULE_WRITE: FinPermission[] = ['finance.config.manage', 'finance.settings.manage'];
 const MONEY_WRITE: FinPermission[] = ['finance.config.manage', 'finance.settings.manage'];
 
@@ -241,7 +246,10 @@ export class FinChartService {
     return new Map(rows.map((row) => [row.id, row]));
   }
 
-  /** A new account inside the caller's transaction, its normal side from its kind. */
+  /**
+   * A new account inside the caller's transaction, its normal side from its kind, in `groupId` (an
+   * active group of the company; left out or null: none, ADR-0239).
+   */
   async createAccountInTx(
     tx: FinTx,
     ctx: FinCallContext,
@@ -252,6 +260,7 @@ export class FinChartService {
       kind: FinAccountKind;
       journal?: FinAccountJournal;
       currency?: string;
+      groupId?: number | null;
     },
   ): Promise<FinAccountView> {
     const code = trimmed(input.code, 'code', 64);
@@ -262,6 +271,11 @@ export class FinChartService {
       userAnyOf: CHART_WRITE,
     });
     const journal = checkedJournal(input.journal ?? 'GENERAL');
+    const groupId = input.groupId ?? null;
+    if (groupId !== null) {
+      await lockGroups(tx, scope.companyId);
+      await activeGroup(tx, scope.companyId, groupId, 'groupId');
+    }
     const values = {
       code,
       name,
@@ -270,6 +284,7 @@ export class FinChartService {
       journal,
       currency: checkedCurrency(input.currency ?? 'MNT'),
       control: controlOfJournal(journal, input.kind, 'NONE'),
+      groupId,
     };
     const [row] = await tx
       .insert(finAccounts)
@@ -304,6 +319,8 @@ export class FinChartService {
         status?: FinStatus;
         journal?: FinAccountJournal;
         currency?: string;
+        /** Its group (null: none); moves it in the tree, never a balance (ADR-0239). */
+        groupId?: number | null;
       };
     },
   ): Promise<{ before: FinAccountView; after: FinAccountView } | null> {
@@ -311,6 +328,10 @@ export class FinChartService {
       source: false,
       userAnyOf: CHART_WRITE,
     });
+    // Before the account's row: the group changes' lock always comes first (see lockGroups).
+    if (input.patch.groupId !== undefined && input.patch.groupId !== null) {
+      await lockGroups(tx, scope.companyId);
+    }
     const [before] = await tx
       .select(accountColumns)
       .from(finAccounts)
@@ -331,6 +352,10 @@ export class FinChartService {
       if (inUse.has(before.id)) {
         throw new FinError('FIN_ACCOUNT_IN_USE', undefined, { path: 'journal', code: before.code });
       }
+    }
+    const groupId = patch.groupId ?? null;
+    if (groupId !== null && groupId !== before.groupId) {
+      await activeGroup(tx, scope.companyId, groupId, 'groupId');
     }
     const control =
       journal === undefined
@@ -375,6 +400,7 @@ export class FinChartService {
           }
         : {}),
       ...(patch.status !== undefined ? { status: patch.status } : {}),
+      ...(patch.groupId !== undefined ? { groupId: patch.groupId } : {}),
     };
     const [after] = await tx
       .update(finAccounts)
@@ -388,7 +414,13 @@ export class FinChartService {
       action: 'UPDATE',
       entity: 'account',
       entityId: input.id,
-      before: { code: before.code, name: before.name, kind: before.kind, status: before.status },
+      before: {
+        code: before.code,
+        name: before.name,
+        kind: before.kind,
+        status: before.status,
+        groupId: before.groupId,
+      },
       after: set,
     });
     return { before, after };
@@ -648,17 +680,179 @@ export class FinChartService {
   ): Promise<FinAccountGroupView[]> {
     const scope = await this.read(executor, ctx, query.company);
     return executor
-      .select({
-        id: finAccountGroups.id,
-        code: finAccountGroups.code,
-        name: finAccountGroups.name,
-        parentId: finAccountGroups.parentId,
-        sort: finAccountGroups.sort,
-        status: finAccountGroups.status,
-      })
+      .select(groupColumns)
       .from(finAccountGroups)
       .where(eq(finAccountGroups.companyId, scope.companyId))
       .orderBy(asc(finAccountGroups.code));
+  }
+
+  /**
+   * A group made by hand (ADR-0239): its code unique in the company, under `parentId` (null: a
+   * root) after its siblings. A code that an earlier, deleted group held brings that group back with
+   * the new name and place; a code an active group holds is refused (`group.code` `taken`).
+   */
+  async createGroupInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; code: string; name: string; parentId: number | null },
+  ): Promise<FinAccountGroupView> {
+    const scope = await this.groupWriter(tx, ctx, input.company);
+    const code = input.code.trim();
+    if (!CODE_PATTERN.test(code)) throw invalid('group.code');
+    const name = trimmed(input.name, 'group.name', 200);
+    if (input.parentId !== null) await activeGroup(tx, scope.companyId, input.parentId, 'parentId');
+    const [taken] = await tx
+      .select(groupColumns)
+      .from(finAccountGroups)
+      .where(and(eq(finAccountGroups.companyId, scope.companyId), eq(finAccountGroups.code, code)));
+    if (taken?.status === 'ACTIVE') throw groupRefused('group.code', 'taken', code);
+    const values = {
+      name,
+      parentId: input.parentId,
+      sort: await nextSort(tx, scope.companyId, input.parentId),
+      status: 'ACTIVE' as const,
+    };
+    const [row] = taken
+      ? await tx
+          .update(finAccountGroups)
+          .set({ ...values, updatedAt: sql`now()` })
+          .where(
+            and(eq(finAccountGroups.companyId, scope.companyId), eq(finAccountGroups.id, taken.id)),
+          )
+          .returning(groupColumns)
+      : await tx
+          .insert(finAccountGroups)
+          .values({ companyId: scope.companyId, code, ...values })
+          .returning(groupColumns);
+    if (!row) throw new Error('fin account group was not saved');
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'CREATE',
+      entity: 'account_group',
+      entityId: row.id,
+      ...(taken
+        ? { before: { name: taken.name, parentId: taken.parentId, status: taken.status } }
+        : {}),
+      after: { code, ...values },
+    });
+    return row;
+  }
+
+  /**
+   * Renames a group or moves it under another parent (ADR-0239); its code stays, since the
+   * whole-tree upsert finds groups by code. A move goes after the new siblings, never under the
+   * group itself or one of its descendants (`group.parentId` `cycle`). Null when the company has no
+   * such group.
+   */
+  async updateGroupInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; id: number; patch: { name?: string; parentId?: number | null } },
+  ): Promise<FinAccountGroupView | null> {
+    const scope = await this.groupWriter(tx, ctx, input.company);
+    const [before] = await tx
+      .select(groupColumns)
+      .from(finAccountGroups)
+      .where(
+        and(eq(finAccountGroups.companyId, scope.companyId), eq(finAccountGroups.id, input.id)),
+      )
+      .for('update');
+    if (!before || before.status !== 'ACTIVE') return null;
+    const { patch } = input;
+    const name = patch.name === undefined ? undefined : trimmed(patch.name, 'group.name', 200);
+    const moves = patch.parentId !== undefined && patch.parentId !== before.parentId;
+    let sort: number | undefined;
+    if (moves && patch.parentId !== undefined) {
+      if (patch.parentId !== null) {
+        await activeGroup(tx, scope.companyId, patch.parentId, 'parentId');
+        const parents = await parentsOf(tx, scope.companyId);
+        for (let at: number | null = patch.parentId, steps = 0; at !== null; steps += 1) {
+          if (at === before.id || steps > parents.size) {
+            throw groupRefused('group.parentId', 'cycle', before.code);
+          }
+          at = parents.get(at) ?? null;
+        }
+      }
+      sort = await nextSort(tx, scope.companyId, patch.parentId);
+    }
+    const set = {
+      ...(name !== undefined ? { name } : {}),
+      ...(moves ? { parentId: patch.parentId ?? null, sort } : {}),
+    };
+    if (Object.keys(set).length === 0) return before;
+    const [after] = await tx
+      .update(finAccountGroups)
+      .set({ ...set, updatedAt: sql`now()` })
+      .where(
+        and(eq(finAccountGroups.companyId, scope.companyId), eq(finAccountGroups.id, input.id)),
+      )
+      .returning(groupColumns);
+    if (!after) return null;
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'UPDATE',
+      entity: 'account_group',
+      entityId: input.id,
+      before: { name: before.name, parentId: before.parentId, sort: before.sort },
+      after: set,
+    });
+    return after;
+  }
+
+  /**
+   * Deletes a group made by hand or imported (ADR-0239): groups are never removed, so it is made
+   * inactive, and only while no account and no active group sits right under it
+   * (`group` `notEmpty`). False when the company has no such active group.
+   */
+  async deleteGroupInTx(
+    tx: FinTx,
+    ctx: FinCallContext,
+    input: { company: string; id: number },
+  ): Promise<boolean> {
+    const scope = await this.groupWriter(tx, ctx, input.company);
+    const [group] = await tx
+      .select(groupColumns)
+      .from(finAccountGroups)
+      .where(
+        and(eq(finAccountGroups.companyId, scope.companyId), eq(finAccountGroups.id, input.id)),
+      )
+      .for('update');
+    if (!group || group.status !== 'ACTIVE') return false;
+    const [account] = await tx
+      .select({ id: finAccounts.id })
+      .from(finAccounts)
+      .where(and(eq(finAccounts.companyId, scope.companyId), eq(finAccounts.groupId, group.id)))
+      .limit(1);
+    const [child] = await tx
+      .select({ id: finAccountGroups.id })
+      .from(finAccountGroups)
+      .where(
+        and(
+          eq(finAccountGroups.companyId, scope.companyId),
+          eq(finAccountGroups.parentId, group.id),
+          eq(finAccountGroups.status, 'ACTIVE'),
+        ),
+      )
+      .limit(1);
+    if (account || child) throw groupRefused('group', 'notEmpty', group.code);
+    await tx
+      .update(finAccountGroups)
+      .set({ status: 'INACTIVE', updatedAt: sql`now()` })
+      .where(
+        and(eq(finAccountGroups.companyId, scope.companyId), eq(finAccountGroups.id, group.id)),
+      );
+    await recordFinAudit(tx, ctx, {
+      tenantId: scope.tenantId,
+      companyId: scope.companyId,
+      action: 'DEACTIVATE',
+      entity: 'account_group',
+      entityId: group.id,
+      before: { code: group.code, name: group.name, parentId: group.parentId, status: 'ACTIVE' },
+      after: { status: 'INACTIVE' },
+    });
+    return true;
   }
 
   /**
@@ -725,6 +919,7 @@ export class FinChartService {
       source: false,
       userAnyOf: CHART_WRITE,
     });
+    await lockGroups(tx, scope.companyId);
     const ids = new Map<string, number>();
     for (const [index, row] of input.groups.entries()) {
       const path = `groups.${index}`;
@@ -774,6 +969,8 @@ export class FinChartService {
     if (input.rows.some((row) => row.key !== null)) {
       await resolveCompany(tx, ctx, input.company, { source: false, userAnyOf: RULE_WRITE });
     }
+    // The group lock before the rules' lock and every row, as the tree upsert takes it.
+    await lockGroups(tx, scope.companyId);
     await tx.execute(sql`SELECT pg_advisory_xact_lock(${RULES_LOCK}, ${scope.companyId})`);
     const codes = input.rows.map((row, index) => trimmed(row.code, `rows.${index}.code`, 64));
     const existing = new Map(
@@ -1106,6 +1303,13 @@ export class FinChartService {
     return resolveCompany(executor, ctx, company, { source: true, userAnyOf: READ });
   }
 
+  /** The company for a change of one group, with the company's group changes queued behind it. */
+  private async groupWriter(tx: FinTx, ctx: FinCallContext, company: string) {
+    const scope = await resolveCompany(tx, ctx, company, { source: false, userAnyOf: GROUP_WRITE });
+    await lockGroups(tx, scope.companyId);
+    return scope;
+  }
+
   private async moneyValues(
     tx: FinTx,
     scope: CompanyScope,
@@ -1168,6 +1372,69 @@ const accountColumns = {
   createdAt: finAccounts.createdAt,
   updatedAt: finAccounts.updatedAt,
 };
+
+const groupColumns = {
+  id: finAccountGroups.id,
+  code: finAccountGroups.code,
+  name: finAccountGroups.name,
+  parentId: finAccountGroups.parentId,
+  sort: finAccountGroups.sort,
+  status: finAccountGroups.status,
+};
+
+/** A refused group change: FIN_PAYLOAD_INVALID with the field and why, for the screen's words. */
+function groupRefused(path: string, constraint: string, code: string): FinError {
+  return new FinError('FIN_PAYLOAD_INVALID', `account group ${code}: ${constraint}`, { path }, [
+    { path, constraint, message: `${constraint}: ${code}` },
+  ]);
+}
+
+/**
+ * The company's group lock (ADR-0239), held to the transaction's end. Lock order: this lock first,
+ * then group rows, then account rows. Every group change (create, rename, move, delete, the
+ * whole-tree upsert) and every account create or update that names a group takes it before any
+ * row, so an account never lands in a group a concurrent delete is making inactive, and no two of
+ * them wait on each other's rows. Re-entrant within a transaction, so a retried or nested call
+ * (ADR-0190) is safe.
+ */
+async function lockGroups(tx: FinTx, companyId: number): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${GROUPS_LOCK}, ${companyId})`);
+}
+
+/** An active group of the company (read under `lockGroups`), or `<path>` `exists` refused. */
+async function activeGroup(tx: FinTx, companyId: number, id: number, path: string): Promise<void> {
+  const [group] = await tx
+    .select({ status: finAccountGroups.status })
+    .from(finAccountGroups)
+    .where(and(eq(finAccountGroups.companyId, companyId), eq(finAccountGroups.id, id)));
+  if (group?.status !== 'ACTIVE') throw groupRefused(path, 'exists', String(id));
+}
+
+/** The place after the last group under `parentId` (null: the roots). */
+async function nextSort(tx: FinTx, companyId: number, parentId: number | null): Promise<number> {
+  const [row] = await tx
+    .select({ sort: sql<number | null>`max(${finAccountGroups.sort})` })
+    .from(finAccountGroups)
+    .where(
+      and(
+        eq(finAccountGroups.companyId, companyId),
+        parentId === null
+          ? isNull(finAccountGroups.parentId)
+          : eq(finAccountGroups.parentId, parentId),
+      ),
+    );
+  const last = row?.sort ?? null;
+  return last === null ? 0 : Math.min(last + 1, 32_000);
+}
+
+/** Every group's parent in the company. */
+async function parentsOf(tx: FinTx, companyId: number): Promise<Map<number, number | null>> {
+  const rows = await tx
+    .select({ id: finAccountGroups.id, parentId: finAccountGroups.parentId })
+    .from(finAccountGroups)
+    .where(eq(finAccountGroups.companyId, companyId));
+  return new Map(rows.map((row) => [row.id, row.parentId]));
+}
 
 /** The company-default rule of every key in force on `on`. */
 export async function rulesOn(

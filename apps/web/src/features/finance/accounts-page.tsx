@@ -28,6 +28,7 @@ import {
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { Combobox } from '@/components/combobox';
+import { SearchSelect } from '@/components/search-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +44,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
@@ -57,6 +59,8 @@ import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { useCreateParam } from '@/lib/use-create-param';
 import { DateRangeFilter } from './date-range-filter';
+import { groupOfCode, groupOptions } from './account-group-tree';
+import { DeleteGroupDialog, GroupDialog, MoveGroupDialog } from './account-groups';
 import {
   type GlAccount,
   type GlRole,
@@ -109,12 +113,15 @@ const LEDGER_COLUMNS: readonly ColumnSpec[] = [
 type GroupRow = components['schemas']['GlAccountGroup'];
 type ChartLine =
   | { group: GroupRow; account?: undefined; depth: number }
-  | { group?: undefined; account: GlAccount; depth: number };
+  | { group?: undefined; account: GlAccount; depth: number }
+  /** The heading over the accounts without a group (ADR-0239). */
+  | { group?: undefined; account?: undefined; depth: number };
 
 /**
  * The chart as Erkhet shows it (ADR-0148): the group tree in its order with each group's accounts
- * under it, ungrouped accounts last. `keepEmpty` shows the groups without accounts too; a search
- * or the inactive view shows only the groups that hold a row.
+ * under it, ungrouped accounts last under «Бүлэггүй данс» (ADR-0239). `keepEmpty` shows the active
+ * groups without accounts too; a search, the inactive view and a deleted group show only the groups
+ * that hold a row.
  */
 function chartLines(
   groups: readonly GroupRow[],
@@ -135,17 +142,19 @@ function chartLines(
       .flatMap((group) => {
         const own = [...(held.get(group.id) ?? [])].sort((a, b) => a.code.localeCompare(b.code));
         const below = walk(group.id, depth + 1);
-        if (!keepEmpty && own.length === 0 && below.length === 0) return [];
+        const shownEmpty = keepEmpty && group.status === 'ACTIVE';
+        if (!shownEmpty && own.length === 0 && below.length === 0) return [];
         return [
           { group, depth },
           ...own.map((account) => ({ account, depth: depth + 1 })),
           ...below,
         ];
       });
-  const loose = [...(held.get(null) ?? [])]
-    .sort((a, b) => a.code.localeCompare(b.code))
-    .map((account) => ({ account, depth: 0 }));
-  return [...walk(null, 0), ...loose];
+  const tree = walk(null, 0);
+  const loose = [...(held.get(null) ?? [])].sort((a, b) => a.code.localeCompare(b.code));
+  if (tree.length === 0) return loose.map((account) => ({ account, depth: 0 }));
+  if (loose.length === 0) return tree;
+  return [...tree, { depth: 0 }, ...loose.map((account) => ({ account, depth: 1 }))];
 }
 
 /** One account's row: it opens the ledger, its code stays the keyboard's link. */
@@ -220,14 +229,56 @@ function AccountRow(props: {
   );
 }
 
+/** A group's «⋯» menu (ADR-0239): a sub-group, its name, its place, its removal. */
+function GroupMenu(props: {
+  group: GroupRow;
+  onAddChild: (group: GroupRow) => void;
+  onEdit: (group: GroupRow) => void;
+  onMove: (group: GroupRow) => void;
+  onDelete: (group: GroupRow) => void;
+}) {
+  const { t } = useTranslation();
+  const { group } = props;
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-xs" aria-label={`${group.code}: ${t('common.actions')}`}>
+          <Ellipsis />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => props.onAddChild(group)}>
+          {t('finance.accounts.groups.addChild')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => props.onEdit(group)}>{t('common.edit')}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => props.onMove(group)}>
+          {t('finance.accounts.groups.move')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={() => props.onDelete(group)}>
+          {t('common.delete')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /**
  * The chart of accounts (ADR-0060 #7) with each account's turnover and balance; the accountant
- * adds and edits accounts, an admin moves the roles the automatic entries post to.
+ * adds and edits accounts, an admin moves the roles the automatic entries post to and keeps the
+ * group tree (ADR-0239: a group added, renamed, moved or deleted one at a time).
  */
 export function AccountsPage() {
   const { t } = useTranslation();
   const canEdit = useHasPermission('finance.journal.manage');
   const canRole = useHasPermission('finance.settings.manage');
+  const canGroups = canRole;
+  const [groupDialog, setGroupDialog] = useState<{
+    group: GroupRow | null;
+    parentId: number | null;
+  } | null>(null);
+  const [movingGroup, setMovingGroup] = useState<GroupRow | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<GroupRow | null>(null);
   const [creating, setCreating] = useCreateParam();
   const [editing, setEditing] = useState<GlAccount | null>(null);
   const [roling, setRoling] = useState<GlAccount | null>(null);
@@ -263,6 +314,15 @@ export function AccountsPage() {
             <Button variant="outline" onClick={() => setCountAccounts(true)}>
               {t('finance.accounts.countAccounts.open')}
             </Button>
+            {canGroups ? (
+              <Button
+                variant="outline"
+                onClick={() => setGroupDialog({ group: null, parentId: null })}
+              >
+                <Plus />
+                {t('finance.accounts.groups.add')}
+              </Button>
+            ) : null}
             {canEdit ? (
               <Button onClick={() => setCreating(true)}>
                 <Plus />
@@ -332,6 +392,26 @@ export function AccountsPage() {
                   </TableCell>
                   <TruncateCell text={line.group.name} />
                   {ACCOUNT_COLUMNS.slice(2).map((column) => (
+                    <TableCell key={column.key}>
+                      {column.key === 'actions' && canGroups && line.group.status === 'ACTIVE' ? (
+                        <GroupMenu
+                          group={line.group}
+                          onAddChild={(group) =>
+                            setGroupDialog({ group: null, parentId: group.id })
+                          }
+                          onEdit={(group) => setGroupDialog({ group, parentId: group.parentId })}
+                          onMove={setMovingGroup}
+                          onDelete={setDeletingGroup}
+                        />
+                      ) : null}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ) : !line.account ? (
+                <TableRow key="none" className="bg-muted/40 font-semibold hover:bg-muted/40">
+                  <TableCell />
+                  <TruncateCell text={t('finance.accounts.groups.none')} />
+                  {ACCOUNT_COLUMNS.slice(2).map((column) => (
                     <TableCell key={column.key} />
                   ))}
                 </TableRow>
@@ -354,8 +434,40 @@ export function AccountsPage() {
           <EmptyState icon={ListTree} title={t('finance.accounts.empty')} />
         ) : null}
       </ListCard>
-      {creating ? <AccountDialog open account={null} onClose={() => setCreating(false)} /> : null}
-      {editing ? <AccountDialog open account={editing} onClose={() => setEditing(null)} /> : null}
+      {creating ? (
+        <AccountDialog
+          open
+          account={null}
+          groups={groups.data ?? []}
+          onClose={() => setCreating(false)}
+        />
+      ) : null}
+      {editing ? (
+        <AccountDialog
+          open
+          account={editing}
+          groups={groups.data ?? []}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
+      {groupDialog ? (
+        <GroupDialog
+          groups={groups.data ?? []}
+          group={groupDialog.group}
+          parentId={groupDialog.parentId}
+          onClose={() => setGroupDialog(null)}
+        />
+      ) : null}
+      {movingGroup ? (
+        <MoveGroupDialog
+          groups={groups.data ?? []}
+          group={movingGroup}
+          onClose={() => setMovingGroup(null)}
+        />
+      ) : null}
+      {deletingGroup ? (
+        <DeleteGroupDialog group={deletingGroup} onClose={() => setDeletingGroup(null)} />
+      ) : null}
       {roling ? <RoleDialog open account={roling} onClose={() => setRoling(null)} /> : null}
     </div>
   );
@@ -364,10 +476,12 @@ export function AccountsPage() {
 function AccountDialog({
   open,
   account,
+  groups,
   onClose,
 }: {
   open: boolean;
   account: GlAccount | null;
+  groups: readonly GroupRow[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -380,18 +494,29 @@ function AccountDialog({
     ACCOUNT_CURRENCIES.find((value) => value === account?.currency) ?? 'MNT',
   );
   const [status, setStatus] = useState<GlAccount['status']>(account?.status ?? 'ACTIVE');
+  // A new account starts in the group its code begins with, until one is chosen (ADR-0239).
+  const [pickedGroup, setPickedGroup] = useState<number | null | undefined>(
+    account ? account.groupId : undefined,
+  );
+  const groupId = pickedGroup === undefined ? groupOfCode(groups, code) : pickedGroup;
   const [checked, setChecked] = useState(false);
   const codeOk = CODE.test(code.trim());
+  // The dialog asks for a group when the chart has one, for a new account or one already in a
+  // group (changed, never cleared here); an old ungrouped account saves as it is. The API leaves
+  // it optional.
+  const needsGroup =
+    (!account || account.groupId !== null) && groups.some((group) => group.status === 'ACTIVE');
+  const groupOk = !needsGroup || groupId !== null;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setChecked(true);
-    if (!codeOk || !name.trim()) return;
+    if (!codeOk || !name.trim() || !groupOk) return;
     void action
       .run(async () => {
         if (account) {
           await mutations.updateAccount.mutateAsync({
             id: account.id,
-            body: { code: code.trim(), name: name.trim(), journal, currency, status },
+            body: { code: code.trim(), name: name.trim(), journal, currency, status, groupId },
           });
         } else {
           await mutations.createAccount.mutateAsync({
@@ -399,6 +524,7 @@ function AccountDialog({
             name: name.trim(),
             journal,
             currency,
+            groupId,
           });
         }
         toast.success(t('finance.accounts.dialog.saved'));
@@ -409,7 +535,7 @@ function AccountDialog({
   };
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent closeLabel={t('common.close')}>
+      <DialogContent size="md" closeLabel={t('common.close')}>
         <DialogHeader>
           <DialogTitle>
             {account
@@ -444,6 +570,20 @@ function AccountDialog({
               value={name}
               maxLength={120}
               onChange={(event) => setName(event.target.value)}
+            />
+          </FormField>
+          <FormField
+            label={t('finance.accounts.groups.group')}
+            htmlFor="account-group"
+            error={checked && !groupOk ? 'validation.required' : undefined}
+          >
+            <SearchSelect
+              id="account-group"
+              value={groupId === null ? '' : String(groupId)}
+              options={groupOptions(groups, account?.groupId ?? null)}
+              placeholder={t('finance.accounts.groups.choose')}
+              invalid={checked && !groupOk}
+              onChange={(value) => setPickedGroup(Number.parseInt(value, 10) || null)}
             />
           </FormField>
           <FormField label={t('finance.fields.kind')} htmlFor="account-journal">

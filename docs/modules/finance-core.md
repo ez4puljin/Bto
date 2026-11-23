@@ -23,6 +23,8 @@ Path abbreviations: `F/` = `apps/api/src/modules/finance/`, `P/` = `apps/api/src
 
 > ADR-0148 (2026-11-05): the chart is Erkhet's, with its group tree in `fin.account_groups` (`parent_id`, `sort`), loaded through `POST /gl-accounts/chart`.
 
+> ADR-0239 (2026-11-23): the tree is also kept one group at a time. `FinChartService.createGroupInTx` / `updateGroupInTx` / `deleteGroupInTx` (rights `finance.settings.manage` or `finance.config.manage`; the company's group changes and `saveGroupTreeInTx` queue behind advisory lock 72_026_134; audit `account_group` CREATE / UPDATE / DEACTIVATE): a code unique in the company and fixed once made (the upsert finds groups by code), a reused code of an inactive group revives it; a move never goes under the group itself or a descendant; a delete makes the group INACTIVE only while no account and no active child sits under it. Refusals are `FIN_PAYLOAD_INVALID` with a field error (`group.code` `taken`, `group.parentId` `cycle`, `group` `notEmpty`, `groupId` / `parentId` `exists`). `createAccountInTx` and `updateAccountInTx` take `groupId` (an active group of the company; null: none), audited with the account; no balance, line or rule moves. `saveGroupTreeInTx` still leaves every group it does not carry as it is.
+
 ## 1. Owner's answers behind the design (2026-10-18)
 
 | # | Topic | Answer | Consequence |
@@ -378,7 +380,7 @@ D16 and D27 stay TODO-VERIFY.
 - soft close, override, the pending list and HELD, drafts and approval;
 - a checklist beyond the reconcile;
 - fixed assets in the opening (balances only);
-- a per-account group screen.
+- a per-account group screen (built by ADR-0239: the groups on «Дансны төлөвлөгөө»).
 
 ### 3.12 What F6 built (2026-10-23, ADR-0105) — reports
 

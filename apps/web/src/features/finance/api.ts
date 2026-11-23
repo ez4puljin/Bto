@@ -32,6 +32,9 @@ export type MoneyAccountPatch = Schemas['MoneyAccountPatch'];
 export type GlAccount = Schemas['GlAccount'];
 export type GlAccountRequest = Schemas['GlAccountRequest'];
 export type GlAccountPatch = Schemas['GlAccountPatch'];
+export type GlAccountGroup = Schemas['GlAccountGroup'];
+export type GlAccountGroupRequest = Schemas['GlAccountGroupRequest'];
+export type GlAccountGroupPatch = Schemas['GlAccountGroupPatch'];
 export type GlRole = NonNullable<GlAccount['role']>;
 export type AccountLedgerLine = Schemas['AccountLedgerLine'];
 export type JournalEntry = Schemas['JournalEntry'];
@@ -635,6 +638,23 @@ export function useFinanceMutations() {
     updateAccount: useMutation({
       mutationFn: async ({ id, body }: { id: number; body: GlAccountPatch }) =>
         unwrap(await api.PUT('/api/v1/gl-accounts/{id}', { params: { path: { id } }, body })),
+      onSuccess: () => changed(),
+    }),
+    createGroup: useMutation({
+      mutationFn: async (body: GlAccountGroupRequest) =>
+        unwrap(await api.POST('/api/v1/gl-accounts/groups', { body })),
+      onSuccess: () => changed(),
+    }),
+    updateGroup: useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: GlAccountGroupPatch }) =>
+        unwrap(
+          await api.PUT('/api/v1/gl-accounts/groups/{id}', { params: { path: { id } }, body }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    deleteGroup: useMutation({
+      mutationFn: async (id: number) =>
+        unwrap(await api.DELETE('/api/v1/gl-accounts/groups/{id}', { params: { path: { id } } })),
       onSuccess: () => changed(),
     }),
     setRole: useMutation({

@@ -7378,8 +7378,27 @@ export interface paths {
         /** The chart's group tree (ADR-0148). */
         get: operations["GlAccounts_groups"];
         put?: never;
-        post?: never;
+        /** A group made by hand (ADR-0239), after its siblings. */
+        post: operations["GlAccounts_createGroup"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/gl-accounts/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Renames a group or moves it under another (ADR-0239); its code stays. */
+        put: operations["GlAccounts_updateGroup"];
+        post?: never;
+        /** Deletes a group with no account and no sub-group (ADR-0239: it is made inactive). */
+        delete: operations["GlAccounts_deleteGroup"];
         options?: never;
         head?: never;
         patch?: never;
@@ -21911,6 +21930,21 @@ export interface components {
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
         };
+        GlAccountGroupRequest: {
+            /**
+             * @description Unique in the company; fixed once made
+             * @example 7011
+             */
+            code: string;
+            name: string;
+            /** @description Null: a root group */
+            parentId: number | null;
+        };
+        GlAccountGroupPatch: {
+            name?: string;
+            /** @description Moves it there; null: a root group; left out: stays */
+            parentId?: number | null;
+        };
         ChartGroupRow: {
             code: string;
             name: string;
@@ -21992,6 +22026,8 @@ export interface components {
             journal?: components["schemas"]["AccountJournal"];
             /** @enum {string} */
             currency?: "MNT" | "USD" | "EUR" | "CNY" | "RUB" | "JPY" | "GBP" | "CHF" | "KRW" | "HKD" | "AUD" | "CAD" | "SGD" | "SEK" | "BGN" | "HUF" | "EGP" | "INR" | "KZT" | "KPW" | "CZK" | "TWD" | "THB" | "IDR" | "MYR" | "AED" | "KWD" | "NZD" | "DKK" | "PLN" | "UAH" | "NOK" | "NPR" | "TRY" | "ZAR";
+            /** @description Its group (ADR-0239) */
+            groupId?: number | null;
         };
         GlAccountPatch: {
             code?: string;
@@ -22003,6 +22039,8 @@ export interface components {
             journal?: components["schemas"]["AccountJournal"];
             /** @enum {string} */
             currency?: "MNT" | "USD" | "EUR" | "CNY" | "RUB" | "JPY" | "GBP" | "CHF" | "KRW" | "HKD" | "AUD" | "CAD" | "SGD" | "SEK" | "BGN" | "HUF" | "EGP" | "INR" | "KZT" | "KPW" | "CZK" | "TWD" | "THB" | "IDR" | "MYR" | "AED" | "KWD" | "NZD" | "DKK" | "PLN" | "UAH" | "NOK" | "NPR" | "TRY" | "ZAR";
+            /** @description Moves it to this group (ADR-0239); null: no group; left out: stays */
+            groupId?: number | null;
         };
         GlAccountRoleRequest: {
             /**
@@ -47268,6 +47306,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GlAccountGroup"][];
                 };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_createGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlAccountGroupRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccountGroup"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_updateGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlAccountGroupPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlAccountGroup"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GlAccounts_deleteGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description RFC 9457 problem details */
             default: {
