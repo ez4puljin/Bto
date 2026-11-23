@@ -316,7 +316,7 @@ describe('fin-bridge', () => {
         `DELETE FROM fin.document_types WHERE code IN ('BTO.SUPPLIER_BILL',
            'BTO.SUPPLIER_BILL_CREDIT', 'BTO.RECEIPT_RECOST', 'BTO.SUPPLIER_RETURN',
            'BTO.STOCK_VALUE', 'FIN.OPENING', 'FIN.YEAR_CLOSE', 'BTO.DAMAGE_CHARGE',
-           'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION')`,
+           'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION', 'BTO.VAT_WAIVER')`,
       );
       await admin.query('SET LOCAL session_replication_role = origin');
       for (const statement of statements) await admin.query(statement);
@@ -368,9 +368,9 @@ describe('fin-bridge', () => {
       );
       await admin.query(
         `DELETE FROM fin.document_types WHERE code IN ('BTO.STOCK_VALUE', 'FIN.OPENING', 'FIN.YEAR_CLOSE',
-           'BTO.DAMAGE_CHARGE', 'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION')`,
+           'BTO.DAMAGE_CHARGE', 'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION', 'BTO.VAT_WAIVER')`,
       );
-      await admin.query(`DELETE FROM fin.number_series WHERE code = 'STOCK'`);
+      await admin.query(`DELETE FROM fin.number_series WHERE code IN ('STOCK', 'VAT_WAIVER')`);
       await admin.query('SET LOCAL session_replication_role = origin');
       for (const statement of statements) await admin.query(statement);
       expect(await count(`fin.posting_rules WHERE posting_key IN (${list})`)).toBe(11);
@@ -398,7 +398,7 @@ describe('fin-bridge', () => {
       // A database of before F5: no opening (nor year close) document type.
       await admin.query(
         `DELETE FROM fin.document_types WHERE code IN ('FIN.OPENING', 'FIN.YEAR_CLOSE',
-           'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION')`,
+           'ERKHET.TR', 'ERKHET.OPENING', 'ERKHET.ALLOCATION', 'BTO.VAT_WAIVER')`,
       );
       expect(await count('fin.document_types')).toBe(14);
       for (const statement of statements) await admin.query(statement);
@@ -474,6 +474,48 @@ describe('fin-bridge', () => {
           `fin.posting_rules WHERE posting_key IN ('VOUCHER_CLEARING', 'VOUCHER_BREAKAGE')`,
         ),
       ).toBe(2);
+    } finally {
+      await admin.query('ROLLBACK');
+    }
+  });
+
+  it('replays the VAT waiver’s series and document type (0123_vat_waiver data section)', async () => {
+    const file = join(__dirname, '../../src/db/migrations/0123_vat_waiver.sql');
+    const text = readFileSync(file, 'utf8');
+    const statements = text
+      .slice(text.indexOf('-- vat_waiver:data:begin'), text.indexOf('-- vat_waiver:data:end'))
+      .split('--> statement-breakpoint')
+      .map((part) => part.trim())
+      .filter((part) => part.replace(/^--.*$/gm, '').trim().length > 0);
+    const booked = () =>
+      one<{ class: string; number_mode: string; number_series: string; source: string }>(
+        `SELECT t.class, t.number_mode, t.number_series, s.code AS source
+           FROM fin.document_types t JOIN fin.source_systems s ON s.id = t.source_system_id
+          WHERE t.code = 'BTO.VAT_WAIVER'`,
+      );
+    // What the boot step wrote is what the migration writes.
+    const atBoot = await booked();
+    expect(atBoot).toEqual({
+      class: 'AR_CREDIT',
+      number_mode: 'CORE',
+      number_series: 'VAT_WAIVER',
+      source: 'BTO',
+    });
+    const series = () =>
+      one<{ pattern: string; digits: number }>(
+        `SELECT pattern, digits FROM fin.number_series WHERE code = 'VAT_WAIVER'`,
+      );
+    const seriesAtBoot = await series();
+    await admin.query('BEGIN');
+    try {
+      // A database of before ADR-0240: neither the series nor the type; twice over, once each.
+      await admin.query(`DELETE FROM fin.document_types WHERE code = 'BTO.VAT_WAIVER'`);
+      await admin.query(`DELETE FROM fin.number_series WHERE code = 'VAT_WAIVER'`);
+      for (const statement of statements) await admin.query(statement);
+      for (const statement of statements) await admin.query(statement);
+      expect(await count(`fin.document_types WHERE code = 'BTO.VAT_WAIVER'`)).toBe(1);
+      expect(await booked()).toEqual(atBoot);
+      expect(await series()).toEqual(seriesAtBoot);
     } finally {
       await admin.query('ROLLBACK');
     }

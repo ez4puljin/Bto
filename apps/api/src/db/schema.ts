@@ -144,12 +144,14 @@ export {
   bankStatements,
   creditNoteLines,
   creditNotes,
+  customerCounterAccounts,
   financeReconcileRuns,
   financeSettings,
   invoiceLines,
   invoices,
   repCollections,
   statementRowLinks,
+  vatWaivers,
 } from '../modules/finance/schema';
 export {
   posCashiers,

@@ -79,6 +79,8 @@ import { ReceiptMoneyAccountsService } from './services/receipt-money-accounts.s
 import { StockBooksService } from './services/stock-books.service';
 import { StockCountAccountsService } from './services/stock-count-accounts.service';
 import { SupplierBillsService } from './services/supplier-bills.service';
+import { CustomerCounterAccountsService } from './services/customer-counter-accounts.service';
+import { VatWaiversService } from './services/vat-waivers.service';
 
 const SERVICES = [
   FinBooks,
@@ -115,6 +117,8 @@ const SERVICES = [
   BankStatementsService,
   RepCollectionsService,
   StatementsService,
+  CustomerCounterAccountsService,
+  VatWaiversService,
 ];
 
 /**

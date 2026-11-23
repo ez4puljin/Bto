@@ -14,6 +14,7 @@ import type {
   MoneyAccountDto,
   PaymentDetailDto,
   PaymentDto,
+  VatWaiverDto,
 } from '../dto/finance.dto';
 import type { CustomerBalanceRow, LedgerEntry } from '../services/ar-ledger.service';
 import type { CreditNoteDetail, CreditNoteSummary } from '../services/credit-notes.service';
@@ -26,6 +27,7 @@ import type {
 } from '../services/journal.service';
 import type { MoneyAccount } from '../services/money-accounts.service';
 import type { PaymentDetail, PaymentSummary } from '../services/payments.service';
+import type { InvoiceVatFacts, VatWaiverView } from '../services/vat-waivers.service';
 
 /** Money with its two decimals, quantities as entered, instants in ISO 8601. */
 export const money = (value: Decimal): string => value.toFixed(2);
@@ -36,8 +38,25 @@ export const iso = (value: Date): string => value.toISOString();
 export const isoOrNull = (value: Date | null): string | null =>
   value === null ? null : value.toISOString();
 
-export const invoiceDto = (invoice: InvoiceSummary): InvoiceDto => ({
+export const vatWaiverDto = (waiver: VatWaiverView): VatWaiverDto => ({
+  ...waiver,
+  pct: waiver.pct.toFixed(2),
+  baseAmount: money(waiver.baseAmount),
+  amount: money(waiver.amount),
+  createdAt: iso(waiver.createdAt),
+  reversedAt: isoOrNull(waiver.reversedAt),
+});
+
+export const invoiceDto = (invoice: InvoiceSummary, vat: InvoiceVatFacts): InvoiceDto => ({
   ...invoice,
+  vatWaiver: vat.vatWaiver ? vatWaiverDto(vat.vatWaiver) : null,
+  vatWaiverPreview: {
+    pct: vat.vatWaiverPreview.pct.toFixed(2),
+    baseAmount: money(vat.vatWaiverPreview.baseAmount),
+    amount: money(vat.vatWaiverPreview.amount),
+    blockedBy: vat.vatWaiverPreview.blockedBy,
+  },
+  receipt: vat.receipt,
   subtotal: money(invoice.subtotal),
   discountTotal: money(invoice.discountTotal),
   total: money(invoice.total),
@@ -50,8 +69,9 @@ export const invoiceDto = (invoice: InvoiceSummary): InvoiceDto => ({
 export const invoiceDetailDto = (
   invoice: InvoiceDetail,
   ebarimt: ReceiptView | null,
+  vat: InvoiceVatFacts,
 ): InvoiceDetailDto => ({
-  ...invoiceDto(invoice),
+  ...invoiceDto(invoice, vat),
   ebarimt: ebarimt ? toReceiptDto(ebarimt) : null,
   note: invoice.note,
   journalEntryId: invoice.journalEntryId,

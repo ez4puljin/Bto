@@ -38,7 +38,13 @@ import {
   ACCOUNT_JOURNALS,
   type AccountCurrency,
   type AccountJournal,
+  VAT_WAIVER_BLOCKS,
+  VAT_WAIVER_DESCRIPTION_MAX,
+  VAT_WAIVER_STATUSES,
+  type VatWaiverBlock,
+  type VatWaiverStatus,
 } from '@tugeel/shared/finance';
+import { WHOLESALE_RECEIPT_STATUSES, type WholesaleReceiptStatus } from '@tugeel/shared/mn';
 import { PRICE_BASES, type PriceBasis } from '@tugeel/shared/pricing';
 import { PAYMENT_METHODS, type PaymentMethod } from '@tugeel/shared/sales';
 import { Transform, Type } from 'class-transformer';
@@ -52,6 +58,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  ValidateIf,
   Max,
   MaxLength,
   Min,
@@ -67,6 +74,9 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 /** A group's code: the core's code shape (ADR-0239). */
 const GROUP_CODE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
+/** A percent with two decimals at most (ADR-0240). */
+const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
+const RECEIPT_TYPES = ['B2C', 'B2B'] as const;
 const STATUSES = ['ACTIVE', 'INACTIVE'] as const;
 type AccountStatus = (typeof STATUSES)[number];
 
@@ -699,6 +709,59 @@ export class JournalPageDto {
 
 // ---------------------------------------------------------------- invoices
 
+@ApiSchema({ name: 'VatWaiver' })
+export class VatWaiverDto {
+  @ApiProperty() id: number;
+  @ApiProperty() invoiceId: number;
+  @ApiProperty({ enum: VAT_WAIVER_STATUSES }) status: VatWaiverStatus;
+  @ApiProperty({ example: '2026-11-23', description: "The entry's date" }) waiverDate: string;
+  @ApiProperty({ example: '2.00' }) pct: string;
+  @ApiProperty({ example: '150000.00', description: 'The invoice total less its credit notes' })
+  baseAmount: string;
+  @ApiProperty({ example: '3000.00' }) amount: string;
+  @ApiProperty({ example: '520201' }) accountCode: string;
+  @ApiProperty({ example: 'Борлуулалтын хөнгөлөлт' }) description: string;
+  @ApiProperty({ type: String, nullable: true, example: 'НХ-20261123-0001' })
+  documentNumber: string | null;
+  @ApiProperty({ type: Number, nullable: true }) journalEntryId: number | null;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: String, nullable: true }) createdByName: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) reversedAt: string | null;
+  @ApiProperty({ type: String, nullable: true }) reversedByName: string | null;
+  @ApiProperty({ type: String, nullable: true }) reverseReason: string | null;
+}
+
+@ApiSchema({ name: 'VatWaiverPreview' })
+export class VatWaiverPreviewDto {
+  @ApiProperty({ example: '2.00' }) pct: string;
+  @ApiProperty({ example: '150000.00' }) baseAmount: string;
+  @ApiProperty({ example: '3000.00', description: 'What a waiver would take today' })
+  amount: string;
+  @ApiProperty({
+    enum: VAT_WAIVER_BLOCKS,
+    nullable: true,
+    description: 'Why a waiver would be refused now; null when it would go through',
+  })
+  blockedBy: VatWaiverBlock | null;
+}
+
+@ApiSchema({ name: 'InvoiceReceiptRef' })
+export class InvoiceReceiptRefDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: RECEIPT_TYPES }) receiptType: string;
+  @ApiProperty({ enum: WHOLESALE_RECEIPT_STATUSES }) status: WholesaleReceiptStatus;
+}
+
+@ApiSchema({ name: 'VatWaiverReverseRequest' })
+export class VatWaiverReverseRequestDto {
+  @ApiPropertyOptional({ type: String, nullable: true, maxLength: FINANCE_LIMITS.maxReason })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(FINANCE_LIMITS.maxReason)
+  reason?: string | null;
+}
+
 @ApiSchema({ name: 'Invoice' })
 export class InvoiceDto {
   @ApiProperty() id: number;
@@ -725,6 +788,19 @@ export class InvoiceDto {
   @ApiProperty() lineCount: number;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
   @ApiProperty({ type: String, nullable: true }) createdByName: string | null;
+  @ApiProperty({
+    type: () => VatWaiverDto,
+    nullable: true,
+    description: 'ADR-0240: its live VAT waiver («НӨАТ авахгүй»); null while it takes the receipt',
+  })
+  vatWaiver: VatWaiverDto | null;
+  @ApiProperty({ type: () => VatWaiverPreviewDto }) vatWaiverPreview: VatWaiverPreviewDto;
+  @ApiProperty({
+    type: () => InvoiceReceiptRefDto,
+    nullable: true,
+    description: 'Its e-Barimt receipt in short; null when it has none',
+  })
+  receipt: InvoiceReceiptRefDto | null;
 }
 
 @ApiSchema({ name: 'InvoiceLine' })
@@ -821,6 +897,13 @@ export class InvoiceListQueryDto extends DateRangeQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   overdue?: boolean;
+  @ApiPropertyOptional({
+    description: 'ADR-0240: true = only invoices with a VAT waiver, false = only those without',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  vatWaived?: boolean;
 }
 
 @ApiSchema({ name: 'InvoicePage' })
@@ -1617,4 +1700,80 @@ export class OpeningCheckDto {
   @ApiProperty({ type: [OpeningCheckRowDto] }) data: OpeningCheckRowDto[];
   @ApiProperty({ example: '150000.00' }) debit: string;
   @ApiProperty({ example: '150000.00' }) credit: string;
+}
+
+// ---------------------------------------------------------------- VAT waivers (ADR-0240)
+
+@ApiSchema({ name: 'VatTotalsSide' })
+export class VatTotalsSideDto {
+  @ApiProperty() count: number;
+  @ApiProperty({ example: '1500000.00' }) total: string;
+  @ApiProperty({ example: '136363.64' }) vatTotal: string;
+  @ApiProperty({ example: '500000.00' }) openAmount: string;
+  @ApiProperty({ example: '0.00', description: 'Σ of the live waivers’ discounts' })
+  waiverAmount: string;
+}
+
+@ApiSchema({ name: 'CustomerVatTotals' })
+export class CustomerVatTotalsDto {
+  @ApiProperty() customerId: number;
+  @ApiProperty({ type: String, nullable: true, example: '2026-11-01' }) from: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '2026-11-30' }) to: string | null;
+  @ApiProperty({ type: VatTotalsSideDto, description: '«НӨАТ авах»' }) takesVat: VatTotalsSideDto;
+  @ApiProperty({ type: VatTotalsSideDto, description: '«НӨАТ авахгүй»' }) waived: VatTotalsSideDto;
+}
+
+@ApiSchema({ name: 'CustomerVatTotalsQuery' })
+export class CustomerVatTotalsQueryDto {
+  @ApiPropertyOptional({ example: '2026-11-01' }) @IsOptional() @Matches(DATE) from?: string;
+  @ApiPropertyOptional({ example: '2026-11-30' }) @IsOptional() @Matches(DATE) to?: string;
+}
+
+@ApiSchema({ name: 'CounterAccountRef' })
+export class CounterAccountRefDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ example: '520201' }) code: string;
+  @ApiProperty({ example: 'Борлуулалтын хөнгөлөлт' }) name: string;
+}
+
+@ApiSchema({ name: 'CustomerCounterAccount' })
+export class CustomerCounterAccountDto {
+  @ApiProperty() customerId: number;
+  @ApiProperty({ description: 'False: none of their own, the sales discount account is used' })
+  own: boolean;
+  @ApiProperty({
+    type: () => CounterAccountRefDto,
+    nullable: true,
+    description: 'What a waiver would debit now; null when the chart has no sales discount account',
+  })
+  account: CounterAccountRefDto | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
+}
+
+@ApiSchema({ name: 'CustomerCounterAccountRequest' })
+export class CustomerCounterAccountRequestDto {
+  @ApiProperty({ type: Number, nullable: true, description: 'null = back to the default account' })
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  accountId: number | null;
+}
+
+@ApiSchema({ name: 'VatWaiverSettings' })
+export class VatWaiverSettingsDto {
+  @ApiProperty({ example: '2.00' }) pct: string;
+  @ApiProperty({ example: 'Борлуулалтын хөнгөлөлт' }) description: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
+}
+
+@ApiSchema({ name: 'VatWaiverSettingsRequest' })
+export class VatWaiverSettingsRequestDto {
+  @ApiProperty({ example: '2.00', description: 'Above 0, at most 100, two decimals' })
+  @Matches(PERCENT)
+  pct: string;
+  @ApiProperty({ maxLength: VAT_WAIVER_DESCRIPTION_MAX })
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(VAT_WAIVER_DESCRIPTION_MAX)
+  description: string;
 }

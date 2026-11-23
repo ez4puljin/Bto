@@ -6,9 +6,11 @@ import {
   FINANCE_NUMBER_DEFAULTS,
   financeNumberIssues,
   invoicePartsFor,
+  isVatWaiverPct,
   renderFinanceNumber,
   settlementOf,
   taxSplit,
+  vatWaiverAmount,
 } from './index';
 
 const plain = (parts: ReturnType<typeof invoicePartsFor>) =>
@@ -196,5 +198,32 @@ describe('finance numbers', () => {
     expect(financeNumberIssues('Н-{year}', 4)).toEqual([
       { path: 'pattern', code: 'ENDS_WITH_DIGIT' },
     ]);
+  });
+});
+
+describe('VAT waiver (ADR-0240 #1)', () => {
+  it.each([
+    // total, credited, pct → base, amount
+    ['10000', '0', '2.00', '10000.00', '200.00'],
+    ['10000', '3000', '2', '7000.00', '140.00'],
+    // 8.425 rounds half up, not to the even digit.
+    ['337', '0', '2.5', '337.00', '8.43'],
+    ['1234567', '0', '2', '1234567.00', '24691.34'],
+    // Everything was returned, or more than everything: nothing is left to take from.
+    ['5000', '5000', '2', '0.00', '0.00'],
+    ['5000', '6000', '2', '0.00', '0.00'],
+    ['10', '0', '0.01', '10.00', '0.00'],
+    ['100', '0', '100', '100.00', '100.00'],
+  ])('%s less %s at %s %% is %s → %s', (total, credited, pct, base, amount) => {
+    const result = vatWaiverAmount(total, credited, pct);
+    expect(result.base.toFixed(2)).toBe(base);
+    expect(result.amount.toFixed(2)).toBe(amount);
+  });
+
+  it('takes a percent above 0, at most 100, with two decimals', () => {
+    for (const pct of ['0.01', '2', '2.00', '99.99', '100']) expect(isVatWaiverPct(pct)).toBe(true);
+    for (const pct of ['0', '-1', '100.01', '2.555', 'x', '']) {
+      expect(isVatWaiverPct(pct)).toBe(false);
+    }
   });
 });

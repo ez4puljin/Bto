@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { classifyBarcode } from '@tugeel/shared/gtin';
-import { type RelayReceiptLine, wholesalePaymentCode } from '@tugeel/shared/mn';
-import { asc, eq } from 'drizzle-orm';
+import {
+  type RelayReceiptLine,
+  wholesalePaymentCode,
+  wholesaleReceiptType,
+} from '@tugeel/shared/mn';
+import { and, asc, eq } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
@@ -16,7 +20,7 @@ import {
 import { BTO_SOURCE, FIN_DOC_TYPES, FinContexts } from '../../fin-bridge';
 import type { Actor, AuthContext } from '../../identity';
 import { CustomersService } from '../../partners';
-import { invoiceLines, invoices } from '../schema';
+import { invoiceLines, invoices, vatWaivers } from '../schema';
 
 /**
  * An invoice's e-Barimt receipt (ADR-0185): finance builds the receipt request from its own
@@ -63,7 +67,9 @@ export class InvoiceEbarimtService {
   /**
    * «Дахин бэлтгэх» (`finance.invoices.manage`): a receipt in ERROR is built again from the
    * invoice with today's data (the customer's TIN typed in, a product's code filled) and waits for
-   * the store edge. Only an issued invoice whose receipt is ERROR (409 otherwise).
+   * the store edge. Only an issued invoice whose receipt is ERROR (409 otherwise). An invoice whose
+   * VAT receipt was waived (ADR-0240 #2) gets no company (B2B) receipt until the waiver is taken
+   * back: 409 with `status: VAT_WAIVED`; a consumer's receipt is prepared as before.
    */
   async retry(ctx: AuthContext, invoiceId: number): Promise<ReceiptView> {
     const source = await this.sourceOf(invoiceId);
@@ -90,6 +96,17 @@ export class InvoiceEbarimtService {
           { status: existing.status },
         );
       }
+      const [waived] = await tx
+        .select({ id: vatWaivers.id })
+        .from(vatWaivers)
+        .where(and(eq(vatWaivers.invoiceId, invoiceId), eq(vatWaivers.status, 'POSTED')));
+      if (waived && wholesaleReceiptType(request.buyer).type === 'B2B') {
+        throw new AppError(
+          'EBARIMT_RECEIPT_STATE_INVALID',
+          `invoice ${invoice.number} has its VAT receipt waived`,
+          { status: 'VAT_WAIVED', number: invoice.number },
+        );
+      }
       await this.receipts.prepareInTx(tx, ctx, request);
     });
     const state = await this.receipts.stateOf(source);
@@ -98,8 +115,8 @@ export class InvoiceEbarimtService {
   }
 
   /** The invoice's receipt for its panel; null when it has none. */
-  async stateOf(invoiceId: number): Promise<ReceiptView | null> {
-    return this.receipts.stateOf(await this.sourceOf(invoiceId));
+  async stateOf(invoiceId: number, executor: Db | Tx = this.db): Promise<ReceiptView | null> {
+    return this.receipts.stateOf(await this.sourceOf(invoiceId), executor);
   }
 
   private async requestInTx(tx: Tx, invoiceId: number): Promise<PrepareRequest | null> {

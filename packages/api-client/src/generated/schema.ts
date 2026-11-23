@@ -7252,6 +7252,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/invoices/{id}/vat-waiver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * «НӨАТ хасуулах» (ADR-0240): the customer takes no VAT receipt for this invoice and the
+         *     receivable falls by the waiver's percent of it, in one entry. 409 `INVOICE_STATE_INVALID` with
+         *     `status` VOID, VAT_WAIVED, NOTHING_LEFT or B2B_RECEIPT when it cannot be waived.
+         */
+        post: operations["Invoices_waiveVat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invoices/{id}/vat-waiver/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** «Буцаах» (ADR-0240 #5): the waiver's entry is reversed and the invoice takes VAT again. */
+        post: operations["Invoices_reverseVatWaiver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invoices/{id}/ebarimt": {
         parameters: {
             query?: never;
@@ -7812,6 +7850,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-balances/{customerId}/vat-totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * «НӨАТ авах» / «НӨАТ авахгүй» (ADR-0240): the customer's issued invoices of a date range, split
+         *     by whether their VAT receipt is waived.
+         */
+        get: operations["CustomerBalances_vatTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-balances/{customerId}/counter-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «Харилцсан данс» (ADR-0240 #4): what a VAT waiver of this customer debits. */
+        get: operations["CustomerBalances_counterAccount"];
+        put: operations["CustomerBalances_setCounterAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/finance/attention": {
         parameters: {
             query?: never;
@@ -7837,6 +7912,23 @@ export interface paths {
         };
         get: operations["FinanceSettings_numbering"];
         put: operations["FinanceSettings_setNumbering"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance-settings/vat-waiver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «НӨАТ хасуулах» (ADR-0240 #1): the percent a waiver takes and the words of its entry. */
+        get: operations["FinanceSettings_vatWaiver"];
+        put: operations["FinanceSettings_setVatWaiver"];
         post?: never;
         delete?: never;
         options?: never;
@@ -13534,7 +13626,7 @@ export interface components {
             password: string;
         };
         /** @enum {string} */
-        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "hr.payroll.view" | "hr.payroll.manage" | "hr.payroll.score" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage" | "problems.read" | "problems.count" | "problems.manage" | "phone.calls.read" | "phone.lines.manage";
+        Permission: "identity.users.read" | "identity.users.manage" | "identity.roles.manage" | "identity.org.manage" | "identity.settings.read" | "identity.settings.manage" | "identity.audit.read" | "catalog.products.manage" | "catalog.products.register" | "catalog.ebarimt.manage" | "catalog.products.export" | "partners.customers.read" | "partners.customers.manage" | "partners.credit.manage" | "partners.suppliers.manage" | "partners.customer_app.manage" | "inventory.setup.manage" | "inventory.locations.manage" | "inventory.receipts.manage" | "inventory.moves.manage" | "inventory.adjustments.manage" | "inventory.adjustments.approve" | "inventory.stocktakes.manage" | "inventory.stocktakes.approve" | "inventory.costs.manage" | "inventory.transfers.manage" | "inventory.issues.manage" | "inventory.issues.confirm" | "procurement.orders.read" | "procurement.orders.edit" | "procurement.orders.manage" | "procurement.prices.read" | "ebarimt.check.read" | "ebarimt.check.edit" | "ebarimt.check.assign" | "ebarimt.check.settings" | "erkhet.sync.read" | "erkhet.sync.manage" | "erkhet.settings.manage" | "imports.manage" | "pricing.manage" | "pricing.prices.manage" | "ai.ask" | "ai.reports.manage" | "ai.settings.manage" | "ai.data.catalog" | "ai.data.stock" | "ai.data.customers" | "ai.data.suppliers" | "ai.data.pricing" | "ai.data.sales" | "ai.data.finance" | "segments.manage" | "sales.orders.read" | "sales.orders.manage" | "sales.boards.manage" | "sales.orders.pick" | "sales.orders.pickLead" | "sales.orders.moveAny" | "sales.orders.party" | "sales.orders.rep" | "sales.orders.load" | "finance.read" | "finance.payments.record" | "finance.invoices.manage" | "finance.journal.manage" | "finance.settings.manage" | "finance.periods.close" | "finance.periods.reopen" | "finance.sms.send" | "finance.vat_waiver.manage" | "pos.read" | "pos.manage" | "pos.till.operate" | "pos.till.supervise" | "pos.loyalty.manage" | "notifications.send" | "customer.home.manage" | "hr.attendance.view" | "hr.attendance.manage" | "hr.payroll.view" | "hr.payroll.manage" | "hr.payroll.score" | "reports.view" | "reports.margins.view" | "expiry.items.manage" | "expiry.liability.manage" | "expiry.items.carry" | "chat.answer" | "chat.answer_own" | "chat.settings.manage" | "problems.read" | "problems.count" | "problems.manage" | "phone.calls.read" | "phone.lines.manage";
         RoleRef: {
             id: number;
             /** @description System roles only */
@@ -21441,6 +21533,63 @@ export interface components {
             /** @description Different stores among them */
             stores: number;
         };
+        VatWaiver: {
+            id: number;
+            invoiceId: number;
+            /** @enum {string} */
+            status: "POSTED" | "REVERSED";
+            /**
+             * @description The entry's date
+             * @example 2026-11-23
+             */
+            waiverDate: string;
+            /** @example 2.00 */
+            pct: string;
+            /**
+             * @description The invoice total less its credit notes
+             * @example 150000.00
+             */
+            baseAmount: string;
+            /** @example 3000.00 */
+            amount: string;
+            /** @example 520201 */
+            accountCode: string;
+            /** @example Борлуулалтын хөнгөлөлт */
+            description: string;
+            /** @example НХ-20261123-0001 */
+            documentNumber: string | null;
+            journalEntryId: number | null;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            /** Format: date-time */
+            reversedAt: string | null;
+            reversedByName: string | null;
+            reverseReason: string | null;
+        };
+        VatWaiverPreview: {
+            /** @example 2.00 */
+            pct: string;
+            /** @example 150000.00 */
+            baseAmount: string;
+            /**
+             * @description What a waiver would take today
+             * @example 3000.00
+             */
+            amount: string;
+            /**
+             * @description Why a waiver would be refused now; null when it would go through
+             * @enum {string|null}
+             */
+            blockedBy: "VOID" | "VAT_WAIVED" | "NOTHING_LEFT" | "B2B_RECEIPT" | null;
+        };
+        InvoiceReceiptRef: {
+            id: number;
+            /** @enum {string} */
+            receiptType: "B2C" | "B2B";
+            /** @enum {string} */
+            status: "PENDING" | "SENDING" | "CONFIRMED" | "ERROR" | "INDETERMINATE" | "CANCELLED";
+        };
         Invoice: {
             id: number;
             /** @example Н-20261016-0001 */
@@ -21480,6 +21629,11 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             createdByName: string | null;
+            /** @description ADR-0240: its live VAT waiver («НӨАТ авахгүй»); null while it takes the receipt */
+            vatWaiver: components["schemas"]["VatWaiver"] | null;
+            vatWaiverPreview: components["schemas"]["VatWaiverPreview"];
+            /** @description Its e-Barimt receipt in short; null when it has none */
+            receipt: components["schemas"]["InvoiceReceiptRef"] | null;
         };
         InvoicePage: {
             data: components["schemas"]["Invoice"][];
@@ -21536,7 +21690,7 @@ export interface components {
         InvoiceAllocation: {
             id: number;
             /** @enum {string} */
-            sourceType: "PAYMENT" | "CREDIT_NOTE" | "ALLOCATION";
+            sourceType: "PAYMENT" | "CREDIT_NOTE" | "ALLOCATION" | "VAT_WAIVER";
             sourceId: number;
             /** @example Т-20261016-0002 */
             sourceNumber: string;
@@ -21642,6 +21796,11 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             createdByName: string | null;
+            /** @description ADR-0240: its live VAT waiver («НӨАТ авахгүй»); null while it takes the receipt */
+            vatWaiver: components["schemas"]["VatWaiver"] | null;
+            vatWaiverPreview: components["schemas"]["VatWaiverPreview"];
+            /** @description Its e-Barimt receipt in short; null when it has none */
+            receipt: components["schemas"]["InvoiceReceiptRef"] | null;
             note: string | null;
             journalEntryId: number | null;
             journalNumber: string | null;
@@ -21655,6 +21814,9 @@ export interface components {
             creditNotes: components["schemas"]["InvoiceCreditNoteRef"][];
             /** @description ADR-0185: its e-Barimt receipt; null when the sale asked for none */
             ebarimt: components["schemas"]["EbarimtReceipt"] | null;
+        };
+        VatWaiverReverseRequest: {
+            reason?: string | null;
         };
         VoidRequest: {
             reason: string;
@@ -22552,6 +22714,51 @@ export interface components {
             /** @example 300000.00 */
             closing: string;
         };
+        VatTotalsSide: {
+            count: number;
+            /** @example 1500000.00 */
+            total: string;
+            /** @example 136363.64 */
+            vatTotal: string;
+            /** @example 500000.00 */
+            openAmount: string;
+            /**
+             * @description Σ of the live waivers’ discounts
+             * @example 0.00
+             */
+            waiverAmount: string;
+        };
+        CustomerVatTotals: {
+            customerId: number;
+            /** @example 2026-11-01 */
+            from: string | null;
+            /** @example 2026-11-30 */
+            to: string | null;
+            /** @description «НӨАТ авах» */
+            takesVat: components["schemas"]["VatTotalsSide"];
+            /** @description «НӨАТ авахгүй» */
+            waived: components["schemas"]["VatTotalsSide"];
+        };
+        CounterAccountRef: {
+            id: number;
+            /** @example 520201 */
+            code: string;
+            /** @example Борлуулалтын хөнгөлөлт */
+            name: string;
+        };
+        CustomerCounterAccount: {
+            customerId: number;
+            /** @description False: none of their own, the sales discount account is used */
+            own: boolean;
+            /** @description What a waiver would debit now; null when the chart has no sales discount account */
+            account: components["schemas"]["CounterAccountRef"] | null;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        CustomerCounterAccountRequest: {
+            /** @description null = back to the default account */
+            accountId: number | null;
+        };
         FinanceAttention: {
             /** @example 0.00 */
             overdueAmount: string;
@@ -22588,6 +22795,22 @@ export interface components {
             PAYMENT: components["schemas"]["FinanceNumberFormatRequest"];
             CREDIT_NOTE: components["schemas"]["FinanceNumberFormatRequest"];
             JOURNAL: components["schemas"]["FinanceNumberFormatRequest"];
+        };
+        VatWaiverSettings: {
+            /** @example 2.00 */
+            pct: string;
+            /** @example Борлуулалтын хөнгөлөлт */
+            description: string;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        VatWaiverSettingsRequest: {
+            /**
+             * @description Above 0, at most 100, two decimals
+             * @example 2.00
+             */
+            pct: string;
+            description: string;
         };
         OpenItem: {
             id: number;
@@ -46923,6 +47146,8 @@ export interface operations {
                 status?: "ISSUED" | "VOID";
                 /** @description Only overdue invoices */
                 overdue?: boolean;
+                /** @description ADR-0240: true = only invoices with a VAT waiver, false = only those without */
+                vatWaived?: boolean;
             };
             header?: never;
             path?: never;
@@ -46959,6 +47184,76 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Invoices_waiveVat: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Invoices_reverseVatWaiver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VatWaiverReverseRequest"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -48397,6 +48692,103 @@ export interface operations {
             };
         };
     };
+    CustomerBalances_vatTotals: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerVatTotals"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBalances_counterAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCounterAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CustomerBalances_setCounterAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCounterAccountRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCounterAccount"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     FinanceAttention_attention: {
         parameters: {
             query?: never;
@@ -48472,6 +48864,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FinanceNumbering"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FinanceSettings_vatWaiver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VatWaiverSettings"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FinanceSettings_setVatWaiver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VatWaiverSettingsRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VatWaiverSettings"];
                 };
             };
             /** @description RFC 9457 problem details */

@@ -1,23 +1,37 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Put, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
+import { Decimal } from '@tugeel/shared/money';
 import {
   CustomerBalanceDto,
   CustomerBalancesPageDto,
   CustomerBalancesQueryDto,
+  CustomerCounterAccountDto,
+  CustomerCounterAccountRequestDto,
   CustomerLedgerPageDto,
   CustomerStatementTotalsDto,
   CustomerStatementTotalsQueryDto,
+  CustomerVatTotalsDto,
+  CustomerVatTotalsQueryDto,
   DateRangeQueryDto,
   FinanceAttentionDto,
   FinanceNumberingDto,
   FinanceNumberingRequestDto,
+  type VatTotalsSideDto,
+  VatWaiverSettingsDto,
+  VatWaiverSettingsRequestDto,
 } from '../dto/finance.dto';
 import { ArLedgerService } from '../services/ar-ledger.service';
 import {
+  type CustomerCounterAccount,
+  CustomerCounterAccountsService,
+} from '../services/customer-counter-accounts.service';
+import {
   type FinanceNumbering,
   FinanceSettingsService,
+  type VatWaiverSettings,
 } from '../services/finance-settings.service';
+import { type VatTotalsSide, VatWaiversService } from '../services/vat-waivers.service';
 import { customerBalanceDto, ledgerEntryDto, money } from './mappers';
 
 const READ = 'finance.read';
@@ -27,7 +41,11 @@ const SETTINGS = 'finance.settings.manage';
 @ApiTags('finance')
 @Controller('customer-balances')
 export class CustomerBalancesController {
-  constructor(private readonly ledger: ArLedgerService) {}
+  constructor(
+    private readonly ledger: ArLedgerService,
+    private readonly waivers: VatWaiversService,
+    private readonly counterAccounts: CustomerCounterAccountsService,
+  ) {}
 
   @Get()
   @RequirePermission(READ)
@@ -80,7 +98,70 @@ export class CustomerBalancesController {
       closing: money(totals.closing),
     };
   }
+
+  /**
+   * «НӨАТ авах» / «НӨАТ авахгүй» (ADR-0240): the customer's issued invoices of a date range, split
+   * by whether their VAT receipt is waived.
+   */
+  @Get(':customerId/vat-totals')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: CustomerVatTotalsDto })
+  async vatTotals(
+    @Param('customerId', ParseIntPipe) customerId: number,
+    @Query() query: CustomerVatTotalsQueryDto,
+  ): Promise<CustomerVatTotalsDto> {
+    const totals = await this.waivers.totalsOf(customerId, query);
+    return {
+      customerId: totals.customerId,
+      from: totals.from,
+      to: totals.to,
+      takesVat: vatSideDto(totals.takesVat),
+      waived: vatSideDto(totals.waived),
+    };
+  }
+
+  /** «Харилцсан данс» (ADR-0240 #4): what a VAT waiver of this customer debits. */
+  @Get(':customerId/counter-account')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: CustomerCounterAccountDto })
+  async counterAccount(
+    @Param('customerId', ParseIntPipe) customerId: number,
+  ): Promise<CustomerCounterAccountDto> {
+    return counterAccountDto(await this.counterAccounts.get(customerId));
+  }
+
+  @Put(':customerId/counter-account')
+  @RequirePermission(SETTINGS)
+  @ApiOkResponse({ type: CustomerCounterAccountDto })
+  async setCounterAccount(
+    @CurrentUser() ctx: AuthContext,
+    @Param('customerId', ParseIntPipe) customerId: number,
+    @Body() body: CustomerCounterAccountRequestDto,
+  ): Promise<CustomerCounterAccountDto> {
+    return counterAccountDto(await this.counterAccounts.set(ctx, customerId, body.accountId));
+  }
 }
+
+const vatSideDto = (side: VatTotalsSide): VatTotalsSideDto => ({
+  count: side.count,
+  total: money(side.total),
+  vatTotal: money(side.vatTotal),
+  openAmount: money(side.openAmount),
+  waiverAmount: money(side.waiverAmount),
+});
+
+const counterAccountDto = (row: CustomerCounterAccount): CustomerCounterAccountDto => ({
+  customerId: row.customerId,
+  own: row.own,
+  account: row.account,
+  updatedAt: row.updatedAt?.toISOString() ?? null,
+});
+
+const vatWaiverSettingsDto = (settings: VatWaiverSettings): VatWaiverSettingsDto => ({
+  pct: settings.pct.toFixed(2),
+  description: settings.description,
+  updatedAt: settings.updatedAt?.toISOString() ?? null,
+});
 
 /** The home page's finance tile (ADR-0060 #11). */
 @ApiTags('finance')
@@ -131,5 +212,28 @@ export class FinanceSettingsController {
     @Body() body: FinanceNumberingRequestDto,
   ): Promise<FinanceNumberingDto> {
     return numberingDto(await this.settings.setNumbering(ctx, body));
+  }
+
+  /** «НӨАТ хасуулах» (ADR-0240 #1): the percent a waiver takes and the words of its entry. */
+  @Get('vat-waiver')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: VatWaiverSettingsDto })
+  async vatWaiver(): Promise<VatWaiverSettingsDto> {
+    return vatWaiverSettingsDto(await this.settings.vatWaiver());
+  }
+
+  @Put('vat-waiver')
+  @RequirePermission(SETTINGS)
+  @ApiOkResponse({ type: VatWaiverSettingsDto })
+  async setVatWaiver(
+    @CurrentUser() ctx: AuthContext,
+    @Body() body: VatWaiverSettingsRequestDto,
+  ): Promise<VatWaiverSettingsDto> {
+    return vatWaiverSettingsDto(
+      await this.settings.setVatWaiver(ctx, {
+        pct: new Decimal(body.pct),
+        description: body.description,
+      }),
+    );
   }
 }

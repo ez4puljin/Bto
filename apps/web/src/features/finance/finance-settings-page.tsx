@@ -52,6 +52,7 @@ import {
   useMoneyAccounts,
 } from './api';
 import { accountOption } from './account-option';
+import { VatWaiverSettingsCard } from './vat-waiver-settings-card';
 
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 const PATTERN_KEYS: Record<
@@ -189,6 +190,7 @@ export function FinanceSettingsPage() {
             edit={(close) => <NumberingForm numbering={numbering.data} onClose={close} />}
           />
         ) : null}
+        <VatWaiverSettingsCard />
       </div>
       {creating ? (
         <MoneyAccountDialog open account={null} onClose={() => setCreating(false)} />

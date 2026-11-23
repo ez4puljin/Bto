@@ -52,6 +52,12 @@ export type InvoiceAllocation = Schemas['InvoiceAllocation'];
 export type SupplierBalance = Schemas['SupplierBalance'];
 export type PayableEntry = Schemas['PayableEntry'];
 export type PayableOpenItem = Schemas['PayableOpenItem'];
+export type VatWaiver = Schemas['VatWaiver'];
+export type VatWaiverBlock = NonNullable<Schemas['VatWaiverPreview']['blockedBy']>;
+export type CustomerVatTotals = Schemas['CustomerVatTotals'];
+export type VatTotalsSide = Schemas['VatTotalsSide'];
+export type CustomerCounterAccount = Schemas['CustomerCounterAccount'];
+export type VatWaiverSettings = Schemas['VatWaiverSettings'];
 
 /** Idempotent routes take the key from the caller: one key per user intent (ADR-0004). */
 type Keyed<T> = T & { key: string };
@@ -70,6 +76,9 @@ const KEYS = {
   ledger: ['finance', 'ledger'] as const,
   openItems: ['finance', 'open-items'] as const,
   numbering: ['finance', 'numbering'] as const,
+  vatTotals: ['finance', 'vat-totals'] as const,
+  counterAccount: ['finance', 'counter-account'] as const,
+  vatWaiverSettings: ['finance', 'vat-waiver-settings'] as const,
 };
 
 export interface InvoiceFilter {
@@ -79,6 +88,8 @@ export interface InvoiceFilter {
   settlement?: Settlement;
   status?: Invoice['status'];
   overdue?: boolean;
+  /** ADR-0240: only invoices whose VAT receipt is waived (true) or is not (false). */
+  vatWaived?: boolean;
   from?: string;
   to?: string;
 }
@@ -100,6 +111,7 @@ export function useInvoices(filter: InvoiceFilter, options: { enabled?: boolean 
               settlement: filter.settlement,
               status: filter.status,
               overdue: filter.overdue,
+              vatWaived: filter.vatWaived,
               from: filter.from,
               to: filter.to,
               cursor: pageParam,
@@ -424,6 +436,56 @@ export function useCustomerStatementTotals(
   });
 }
 
+/**
+ * A customer's issued invoices of a range, split into «НӨАТ авах» and «НӨАТ авахгүй» (ADR-0240).
+ */
+export function useCustomerVatTotals(
+  customerId: number,
+  range: { from?: string; to?: string },
+  enabled = true,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.vatTotals, customerId, range],
+    enabled: enabled && customerId > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/customer-balances/{customerId}/vat-totals', {
+          params: { path: { customerId }, query: { from: range.from, to: range.to } },
+          signal,
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** «Харилцсан данс» of a customer (ADR-0240): what a VAT waiver of theirs debits. */
+export function useCustomerCounterAccount(customerId: number, enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...KEYS.counterAccount, customerId],
+    enabled: enabled && customerId > 0,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/customer-balances/{customerId}/counter-account', {
+          params: { path: { customerId } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** The waiver's percent and the words of its entry (ADR-0240). */
+export function useVatWaiverSettings(enabled = true) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: KEYS.vatWaiverSettings,
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/v1/finance-settings/vat-waiver', { signal })),
+  });
+}
+
 /** A customer's open receivable items (ADR-0090): invoices and refunds to settle, credits to use. */
 export function useOpenItems(customerId: number, enabled = true) {
   const api = useApiClient();
@@ -543,6 +605,48 @@ export function useFinanceMutations() {
       queryClient.invalidateQueries({ queryKey: ATTENTION_KEY }),
     ]);
   return {
+    waiveVat: useMutation({
+      mutationFn: async ({ id, key }: Keyed<{ id: number }>) =>
+        unwrap(
+          await api.POST('/api/v1/invoices/{id}/vat-waiver', {
+            params: { path: { id }, header: idempotencyKey(key) },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    reverseVatWaiver: useMutation({
+      mutationFn: async ({ id, key, reason }: Keyed<{ id: number; reason: string | null }>) =>
+        unwrap(
+          await api.POST('/api/v1/invoices/{id}/vat-waiver/reverse', {
+            params: { path: { id }, header: idempotencyKey(key) },
+            body: { reason },
+          }),
+        ),
+      onSuccess: () => changed(),
+    }),
+    setCounterAccount: useMutation({
+      mutationFn: async ({
+        customerId,
+        accountId,
+      }: {
+        customerId: number;
+        accountId: number | null;
+      }) =>
+        unwrap(
+          await api.PUT('/api/v1/customer-balances/{customerId}/counter-account', {
+            params: { path: { customerId } },
+            body: { accountId },
+          }),
+        ),
+      onSuccess: (row) => {
+        queryClient.setQueryData([...KEYS.counterAccount, row.customerId], row);
+      },
+    }),
+    setVatWaiverSettings: useMutation({
+      mutationFn: async (body: Schemas['VatWaiverSettingsRequest']) =>
+        unwrap(await api.PUT('/api/v1/finance-settings/vat-waiver', { body })),
+      onSuccess: () => changed(),
+    }),
     voidInvoice: useMutation({
       mutationFn: async ({ id, key, reason }: Keyed<{ id: number; reason: string }>) =>
         unwrap(

@@ -182,6 +182,8 @@ export const STORE_SEED_TABLES: Record<string, SeedRule> = {
   'public.finance_settings': copy(),
   'public.statement_row_links': copy("the accountant's account-to-row links of СТ-1 and СТ-2"),
   'public.bank_statement_settings': copy(),
+  'public.customer_counter_accounts': copy("each customer's counter account of a VAT waiver"),
+  'public.vat_waivers': empty(DOCUMENT),
   'public.invoices': empty(DOCUMENT),
   'public.invoice_lines': empty(DOCUMENT),
   'public.credit_notes': empty(DOCUMENT),

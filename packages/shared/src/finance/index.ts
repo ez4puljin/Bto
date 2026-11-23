@@ -7,7 +7,7 @@ import {
   NUMBER_DEFAULTS,
   type NumberFormat,
 } from '../mn';
-import { Decimal, type DecimalInput, toWholeMnt } from '../money';
+import { Decimal, type DecimalInput, toMoney, toWholeMnt } from '../money';
 import {
   formatOrderNumber,
   type OrderNumberIssue,
@@ -135,9 +135,67 @@ export type PayableEntryKind = (typeof PAYABLE_ENTRY_KINDS)[number];
 export const PAYABLE_DOC_KINDS = ['RECEIPT', 'ISSUE', 'JOURNAL'] as const;
 export type PayableDocKind = (typeof PAYABLE_DOC_KINDS)[number];
 
-/** What settled an invoice: a voucher, a credit note, or the accountant's allocation (F2, ADR-0090). */
-export const ALLOCATION_SOURCES = ['PAYMENT', 'CREDIT_NOTE', 'ALLOCATION'] as const;
+/**
+ * What settled an invoice: a voucher, a credit note, the accountant's allocation (F2, ADR-0090) or
+ * the discount of a waived VAT receipt (ADR-0240).
+ */
+export const ALLOCATION_SOURCES = ['PAYMENT', 'CREDIT_NOTE', 'ALLOCATION', 'VAT_WAIVER'] as const;
 export type AllocationSource = (typeof ALLOCATION_SOURCES)[number];
+
+/**
+ * «НӨАТ хасуулах» (ADR-0240): a customer who takes no VAT receipt for a sale has the receivable
+ * reduced by a percent of that sale instead. A waiver is POSTED until it is taken back (REVERSED);
+ * an invoice carries at most one POSTED waiver.
+ */
+export const VAT_WAIVER_STATUSES = ['POSTED', 'REVERSED'] as const;
+export type VatWaiverStatus = (typeof VAT_WAIVER_STATUSES)[number];
+
+/** The longest «Гүйлгээний утга» of a waiver: the entry's description carries its number too. */
+export const VAT_WAIVER_DESCRIPTION_MAX = 120;
+
+/** The percent a waiver takes until «Санхүү → Тохиргоо» says otherwise (owner, 2026-11-23). */
+export const VAT_WAIVER_DEFAULT_PCT = '2.00';
+
+/**
+ * Why an invoice cannot be waived now: it is void, it is waived already, its credit notes took
+ * everything back (or the discount rounds to nothing), or the customer already holds a company
+ * (B2B) e-Barimt receipt for it.
+ */
+export const VAT_WAIVER_BLOCKS = ['VOID', 'VAT_WAIVED', 'NOTHING_LEFT', 'B2B_RECEIPT'] as const;
+export type VatWaiverBlock = (typeof VAT_WAIVER_BLOCKS)[number];
+
+/** A company receipt in one of these states counts as taken (or possibly taken) by the customer. */
+export const VAT_WAIVER_BLOCKING_RECEIPT_STATUSES = [
+  'PENDING',
+  'SENDING',
+  'CONFIRMED',
+  'INDETERMINATE',
+] as const;
+
+/** A waiver's percent: above 0, at most 100, two decimals. */
+export function isVatWaiverPct(value: DecimalInput): boolean {
+  let pct: Decimal;
+  try {
+    pct = new Decimal(value);
+  } catch {
+    return false;
+  }
+  return pct.isFinite() && pct.gt(0) && pct.lte(100) && pct.decimalPlaces() <= 2;
+}
+
+/**
+ * What a waiver is taken from and how much it takes (ADR-0240 #1): the invoice's total, VAT
+ * included, less what its credit notes took back, times the percent, two decimals HALF_UP.
+ */
+export function vatWaiverAmount(
+  invoiceTotal: DecimalInput,
+  creditedTotal: DecimalInput,
+  pct: DecimalInput,
+): { base: Decimal; amount: Decimal } {
+  const net = new Decimal(invoiceTotal).minus(creditedTotal);
+  const base = net.gt(0) ? toMoney(net) : new Decimal(0);
+  return { base, amount: toMoney(base.times(pct).div(100)) };
+}
 
 export const FINANCE_LIMITS = {
   maxDescription: 300,

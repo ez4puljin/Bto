@@ -7,8 +7,13 @@ import {
   financeNumberIssues,
   financeNumberPrefix,
   formatFinanceNumber,
+  isVatWaiverPct,
   type NumberFormat,
+  VAT_WAIVER_DEFAULT_PCT,
+  VAT_WAIVER_DESCRIPTION_MAX,
 } from '@tugeel/shared/finance';
+import mn from '@tugeel/shared/i18n/mn.json';
+import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { eq, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -25,6 +30,13 @@ export type FinanceNumberingInput = Record<FinanceDocKind, NumberFormat>;
 export interface FinanceNumbering extends FinanceNumberingInput {
   updatedAt: Date | null;
   updatedBy: number | null;
+}
+
+/** «НӨАТ хасуулах» (ADR-0240): the percent a waiver takes and the words of its entry. */
+export interface VatWaiverSettings {
+  pct: Decimal;
+  description: string;
+  updatedAt: Date | null;
 }
 
 /** The formats Bto numbers itself (its invoices and credit notes, ADR-0073 #2). */
@@ -124,6 +136,70 @@ export class FinanceSettingsService {
       });
     });
     return this.numbering();
+  }
+
+  /**
+   * The waiver's percent and words (ADR-0240 #1): the saved ones, else 2 % and «Борлуулалтын
+   * хөнгөлөлт». A waiver freezes both on its own row, so a change reaches only later waivers.
+   */
+  async vatWaiver(executor: Db | Tx = this.db): Promise<VatWaiverSettings> {
+    const [row] = await executor
+      .select({
+        pct: financeSettings.vatWaiverPct,
+        description: financeSettings.vatWaiverDescription,
+        updatedAt: financeSettings.updatedAt,
+      })
+      .from(financeSettings)
+      .where(eq(financeSettings.id, 1));
+    return {
+      pct: row?.pct ?? new Decimal(VAT_WAIVER_DEFAULT_PCT),
+      description: row?.description ?? mn.finance.vatWaiver.defaultDescription,
+      updatedAt: row?.updatedAt ?? null,
+    };
+  }
+
+  async setVatWaiver(
+    ctx: AuthContext,
+    input: { pct: Decimal; description: string },
+  ): Promise<VatWaiverSettings> {
+    if (!isVatWaiverPct(input.pct)) {
+      throw invalid('pct', 'vatWaiverPct', 'above 0, at most 100, two decimals');
+    }
+    const description = input.description.trim();
+    if (description.length === 0 || description.length > VAT_WAIVER_DESCRIPTION_MAX) {
+      throw invalid('description', 'length', `1 to ${VAT_WAIVER_DESCRIPTION_MAX} characters`);
+    }
+    await inTransaction(this.db, async (tx) => {
+      const before = await this.vatWaiver(tx);
+      const values = {
+        vatWaiverPct: input.pct,
+        vatWaiverDescription: description,
+        updatedBy: actorUserId(ctx),
+      };
+      // The row is absent until something is saved: it starts with the number formats in force.
+      await tx
+        .insert(financeSettings)
+        .values({
+          id: 1,
+          invoicePattern: FINANCE_NUMBER_DEFAULTS.INVOICE.pattern,
+          invoiceDigits: FINANCE_NUMBER_DEFAULTS.INVOICE.digits,
+          creditNotePattern: FINANCE_NUMBER_DEFAULTS.CREDIT_NOTE.pattern,
+          creditNoteDigits: FINANCE_NUMBER_DEFAULTS.CREDIT_NOTE.digits,
+          ...values,
+        })
+        .onConflictDoUpdate({
+          target: financeSettings.id,
+          set: { ...values, updatedAt: sql`now()` },
+        });
+      await this.audit.record(tx, ctx, {
+        action: 'UPDATE',
+        entity: 'finance_settings',
+        entityId: 1,
+        before: { vatWaiverPct: before.pct.toFixed(2), vatWaiverDescription: before.description },
+        after: { vatWaiverPct: input.pct.toFixed(2), vatWaiverDescription: description },
+      });
+    });
+    return this.vatWaiver();
   }
 
   /**

@@ -48,6 +48,7 @@ import { formatTugrik } from '@/lib/money';
 import { problemFromError, unwrap } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
+import { VatWaiverProblem } from './vat-waiver-dialogs';
 
 export type EbarimtReceipt = components['schemas']['EbarimtReceipt'];
 
@@ -311,7 +312,13 @@ export function EbarimtReceiptsPage() {
           onCheckedChange={(checked) => setParam('cancel', checked ? '1' : undefined)}
         />
       </FilterBar>
-      <ProblemAlert problem={problem} onRetry={receipts.refetch} />
+      {/* ADR-0240: a waived sale gets no company receipt; say so in the owner's words. */}
+      {problem?.code === 'EBARIMT_RECEIPT_STATE_INVALID' &&
+      problem.params?.status === 'VAT_WAIVED' ? (
+        <VatWaiverProblem problem={problem} />
+      ) : (
+        <ProblemAlert problem={problem} onRetry={receipts.refetch} />
+      )}
       <ListCard scroll>
         <ListTable columns={COLUMNS}>
           <TableHeader>

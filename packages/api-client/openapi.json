@@ -28860,6 +28860,15 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "vatWaived",
+            "required": false,
+            "in": "query",
+            "description": "ADR-0240: true = only invoices with a VAT waiver, false = only those without",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -28934,6 +28943,126 @@
             "bearer": []
           }
         ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/vat-waiver": {
+      "post": {
+        "operationId": "Invoices_waiveVat",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«НӨАТ хасуулах» (ADR-0240): the customer takes no VAT receipt for this invoice and the\nreceivable falls by the waiver's percent of it, in one entry. 409 `INVOICE_STATE_INVALID` with\n`status` VOID, VAT_WAIVED, NOTHING_LEFT or B2B_RECEIPT when it cannot be waived.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/vat-waiver/reverse": {
+      "post": {
+        "operationId": "Invoices_reverseVatWaiver",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VatWaiverReverseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Буцаах» (ADR-0240 #5): the waiver's entry is reversed and the invoice takes VAT again.",
         "tags": [
           "finance"
         ]
@@ -31698,6 +31827,169 @@
         ]
       }
     },
+    "/api/v1/customer-balances/{customerId}/vat-totals": {
+      "get": {
+        "operationId": "CustomerBalances_vatTotals",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerVatTotals"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«НӨАТ авах» / «НӨАТ авахгүй» (ADR-0240): the customer's issued invoices of a date range, split\nby whether their VAT receipt is waived.",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/customer-balances/{customerId}/counter-account": {
+      "get": {
+        "operationId": "CustomerBalances_counterAccount",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCounterAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Харилцсан данс» (ADR-0240 #4): what a VAT waiver of this customer debits.",
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "CustomerBalances_setCounterAccount",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCounterAccountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCounterAccount"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/finance/attention": {
       "get": {
         "operationId": "FinanceAttention_attention",
@@ -31789,6 +32081,87 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FinanceNumbering"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance-settings/vat-waiver": {
+      "get": {
+        "operationId": "FinanceSettings_vatWaiver",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VatWaiverSettings"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«НӨАТ хасуулах» (ADR-0240 #1): the percent a waiver takes and the words of its entry.",
+        "tags": [
+          "finance"
+        ]
+      },
+      "put": {
+        "operationId": "FinanceSettings_setVatWaiver",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VatWaiverSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VatWaiverSettings"
                 }
               }
             }
@@ -53645,6 +54018,7 @@
           "finance.periods.close",
           "finance.periods.reopen",
           "finance.sms.send",
+          "finance.vat_waiver.manage",
           "pos.read",
           "pos.manage",
           "pos.till.operate",
@@ -80953,6 +81327,164 @@
           "stores"
         ]
       },
+      "VatWaiver": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "invoiceId": {
+            "type": "number"
+          },
+          "status": {
+            "enum": [
+              "POSTED",
+              "REVERSED"
+            ],
+            "type": "string"
+          },
+          "waiverDate": {
+            "type": "string",
+            "example": "2026-11-23",
+            "description": "The entry's date"
+          },
+          "pct": {
+            "type": "string",
+            "example": "2.00"
+          },
+          "baseAmount": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "The invoice total less its credit notes"
+          },
+          "amount": {
+            "type": "string",
+            "example": "3000.00"
+          },
+          "accountCode": {
+            "type": "string",
+            "example": "520201"
+          },
+          "description": {
+            "type": "string",
+            "example": "Борлуулалтын хөнгөлөлт"
+          },
+          "documentNumber": {
+            "type": "string",
+            "nullable": true,
+            "example": "НХ-20261123-0001"
+          },
+          "journalEntryId": {
+            "type": "number",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reversedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "reverseReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "invoiceId",
+          "status",
+          "waiverDate",
+          "pct",
+          "baseAmount",
+          "amount",
+          "accountCode",
+          "description",
+          "documentNumber",
+          "journalEntryId",
+          "createdAt",
+          "createdByName",
+          "reversedAt",
+          "reversedByName",
+          "reverseReason"
+        ]
+      },
+      "VatWaiverPreview": {
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "string",
+            "example": "2.00"
+          },
+          "baseAmount": {
+            "type": "string",
+            "example": "150000.00"
+          },
+          "amount": {
+            "type": "string",
+            "example": "3000.00",
+            "description": "What a waiver would take today"
+          },
+          "blockedBy": {
+            "nullable": true,
+            "enum": [
+              "VOID",
+              "VAT_WAIVED",
+              "NOTHING_LEFT",
+              "B2B_RECEIPT"
+            ],
+            "type": "string",
+            "description": "Why a waiver would be refused now; null when it would go through"
+          }
+        },
+        "required": [
+          "pct",
+          "baseAmount",
+          "amount",
+          "blockedBy"
+        ]
+      },
+      "InvoiceReceiptRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "receiptType": {
+            "type": "string",
+            "enum": [
+              "B2C",
+              "B2B"
+            ]
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "SENDING",
+              "CONFIRMED",
+              "ERROR",
+              "INDETERMINATE",
+              "CANCELLED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "receiptType",
+          "status"
+        ]
+      },
       "Invoice": {
         "type": "object",
         "properties": {
@@ -81057,6 +81589,29 @@
           "createdByName": {
             "type": "string",
             "nullable": true
+          },
+          "vatWaiver": {
+            "nullable": true,
+            "description": "ADR-0240: its live VAT waiver («НӨАТ авахгүй»); null while it takes the receipt",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VatWaiver"
+              }
+            ]
+          },
+          "vatWaiverPreview": {
+            "$ref": "#/components/schemas/VatWaiverPreview"
+          },
+          "receipt": {
+            "nullable": true,
+            "description": "Its e-Barimt receipt in short; null when it has none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceReceiptRef"
+              }
+            ]
           }
         },
         "required": [
@@ -81083,7 +81638,10 @@
           "openAmount",
           "lineCount",
           "createdAt",
-          "createdByName"
+          "createdByName",
+          "vatWaiver",
+          "vatWaiverPreview",
+          "receipt"
         ]
       },
       "InvoicePage": {
@@ -81258,7 +81816,8 @@
             "enum": [
               "PAYMENT",
               "CREDIT_NOTE",
-              "ALLOCATION"
+              "ALLOCATION",
+              "VAT_WAIVER"
             ],
             "type": "string"
           },
@@ -81602,6 +82161,29 @@
             "type": "string",
             "nullable": true
           },
+          "vatWaiver": {
+            "nullable": true,
+            "description": "ADR-0240: its live VAT waiver («НӨАТ авахгүй»); null while it takes the receipt",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VatWaiver"
+              }
+            ]
+          },
+          "vatWaiverPreview": {
+            "$ref": "#/components/schemas/VatWaiverPreview"
+          },
+          "receipt": {
+            "nullable": true,
+            "description": "Its e-Barimt receipt in short; null when it has none",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceReceiptRef"
+              }
+            ]
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -81685,6 +82267,9 @@
           "lineCount",
           "createdAt",
           "createdByName",
+          "vatWaiver",
+          "vatWaiverPreview",
+          "receipt",
           "note",
           "journalEntryId",
           "journalNumber",
@@ -81697,6 +82282,16 @@
           "creditNotes",
           "ebarimt"
         ]
+      },
+      "VatWaiverReverseRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        }
       },
       "VoidRequest": {
         "type": "object",
@@ -84896,6 +85491,147 @@
           "closing"
         ]
       },
+      "VatTotalsSide": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "total": {
+            "type": "string",
+            "example": "1500000.00"
+          },
+          "vatTotal": {
+            "type": "string",
+            "example": "136363.64"
+          },
+          "openAmount": {
+            "type": "string",
+            "example": "500000.00"
+          },
+          "waiverAmount": {
+            "type": "string",
+            "example": "0.00",
+            "description": "Σ of the live waivers’ discounts"
+          }
+        },
+        "required": [
+          "count",
+          "total",
+          "vatTotal",
+          "openAmount",
+          "waiverAmount"
+        ]
+      },
+      "CustomerVatTotals": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "from": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-01"
+          },
+          "to": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-30"
+          },
+          "takesVat": {
+            "description": "«НӨАТ авах»",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VatTotalsSide"
+              }
+            ]
+          },
+          "waived": {
+            "description": "«НӨАТ авахгүй»",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VatTotalsSide"
+              }
+            ]
+          }
+        },
+        "required": [
+          "customerId",
+          "from",
+          "to",
+          "takesVat",
+          "waived"
+        ]
+      },
+      "CounterAccountRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "520201"
+          },
+          "name": {
+            "type": "string",
+            "example": "Борлуулалтын хөнгөлөлт"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "CustomerCounterAccount": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "number"
+          },
+          "own": {
+            "type": "boolean",
+            "description": "False: none of their own, the sales discount account is used"
+          },
+          "account": {
+            "nullable": true,
+            "description": "What a waiver would debit now; null when the chart has no sales discount account",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CounterAccountRef"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "customerId",
+          "own",
+          "account",
+          "updatedAt"
+        ]
+      },
+      "CustomerCounterAccountRequest": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "null = back to the default account"
+          }
+        },
+        "required": [
+          "accountId"
+        ]
+      },
       "FinanceAttention": {
         "type": "object",
         "properties": {
@@ -85009,6 +85745,47 @@
           "PAYMENT",
           "CREDIT_NOTE",
           "JOURNAL"
+        ]
+      },
+      "VatWaiverSettings": {
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "string",
+            "example": "2.00"
+          },
+          "description": {
+            "type": "string",
+            "example": "Борлуулалтын хөнгөлөлт"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "pct",
+          "description",
+          "updatedAt"
+        ]
+      },
+      "VatWaiverSettingsRequest": {
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "string",
+            "example": "2.00",
+            "description": "Above 0, at most 100, two decimals"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "pct",
+          "description"
         ]
       },
       "OpenItem": {

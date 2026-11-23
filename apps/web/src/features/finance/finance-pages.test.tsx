@@ -7,6 +7,7 @@ import { findSidebar, json, problem, renderApp, signedIn } from '@/test/render-a
 import {
   BALANCE,
   CASH_BOX,
+  COUNTER_ACCOUNT,
   INVOICE,
   INVOICE_ALLOCATED,
   INVOICE_ROW,
@@ -47,6 +48,7 @@ const routes = () => ({
   'GET /api/v1/customer-balances': () => list([BALANCE]),
   'GET /api/v1/customer-balances/9': () => json(BALANCE),
   'GET /api/v1/customer-balances/9/open-items': () => json({ data: OPEN_ITEMS }),
+  'GET /api/v1/customer-balances/9/counter-account': () => json(COUNTER_ACCOUNT),
   'GET /api/v1/customer-balances/9/ledger': () =>
     json({ data: LEDGER, nextCursor: null, opening: '0.00' }),
   'GET /api/v1/customers': () => list([CUSTOMER_ROW]),

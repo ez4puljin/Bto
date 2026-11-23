@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ProblemAlert } from '@/components/problem-alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -200,6 +201,25 @@ function InvoiceBody({ invoice }: { invoice: InvoiceDetail }) {
                 >
                   {t('finance.ebarimtReceipts.open')}
                 </Link>
+              </span>
+            ),
+          },
+        ]
+      : []),
+    ...(invoice.vatWaiver
+      ? [
+          {
+            // ADR-0240: the customer takes no VAT receipt; the discount that reduced the debt.
+            label: t('finance.vatWaiver.onInvoice'),
+            value: (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                <Badge variant="warning">{t('finance.vatWaiver.onInvoiceWaived')}</Badge>
+                <span>
+                  {t('finance.vatWaiver.onInvoiceDetail', {
+                    amount: formatTugrik(invoice.vatWaiver.amount),
+                    date: invoice.vatWaiver.waiverDate,
+                  })}
+                </span>
               </span>
             ),
           },

@@ -50,6 +50,10 @@ export const FIN_DOC_TYPES = {
   // F4 (ADR-0097): a stock posting's value and a receipt's revaluation, numbered by the core.
   STOCK_VALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK' },
   STOCK_REVALUE: { code: 'BTO.STOCK_VALUE', system: BTO_SOURCE, docType: 'STOCK_REVALUE' },
+  // «НӨАТ хасуулах» (ADR-0240; migration 0123 wrote the same rows): the discount that reduces the
+  // receivable of a sale whose customer takes no VAT receipt, a credit on the customer settling
+  // that invoice, numbered by the core's series VAT_WAIVER. One document per waiver row.
+  VAT_WAIVER: { code: 'BTO.VAT_WAIVER', system: BTO_SOURCE, docType: 'VAT_WAIVER' },
 } as const;
 
 /**
@@ -74,6 +78,10 @@ export const ERKHET_DOC_TYPES = {
 
 /** The stock value documents' first number format until the accountant chooses one (TODO-VERIFY, ADR-0097). */
 export const STOCK_NUMBER_DEFAULT = { pattern: 'Б-{year}{month}{day}-', digits: 4 } as const;
+
+/** The VAT waivers' series and its number format until the accountant chooses one (TODO-VERIFY, ADR-0240). */
+export const VAT_WAIVER_SERIES = 'VAT_WAIVER';
+export const VAT_WAIVER_NUMBER_DEFAULT = { pattern: 'НХ-{year}{month}{day}-', digits: 4 } as const;
 
 /** The allocations' number format until the accountant chooses one (TODO-VERIFY, ADR-0090). */
 export const ALLOCATION_NUMBER_DEFAULT = { pattern: 'Х-{year}{month}{day}-', digits: 4 } as const;
@@ -239,6 +247,7 @@ export function btoInstallationSpec(input: {
       { code: 'JOURNAL', ...FINANCE_NUMBER_DEFAULTS.JOURNAL },
       { code: 'ALLOCATION', ...ALLOCATION_NUMBER_DEFAULT },
       { code: 'STOCK', ...STOCK_NUMBER_DEFAULT },
+      { code: VAT_WAIVER_SERIES, ...VAT_WAIVER_NUMBER_DEFAULT },
     ],
     documentTypes: [
       {
@@ -332,6 +341,13 @@ export function btoInstallationSpec(input: {
         class: 'JOURNAL',
         numberMode: 'CORE',
         numberSeries: 'STOCK',
+      },
+      {
+        code: FIN_DOC_TYPES.VAT_WAIVER.code,
+        system: BTO_SOURCE,
+        class: 'AR_CREDIT',
+        numberMode: 'CORE',
+        numberSeries: VAT_WAIVER_SERIES,
       },
       {
         code: ERKHET_DOC_TYPES.TR.code,

@@ -20,6 +20,7 @@ import {
   PaymentListQueryDto,
   PaymentPageDto,
   PaymentRequestDto,
+  VatWaiverReverseRequestDto,
   VoidRequestDto,
 } from '../dto/finance.dto';
 import { CreditNotesService } from '../services/credit-notes.service';
@@ -28,6 +29,7 @@ import { InvoiceEbarimtService } from '../services/invoice-ebarimt.service';
 import { InvoiceQueryService } from '../services/invoice-query.service';
 import { InvoicingService } from '../services/invoicing.service';
 import { PaymentsService } from '../services/payments.service';
+import { type InvoiceVatFacts, VatWaiversService } from '../services/vat-waivers.service';
 import {
   creditNoteDetailDto,
   creditNoteDto,
@@ -40,6 +42,7 @@ import {
 const READ = 'finance.read';
 const INVOICES = 'finance.invoices.manage';
 const PAYMENTS = 'finance.payments.record';
+const VAT_WAIVER = 'finance.vat_waiver.manage';
 
 /** Invoices (ADR-0060 #3): issued by the sale, read here, voided by the accountant. */
 @ApiTags('finance')
@@ -49,6 +52,7 @@ export class InvoicesController {
     private readonly query: InvoiceQueryService,
     private readonly invoicing: InvoicingService,
     private readonly ebarimt: InvoiceEbarimtService,
+    private readonly waivers: VatWaiversService,
   ) {}
 
   @Get()
@@ -59,14 +63,52 @@ export class InvoicesController {
     @Query() query: InvoiceListQueryDto,
   ): Promise<InvoicePageDto> {
     const page = await this.query.list(ctx, query);
-    return { data: page.data.map(invoiceDto), nextCursor: page.nextCursor, total: page.total };
+    const vat = await this.waivers.factsOf(page.data);
+    return {
+      data: page.data.map((invoice) => invoiceDto(invoice, factsFor(vat, invoice.id))),
+      nextCursor: page.nextCursor,
+      total: page.total,
+    };
   }
 
   @Get(':id')
   @RequirePermission(READ)
   @ApiOkResponse({ type: InvoiceDetailDto })
-  async get(@Param('id', ParseIntPipe) id: number): Promise<InvoiceDetailDto> {
-    return invoiceDetailDto(await this.query.get(id), await this.ebarimt.stateOf(id));
+  get(@Param('id', ParseIntPipe) id: number): Promise<InvoiceDetailDto> {
+    return this.detail(id);
+  }
+
+  /**
+   * «НӨАТ хасуулах» (ADR-0240): the customer takes no VAT receipt for this invoice and the
+   * receivable falls by the waiver's percent of it, in one entry. 409 `INVOICE_STATE_INVALID` with
+   * `status` VOID, VAT_WAIVED, NOTHING_LEFT or B2B_RECEIPT when it cannot be waived.
+   */
+  @Post(':id/vat-waiver')
+  @HttpCode(200)
+  @RequirePermission(VAT_WAIVER)
+  @Idempotent()
+  @ApiOkResponse({ type: InvoiceDetailDto })
+  async waiveVat(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<InvoiceDetailDto> {
+    await this.waivers.waive(ctx, id);
+    return this.detail(id);
+  }
+
+  /** «Буцаах» (ADR-0240 #5): the waiver's entry is reversed and the invoice takes VAT again. */
+  @Post(':id/vat-waiver/reverse')
+  @HttpCode(200)
+  @RequirePermission(VAT_WAIVER)
+  @Idempotent()
+  @ApiOkResponse({ type: InvoiceDetailDto })
+  async reverseVatWaiver(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: VatWaiverReverseRequestDto,
+  ): Promise<InvoiceDetailDto> {
+    await this.waivers.reverse(ctx, id, body.reason ?? null);
+    return this.detail(id);
   }
 
   /**
@@ -94,9 +136,21 @@ export class InvoicesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: VoidRequestDto,
   ): Promise<InvoiceDetailDto> {
-    const invoice = await this.invoicing.void(ctx, id, body.reason);
-    return invoiceDetailDto(invoice, await this.ebarimt.stateOf(id));
+    await this.invoicing.void(ctx, id, body.reason);
+    return this.detail(id);
   }
+
+  private async detail(id: number): Promise<InvoiceDetailDto> {
+    const invoice = await this.query.get(id);
+    const vat = await this.waivers.factsOf([invoice]);
+    return invoiceDetailDto(invoice, await this.ebarimt.stateOf(id), factsFor(vat, id));
+  }
+}
+
+function factsFor(facts: Map<number, InvoiceVatFacts>, invoiceId: number): InvoiceVatFacts {
+  const own = facts.get(invoiceId);
+  if (!own) throw new Error(`no VAT facts for invoice ${invoiceId}`);
+  return own;
 }
 
 /** Credit notes (ADR-0060 #6): goods back, the receivable reduced. */

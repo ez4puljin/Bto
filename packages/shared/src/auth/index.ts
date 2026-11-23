@@ -106,6 +106,9 @@ export const PERMISSIONS = [
   'finance.periods.reopen',
   // Settlement SMS (ADR-0216): sending the customers a text about their balance through WeSend.
   'finance.sms.send',
+  // «НӨАТ хасуулах» (ADR-0240): reducing a customer's receivable by the discount of a sale they take
+  // no VAT receipt for, and taking that back. No role holds it until an admin ticks it.
+  'finance.vat_waiver.manage',
   // The supermarket POS (ADR-0063): reading tills, shifts and sales; configuring tills, cashiers,
   // PINs and the store's edge node; working a till; approving returns and no-sale drawer opens.
   'pos.read',

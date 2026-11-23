@@ -6,6 +6,8 @@ import {
   COLLECTION_STATUSES,
   FINANCE_LIMITS,
   INVOICE_STATUSES,
+  VAT_WAIVER_DESCRIPTION_MAX,
+  VAT_WAIVER_STATUSES,
 } from '@tugeel/shared/finance';
 import { PRICE_BASES } from '@tugeel/shared/pricing';
 import { PAYMENT_METHODS } from '@tugeel/shared/sales';
@@ -61,11 +63,22 @@ export const financeSettings = pgTable(
     invoiceDigits: smallint('invoice_digits').notNull(),
     creditNotePattern: text('credit_note_pattern').notNull(),
     creditNoteDigits: smallint('credit_note_digits').notNull(),
+    /** «НӨАТ хасуулах» (ADR-0240): the percent and the entry's words; null = the shared defaults. */
+    vatWaiverPct: percent('vat_waiver_pct'),
+    vatWaiverDescription: text('vat_waiver_description'),
     updatedBy: userRef('updated_by'),
     updatedAt: updatedAt(),
   },
   (t) => [
     check('finance_settings_single', sql`${t.id} = 1`),
+    check(
+      'finance_settings_vat_waiver_pct',
+      sql`${t.vatWaiverPct} IS NULL OR (${t.vatWaiverPct} > 0 AND ${t.vatWaiverPct} <= 100)`,
+    ),
+    check(
+      'finance_settings_vat_waiver_description',
+      sql`${t.vatWaiverDescription} IS NULL OR length(${t.vatWaiverDescription}) BETWEEN 1 AND ${lim(VAT_WAIVER_DESCRIPTION_MAX)}`,
+    ),
     check('finance_settings_invoice', patternCheck(t.invoicePattern)),
     check('finance_settings_credit_note', patternCheck(t.creditNotePattern)),
     check(
@@ -472,4 +485,79 @@ export const statementRowLinks = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [check('statement_row_links_row', sql`length(${t.rowCode}) BETWEEN 1 AND 16`)],
+);
+
+/**
+ * «Харилцсан данс» of a customer (ADR-0240 #6): the account a VAT waiver of that customer debits
+ * in place of the sales discount. Finance's own table keyed by the customer, so partners never
+ * depends on finance; the account is the Finance Core's (`fin.accounts.id`, no FK). A setting: the
+ * row is removed when the customer goes back to the default.
+ */
+export const customerCounterAccounts = pgTable('customer_counter_accounts', {
+  customerId: bigint('customer_id', { mode: 'number' })
+    .primaryKey()
+    .references(() => customers.id),
+  accountId: ref('account_id').notNull(),
+  updatedBy: userRef('updated_by'),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * A VAT waiver (ADR-0240): the customer takes no VAT receipt for the invoice and the receivable
+ * falls by `pct` of `base_amount` (the invoice's total less its credit notes at that moment). The
+ * percent, the account and the words are frozen here; the entry is the Finance Core's document
+ * `BTO / VAT_WAIVER / <id>` (`document_id`, `journal_entry_id`: plain ids, no FK leaves `fin`).
+ * Taken back by the core's reversal, the row stays as REVERSED; never removed.
+ */
+export const vatWaivers = pgTable(
+  'vat_waivers',
+  {
+    id: id(),
+    invoiceId: ref('invoice_id')
+      .notNull()
+      .references(() => invoices.id),
+    customerId: ref('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    status: text('status', { enum: VAT_WAIVER_STATUSES }).notNull().default('POSTED'),
+    /** The entry's date: the Ulaanbaatar business date the waiver was made. */
+    waiverDate: date('waiver_date').notNull(),
+    pct: percent('pct').notNull(),
+    baseAmount: money('base_amount').notNull(),
+    amount: money('amount').notNull(),
+    accountId: ref('account_id').notNull(),
+    accountCode: text('account_code').notNull(),
+    description: text('description').notNull(),
+    documentId: ref('document_id'),
+    documentNumber: text('document_number'),
+    journalEntryId: ref('journal_entry_id'),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    reversedAt: timestamp('reversed_at', { withTimezone: true }),
+    reversedBy: userRef('reversed_by'),
+    reverseReason: text('reverse_reason'),
+    reverseJournalEntryId: ref('reverse_journal_entry_id'),
+  },
+  (t) => [
+    uniqueIndex('vat_waivers_invoice_posted')
+      .on(t.invoiceId)
+      .where(sql`${t.status} = 'POSTED'`),
+    index('vat_waivers_invoice_idx').on(t.invoiceId, t.id),
+    index('vat_waivers_customer_idx').on(t.customerId, t.id),
+    check('vat_waivers_status', inList(t.status, VAT_WAIVER_STATUSES)),
+    check('vat_waivers_pct', sql`${t.pct} > 0 AND ${t.pct} <= 100`),
+    check('vat_waivers_amounts', sql`${t.amount} > 0 AND ${t.amount} <= ${t.baseAmount}`),
+    check(
+      'vat_waivers_description',
+      sql`length(${t.description}) BETWEEN 1 AND ${lim(VAT_WAIVER_DESCRIPTION_MAX)}`,
+    ),
+    check(
+      'vat_waivers_reversed',
+      sql`(${t.status} = 'REVERSED') = (${t.reversedAt} IS NOT NULL) AND (${t.reversedAt} IS NULL) = (${t.reversedBy} IS NULL)`,
+    ),
+    check(
+      'vat_waivers_reverse_reason',
+      sql`${t.reverseReason} IS NULL OR (${t.reversedAt} IS NOT NULL AND length(${t.reverseReason}) BETWEEN 1 AND ${lim(FINANCE_LIMITS.maxReason)})`,
+    ),
+  ],
 );

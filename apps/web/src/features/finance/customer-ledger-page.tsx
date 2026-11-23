@@ -11,6 +11,7 @@ import {
   ListCard,
   ListTable,
   LoadMore,
+  SegmentedControl,
   SkeletonRows,
 } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
@@ -36,6 +37,7 @@ import {
 } from './api';
 import { erkhetKeysOf, useErkhetLinks } from '@/features/erkhet/api';
 import { ErkhetDocument, ErkhetKind } from '@/features/erkhet/erkhet-entry';
+import { CounterAccountRow, CustomerSalesTab } from './customer-sales-tab';
 import { PaymentDialog } from './payment-dialog';
 import { PeekLink, type RecordPeek } from '@/features/reports/books/record-peek';
 import { usePeek } from '@/features/reports/books/use-peek';
@@ -50,11 +52,15 @@ const LEDGER_COLUMNS: readonly ColumnSpec[] = [
   { key: 'balanceAfter', kind: 'money', width: 10 },
 ];
 
+/** The page's two views (ADR-0240): the ledger as it always was, and the customer's sales. */
+const TABS = ['ledger', 'sales'] as const;
+
 /**
  * One customer's receivables (ADR-0060 #4): the balance with its aging and credit terms, then the
  * ledger newest first with the balance after each entry; «Төлбөр бүртгэх» starts a payment for
  * this customer (`?new=1`), «Тулгалт хийх» pairs its open credits with its invoices by hand
- * (`?allocate=1`, ADR-0090).
+ * (`?allocate=1`, ADR-0090). «Борлуулалт» (`?tab=sales`, ADR-0240) lists the customer's invoices
+ * by whether the VAT receipt is taken; «Харилцсан данс» sits under the balance.
  */
 export function CustomerLedgerPage() {
   const { t } = useTranslation();
@@ -66,6 +72,7 @@ export function CustomerLedgerPage() {
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
   const allocating = params.get('allocate') === '1';
+  const tab = params.get('tab') === 'sales' ? 'sales' : 'ledger';
   // A document opens over the ledger, which stays as it was (2026-11-16, the owner).
   const peek = usePeek();
   const balance = useCustomerBalance(customerId);
@@ -127,86 +134,98 @@ export function CustomerLedgerPage() {
         }
       />
       <BalanceCard balance={summary} />
-      <section aria-label={t('finance.balances.ledgerTitle')} className="space-y-3">
-        <FilterBar>
-          <DateRangeFilter
-            label={t('finance.fields.date')}
-            fromLabel={t('finance.fields.from')}
-            toLabel={t('finance.fields.to')}
-            from={from}
-            to={to}
-            onFrom={(value) => setParam('from', value)}
-            onTo={(value) => setParam('to', value)}
-          />
-          {ledger.data?.pages[0] && from ? (
-            <span className="text-sm text-muted-foreground">
-              {t('finance.fields.opening')}:{' '}
-              <span className="font-mono">{formatMnt(ledger.data.pages[0].opening)}</span>
-            </span>
+      <CounterAccountRow customer={{ id: summary.customerId, name: summary.name }} />
+      <SegmentedControl
+        name={t('finance.vatWaiver.tabs.label')}
+        options={TABS}
+        value={tab}
+        label={(value) => t(`finance.vatWaiver.tabs.${value}`)}
+        onChange={(value) => setParam('tab', value === 'ledger' ? null : value)}
+      />
+      {tab === 'sales' ? (
+        <CustomerSalesTab customerId={customerId} onOpen={peek.open} />
+      ) : (
+        <section aria-label={t('finance.balances.ledgerTitle')} className="space-y-3">
+          <FilterBar>
+            <DateRangeFilter
+              label={t('finance.fields.date')}
+              fromLabel={t('finance.fields.from')}
+              toLabel={t('finance.fields.to')}
+              from={from}
+              to={to}
+              onFrom={(value) => setParam('from', value)}
+              onTo={(value) => setParam('to', value)}
+            />
+            {ledger.data?.pages[0] && from ? (
+              <span className="text-sm text-muted-foreground">
+                {t('finance.fields.opening')}:{' '}
+                <span className="font-mono">{formatMnt(ledger.data.pages[0].opening)}</span>
+              </span>
+            ) : null}
+          </FilterBar>
+          {from && to ? (
+            <StatementTotals
+              data={totals.data}
+              problem={problemFromError(totals.error)}
+              onRetry={totals.refetch}
+            />
           ) : null}
-        </FilterBar>
-        {from && to ? (
-          <StatementTotals
-            data={totals.data}
-            problem={problemFromError(totals.error)}
-            onRetry={totals.refetch}
-          />
-        ) : null}
-        <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
-        <ListCard scroll>
-          <ListTable columns={LEDGER_COLUMNS}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('finance.fields.date')}</TableHead>
-                <TableHead>{t('finance.fields.kind')}</TableHead>
-                <TableHead>{t('finance.balances.document')}</TableHead>
-                <TableHead className="text-right">{t('finance.fields.debit')}</TableHead>
-                <TableHead className="text-right">{t('finance.fields.credit')}</TableHead>
-                <TableHead className="text-right">{t('finance.fields.balanceAfter')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ledger.isPending ? <SkeletonRows columns={6} /> : null}
-              {rows.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-mono">{entry.entryDate}</TableCell>
-                  <TableCell>
-                    {entry.erkhet ? (
-                      <ErkhetKind erkhet={entry.erkhet} reversal={entry.kind === 'VOID'} />
-                    ) : (
-                      t(`finance.arKinds.${entry.kind}`)
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    {entry.erkhet ? (
-                      <ErkhetDocument
-                        erkhet={entry.erkhet}
-                        number={entry.docNumber}
-                        link={entry.erkhet.key ? erkhetLinks.get(entry.erkhet.key) : undefined}
-                      />
-                    ) : (
-                      <DocumentLink entry={entry} onOpen={peek.open} />
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {entry.credit === '0.00' ? '' : formatMnt(entry.credit)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatMnt(entry.balanceAfter)}
-                  </TableCell>
+          <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
+          <ListCard scroll>
+            <ListTable columns={LEDGER_COLUMNS}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('finance.fields.date')}</TableHead>
+                  <TableHead>{t('finance.fields.kind')}</TableHead>
+                  <TableHead>{t('finance.balances.document')}</TableHead>
+                  <TableHead className="text-right">{t('finance.fields.debit')}</TableHead>
+                  <TableHead className="text-right">{t('finance.fields.credit')}</TableHead>
+                  <TableHead className="text-right">{t('finance.fields.balanceAfter')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </ListTable>
-          {!ledger.isPending && rows.length === 0 ? (
-            <EmptyState title={t('finance.balances.ledgerEmpty')} />
-          ) : null}
-          <LoadMore query={ledger} />
-        </ListCard>
-      </section>
+              </TableHeader>
+              <TableBody>
+                {ledger.isPending ? <SkeletonRows columns={6} /> : null}
+                {rows.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-mono">{entry.entryDate}</TableCell>
+                    <TableCell>
+                      {entry.erkhet ? (
+                        <ErkhetKind erkhet={entry.erkhet} reversal={entry.kind === 'VOID'} />
+                      ) : (
+                        t(`finance.arKinds.${entry.kind}`)
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {entry.erkhet ? (
+                        <ErkhetDocument
+                          erkhet={entry.erkhet}
+                          number={entry.docNumber}
+                          link={entry.erkhet.key ? erkhetLinks.get(entry.erkhet.key) : undefined}
+                        />
+                      ) : (
+                        <DocumentLink entry={entry} onOpen={peek.open} />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {entry.credit === '0.00' ? '' : formatMnt(entry.credit)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatMnt(entry.balanceAfter)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </ListTable>
+            {!ledger.isPending && rows.length === 0 ? (
+              <EmptyState title={t('finance.balances.ledgerEmpty')} />
+            ) : null}
+            <LoadMore query={ledger} />
+          </ListCard>
+        </section>
+      )}
       <PaymentDialog
         open={creating}
         customer={{ id: summary.customerId, code: summary.code, name: summary.name }}

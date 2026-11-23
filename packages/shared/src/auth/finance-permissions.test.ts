@@ -18,8 +18,10 @@ const NOT_GRANTED_YET = [
  * Bto's own rights that only share the `finance.` prefix: they guard Bto modules, not the Finance
  * Core, so @tugeel/fin-contract does not list them (docs/modules/finance-core.md §2).
  * `finance.sms.send`: settlement SMS through WeSend, Bto's notifications module (ADR-0216).
+ * `finance.vat_waiver.manage`: «НӨАТ хасуулах» and its undo in Bto's finance module, posted through
+ * the intake as source BTO (ADR-0240).
  */
-const BTO_ONLY = ['finance.sms.send'];
+const BTO_ONLY = ['finance.sms.send', 'finance.vat_waiver.manage'];
 
 describe('finance rights (docs/modules/finance-core.md §13)', () => {
   it('lists the same strings as @tugeel/fin-contract', () => {

@@ -79,6 +79,9 @@ export const INVOICE: Schemas['InvoiceDetail'] = {
   ],
   creditNotes: [],
   ebarimt: null,
+  vatWaiver: null,
+  vatWaiverPreview: { pct: '2.00', baseAmount: '150000.00', amount: '3000.00', blockedBy: null },
+  receipt: null,
 };
 
 export const INVOICE_ROW: Schemas['Invoice'] = {
@@ -106,6 +109,36 @@ export const INVOICE_ROW: Schemas['Invoice'] = {
   lineCount: INVOICE.lineCount,
   createdAt: INVOICE.createdAt,
   createdByName: INVOICE.createdByName,
+  vatWaiver: INVOICE.vatWaiver,
+  vatWaiverPreview: INVOICE.vatWaiverPreview,
+  receipt: INVOICE.receipt,
+};
+
+/** A customer without a counter account of their own: the sales discount account (ADR-0240). */
+export const COUNTER_ACCOUNT: Schemas['CustomerCounterAccount'] = {
+  customerId: 9,
+  own: false,
+  account: { id: 52, code: '520201', name: 'Борлуулалтын хөнгөлөлт' },
+  updatedAt: null,
+};
+
+export const VAT_WAIVER: Schemas['VatWaiver'] = {
+  id: 3,
+  invoiceId: INVOICE.id,
+  status: 'POSTED',
+  waiverDate: '2026-10-20',
+  pct: '2.00',
+  baseAmount: '150000.00',
+  amount: '3000.00',
+  accountCode: '520201',
+  description: 'Борлуулалтын хөнгөлөлт',
+  documentNumber: 'НХ-20261020-0001',
+  journalEntryId: 41,
+  createdAt: STAMP,
+  createdByName: 'Нягтлан Болд',
+  reversedAt: null,
+  reversedByName: null,
+  reverseReason: null,
 };
 
 export const PAYMENT: Schemas['PaymentDetail'] = {

@@ -135,7 +135,7 @@ Schema `ai` gains `ai.invoices`, `ai.invoice_lines`, `ai.payments` and `ai.custo
 
 | Route | Does |
 |---|---|
-| `GET /invoices`, `GET /invoices/:id` [`finance.read`] | the list (`q`, `customerId`, `orderId`, `branchId`, `settlement`, `status`, `overdue`, `from`, `to`; keyset by id; `total` on the first page) and one invoice with lines, allocations and credit notes |
+| `GET /invoices`, `GET /invoices/:id` [`finance.read`] | the list (`q`, `customerId`, `orderId`, `branchId`, `settlement`, `status`, `overdue`, `vatWaived`, `from`, `to`; keyset by id; `total` on the first page) and one invoice with lines, allocations and credit notes; every invoice carries `vatWaiver`, `vatWaiverPreview` and `receipt` (ADR-0240, the section «VAT waivers» below) |
 | `POST /invoices/:id/void` [`finance.invoices.manage`, idempotent] | voids an issued invoice nothing is allocated to or credited against |
 | `GET /credit-notes`, `GET /credit-notes/:id`, `POST /credit-notes` [read / `finance.invoices.manage`, idempotent] | credit notes; `warehouseId` null = no goods back, `binId` null = the RETURNS bin; the warehouse scope applies |
 | `GET /payments`, `GET /payments/:id`, `POST /payments`, `POST /payments/:id/void` [read / `finance.payments.record`, idempotent] | vouchers; `allocations` omitted = oldest due first |
@@ -240,3 +240,45 @@ Also: the home tile «Хугацаа хэтэрсэн авлагатай хар�
 ## Invoice e-Barimt receipts (ADR-0185)
 
 `InvoiceEbarimtService` (`modules/ebarimt` does the rest, `docs/modules/ebarimt.md`): `InvoicingService.onSold` calls `prepareInTx(tx, actor, invoiceId)` after the invoice when the sale's snapshot says `ebarimt` (the stage's «e-Barimt гаргах»); it builds the receipt request from the invoice — the buyer's kind, TIN and consumer number from partners, each product's classification code (its own, else its nearest category's default; null = the store's default) and tax product code and the unit's barcode from `CatalogService.ebarimtAttributes`, the lines' totals, VAT and city tax, one payment `CASH` or `BANK_TRANSFER` for the total — and hands it over keyed `<company> / BTO / SALES_INVOICE / <invoice id>`. A `CREDIT` invoice and one with nothing to pay get no receipt (TODO-VERIFY with the accountant: a credit sale's payment code). A data problem never fails the sale: the receipt is written ERROR. `InvoicingService.void` calls `cancelInTx` in its transaction (ADR-0185 #7). `GET /invoices/:id` and the void's answer carry `ebarimt` (the receipt's state, or null); `POST /invoices/:id/ebarimt` [`finance.invoices.manage`] prepares an ERROR receipt again from the invoice (409 `EBARIMT_RECEIPT_STATE_INVALID` in any other state, for a voided invoice, or when the invoice gets none). Screens: «Санхүү → e-Barimt баримт» and the invoice panel's «e-Barimt» fact. Tests: `ebarimt-wholesale.int-spec.ts`.
+
+## VAT waivers «НӨАТ хасуулах» (ADR-0240)
+
+A customer who takes no VAT receipt for a sale has the receivable reduced by a percent of that sale. The invoice's own entry, its VAT and the VAT report are untouched (TODO-VERIFY with the accountant, ADR-0240 #3).
+
+**Tables** (migration `0123_vat_waiver`, only adds):
+
+| Table | Holds | Guards |
+|---|---|---|
+| `vat_waivers` | one row per waiver: `invoice_id`, `customer_id`, `status` POSTED / REVERSED, `waiver_date` (the entry's date), the frozen `pct`, `base_amount` (the invoice's total less its credit notes then), `amount`, `account_id` + `account_code`, `description`; the core's `document_id`, `document_number`, `journal_entry_id` (plain ids); `created_by` / `created_at`; `reversed_at`, `reversed_by`, `reverse_reason`, `reverse_journal_entry_id` | at most one POSTED row per invoice (partial unique index `vat_waivers_invoice_posted`); `0 < pct ≤ 100`; `0 < amount ≤ base_amount`; the reversal fields together with REVERSED; `REVOKE DELETE, TRUNCATE` from `app` |
+| `customer_counter_accounts` | «Харилцсан данс»: `customer_id` (PK) → `account_id` (`fin.accounts.id`, no FK), `updated_by`, `updated_at` | a setting: the row is deleted when the customer goes back to the default. `customers` is not changed |
+| `finance_settings` | + `vat_waiver_pct`, `vat_waiver_description` (both null = 2.00 and «Борлуулалтын хөнгөлөлт») | `0 < pct ≤ 100`; 1–120 characters |
+
+**Services.** `VatWaiversService.waive(ctx, invoiceId)` / `reverse(ctx, invoiceId, reason)` / `factsOf(invoices)` / `totalsOf(customerId, {from, to})`; `CustomerCounterAccountsService.get` / `set` / `resolveInTx`; `FinanceSettingsService.vatWaiver` / `setVatWaiver`.
+
+- **The amount** is `vatWaiverAmount(total, Σ credit notes, pct)` of `@tugeel/shared/finance`: two decimals HALF_UP.
+- **The entry** is the core's document `BTO / VAT_WAIVER / <waiver id>`, type `BTO.VAT_WAIVER` (class `AR_CREDIT`, numbered by the core's series `VAT_WAIVER`, «НХ-…»), dated today: Dr the counter account by its posting key (`VAT_WAIVER_<code>` for the customer's own account, else `SALES_DISCOUNT`), Cr AR on the customer settling the invoice for `min(amount, open_amount)`; the rest stays the customer's open credit. `invoices.open_amount` follows through `FinPosting.syncInvoices`.
+- **Lock order:** the customer (`CustomersService.lockForUpdate`), then the invoice FOR UPDATE, then (for the undo) the POSTED waiver FOR UPDATE; the core's locks after.
+- **Refused** (409 `INVOICE_STATE_INVALID`, `params.status`): `VOID`; `VAT_WAIVED` (a live waiver); `NOTHING_LEFT` (the returns took everything, or the discount rounds to nothing); `B2B_RECEIPT` (the invoice's e-Barimt receipt is B2B and PENDING, SENDING, CONFIRMED or INDETERMINATE). The undo of an invoice without a live waiver: `NOT_VAT_WAIVED`. A closed month: the core's `FIN_PERIOD_CLOSED`. The customer's account no longer usable: 422 on `counterAccount` / `usable`; no sales discount account in the chart: 409 `ACCOUNT_ROLE_MISSING`.
+- **The undo** is the core's REVERSE of the document (its allocation undone, the mirror entry dated today); the row becomes REVERSED and the invoice may be waived again. `FIN_REVERSAL_BLOCKED` (409) while another allocation sits on the waiver's own credit.
+- **e-Barimt.** `InvoiceEbarimtService.retry` refuses a B2B receipt for an invoice with a live waiver (409 `EBARIMT_RECEIPT_STATE_INVALID`, `params.status` `VAT_WAIVED`); a B2C one is prepared as before.
+- **The counter account** must be ACTIVE, with control NONE, not money (journal CASH / BANK / MONEY) and not stock (journal INVENTORY or the role INVENTORY); saving it writes its key and rule as the saving staff member (ADR-0154's manner).
+- **A credit note after a waiver** does not recompute the waiver (ADR-0240, known limits).
+- **Reads elsewhere.** The customer's ledger shows a waiver as `ADJUSTMENT` with its document number (docType `JOURNAL`); an invoice's allocations name it `VAT_WAIVER` (`ALLOCATION_SOURCES`).
+
+**Routes** (`/api/v1`):
+
+| Route | Does |
+|---|---|
+| `POST /invoices/:id/vat-waiver`, `POST /invoices/:id/vat-waiver/reverse` `{reason?}` [`finance.vat_waiver.manage`, idempotent] | waives the invoice's VAT receipt; takes the waiver back. Both answer the invoice |
+| `GET /invoices?vatWaived=true\|false` [`finance.read`] | only invoices with (without) a live waiver |
+| `GET /customer-balances/:customerId/vat-totals?from&to` [`finance.read`] | the customer's issued invoices of the range by invoice date, split into `takesVat` and `waived`: `count`, `total`, `vatTotal`, `openAmount`, `waiverAmount` |
+| `GET /customer-balances/:customerId/counter-account` [`finance.read`], `PUT` `{accountId \| null}` [`finance.settings.manage`] | the account a waiver of the customer debits (`own` false = the sales discount account); null goes back to the default |
+| `GET /finance-settings/vat-waiver` [`finance.read`], `PUT` `{pct, description}` [`finance.settings.manage`] | the percent and the entry's words |
+
+**The right** `finance.vat_waiver.manage` («НӨАТ хасуулах»): ADMIN only by default, tickable on any role (ADR-0165); Bto's own, not in `@tugeel/fin-contract`.
+
+**Audit.** `vat_waivers` CREATE / REVERSE, `customer_counter_accounts` UPDATE, `finance_settings` UPDATE.
+
+**Screens.** `/finance/customers/:id`: «Харилцсан данс» under the balance (`CounterAccountRow`, `CounterAccountDialog`), the views «Тооцооны дэвтэр» / «Борлуулалт» (`?tab=sales`; `customer-sales-tab.tsx`: the date range, «Бүгд · НӨАТ авах · НӨАТ авахгүй» as `?vat=`, the totals of the filter in view, the row actions «НӨАТ хасуулах» / «Буцаах» with their dialogs in `vat-waiver-dialogs.tsx`); `/finance/settings`: the card «НӨАТ хасуулах» (`vat-waiver-settings-card.tsx`); the invoice panel's fact «НӨАТ авахгүй». Guide «НӨАТ хасуулах» (`guide/content/finance/40-noat-hasuulah.md`).
+
+**Tests.** `finance-vat-waiver.int-spec.ts`, `fin-bridge.int-spec.ts` (0123's data section), `packages/shared/src/finance/finance.test.ts`, web `customer-sales.test.tsx`.

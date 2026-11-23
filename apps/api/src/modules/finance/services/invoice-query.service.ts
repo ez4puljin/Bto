@@ -112,6 +112,8 @@ export interface InvoiceQuery {
   settlement?: Settlement;
   status?: InvoiceStatus;
   overdue?: boolean;
+  /** ADR-0240: only invoices whose VAT receipt is waived (true) or is not (false). */
+  vatWaived?: boolean;
   from?: string;
   to?: string;
   cursor?: string;
@@ -146,6 +148,7 @@ export class InvoiceQueryService {
     if (query.status) filters.push(eq(invoices.status, query.status));
     if (query.settlement) filters.push(this.settlementSql(query.settlement));
     if (query.overdue) filters.push(this.overdueSql(today));
+    if (query.vatWaived !== undefined) filters.push(vatWaivedSql(query.vatWaived));
     if (query.from) filters.push(sql`${invoices.invoiceDate} >= ${query.from}`);
     if (query.to) filters.push(sql`${invoices.invoiceDate} <= ${query.to}`);
     const q = query.q?.trim();
@@ -266,12 +269,16 @@ export class InvoiceQueryService {
           ? 'CREDIT_NOTE'
           : by.typeCode === FIN_DOC_TYPES.ALLOCATION.code
             ? 'ALLOCATION'
-            : by.class === 'RECEIPT' || by.class === 'PAYMENT'
-              ? 'PAYMENT'
-              : null;
+            : by.typeCode === FIN_DOC_TYPES.VAT_WAIVER.code
+              ? 'VAT_WAIVER'
+              : by.class === 'RECEIPT' || by.class === 'PAYMENT'
+                ? 'PAYMENT'
+                : null;
       if (sourceType === null) return [];
+      // A credit note and a waiver are Bto's records: the id is the source's, not the core's.
       const sourceId =
-        sourceType === 'CREDIT_NOTE' && row.counterpart.documentId === by.id
+        (sourceType === 'CREDIT_NOTE' || sourceType === 'VAT_WAIVER') &&
+        row.counterpart.documentId === by.id
           ? Number.parseInt(row.counterpart.sourceDocId, 10)
           : by.id;
       return [
@@ -427,4 +434,10 @@ export class InvoiceQueryService {
       createdByName: invoice.createdBy === null ? null : (names.get(invoice.createdBy) ?? null),
     }));
   }
+}
+
+/** Invoices with (or without) a POSTED VAT waiver (ADR-0240). */
+export function vatWaivedSql(waived: boolean): SQL {
+  const exists = sql`EXISTS (SELECT 1 FROM vat_waivers w WHERE w.invoice_id = ${invoices.id} AND w.status = 'POSTED')`;
+  return waived ? exists : sql`NOT ${exists}`;
 }

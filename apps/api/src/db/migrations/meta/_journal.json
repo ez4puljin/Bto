@@ -848,6 +848,13 @@
       "when": 1795418552358,
       "tag": "0122_reporting_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1795423683470,
+      "tag": "0123_vat_waiver",
+      "breakpoints": true
     }
   ]
 }
