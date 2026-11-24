@@ -1,0 +1,8 @@
+{
+  "id": "20261124T090058854Z-brain-01d882",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-24T09:00:58.854Z",
+  "text": "inbox gate: in/fix-price-import-unit-header @ 02cd5fc9: REFUSED: the brain's review: Not needed any more: main 0f6467c8 already fixed it another way. imports.aliases now accepts the old headers («",
+  "slug": "fix-price-import-unit-header"
+}
