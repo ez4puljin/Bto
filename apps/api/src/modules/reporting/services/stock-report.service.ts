@@ -149,25 +149,25 @@ export class StockReportService {
               LEFT JOIN sold ON sold.product_id = p.id
               LEFT JOIN last ON last.product_id = p.id
               LEFT JOIN public.categories k ON k.id = p.category_id
-             WHERE (coalesce(st.on_hand, 0) <> 0 OR coalesce(lv.low, false)) AND ${where})
-          SELECT r.*, t.*
-            FROM r
-           CROSS JOIN (SELECT count(*) AS total_products, coalesce(sum(value), 0) AS total_value,
+             WHERE (coalesce(st.on_hand, 0) <> 0 OR coalesce(lv.low, false)) AND ${where}),
+          totals AS (SELECT count(*) AS total_products, coalesce(sum(value), 0) AS total_value,
                               count(*) FILTER (WHERE slow) AS slow_products,
                               coalesce(sum(value) FILTER (WHERE slow), 0) AS slow_value,
                               count(*) FILTER (WHERE low) AS low_products
-                         FROM r) t
-           WHERE ${kept}
-           ORDER BY ${order}
-           LIMIT ${limit + 1} OFFSET ${offset}`,
+                         FROM r),
+          page AS (SELECT r.* FROM r WHERE ${kept}
+                    ORDER BY ${order} LIMIT ${limit + 1} OFFSET ${offset})
+          SELECT r.*, t.* FROM totals t LEFT JOIN page r ON TRUE ORDER BY ${order}`,
     );
     const first = rows[0];
+    // The left join retains the summary even when a filter/page has no products.
+    const products = rows.filter((row) => row.product_id !== null);
     const days = new Decimal(slowDays);
     return {
       date: scope.today,
       slowDays,
-      nextOffset: rows.length > limit ? offset + limit : null,
-      rows: rows.slice(0, limit).map((row) => {
+      nextOffset: products.length > limit ? offset + limit : null,
+      rows: products.slice(0, limit).map((row) => {
         const onHand = dec(row.on_hand);
         const sold = dec(row.sold_qty);
         const lastSale = dateText(row.last_sale);

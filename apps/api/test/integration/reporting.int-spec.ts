@@ -380,6 +380,41 @@ describe('management reports', () => {
     expect(d(after.overdue).gt(0)).toBe(true);
   });
 
+  it('retains stock summary totals when a filter or page contains no products', async () => {
+    const query = { q: milk.sku, warehouseId: flow.wh.id };
+    type StockResult = {
+      rows: { productId: number }[];
+      nextOffset: number | null;
+      totals: { products: number; value: string | null; slowProducts: number; lowProducts: number };
+    };
+    const all = (await get(accountant, '/stock', query).expect(200)).body as StockResult;
+    expect(all.rows.map((row) => row.productId)).toEqual([milk.id]);
+    expect(all.totals.products).toBe(1);
+    expect(d(all.totals.value).gt(0)).toBe(true);
+    expect(all.totals.slowProducts).toBe(0);
+    expect(all.totals.lowProducts).toBe(0);
+    for (const empty of [{ filter: 'SLOW' }, { filter: 'LOW' }, { offset: 1000 }]) {
+      const report = (await get(accountant, '/stock', { ...query, ...empty }).expect(200))
+        .body as StockResult;
+      expect(report).toMatchObject({ rows: [], nextOffset: null, totals: all.totals });
+    }
+    const hidden = (await get(viewer, '/stock', { ...query, filter: 'LOW' }).expect(200))
+      .body as StockResult;
+    expect(hidden).toMatchObject({
+      rows: [],
+      nextOffset: null,
+      totals: { ...all.totals, value: null, slowValue: null },
+    });
+    const absent = (
+      await get(accountant, '/stock', { q: 'nonexistent-stock-summary-test' }).expect(200)
+    ).body as StockResult;
+    expect(absent).toMatchObject({
+      rows: [],
+      nextOffset: null,
+      totals: { products: 0, value: '0.00', slowProducts: 0, slowValue: '0.00', lowProducts: 0 },
+    });
+  });
+
   it('reports stock cover and slow movers', async () => {
     const report = (await get(accountant, '/stock', { q: 'РП', slowDays: 90 }).expect(200))
       .body as {
