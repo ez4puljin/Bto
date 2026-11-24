@@ -157,6 +157,8 @@ async function discover(accessToken) {
  * A browser's JSON protocol over Node's WebSocket, DevTools or WebDriver BiDi: `send` answers by
  * id, `on` gets events.
  */
+const PROTOCOL_TIMEOUT = 30_000;
+
 class Wire {
   constructor(url) {
     this.socket = new WebSocket(url);
@@ -167,14 +169,39 @@ class Wire {
 
   async open() {
     await new Promise((resolveOpen, rejectOpen) => {
-      this.socket.addEventListener('open', resolveOpen, { once: true });
-      this.socket.addEventListener('error', rejectOpen, { once: true });
+      const finish = (error) => {
+        clearTimeout(timer);
+        this.socket.removeEventListener('open', opened);
+        this.socket.removeEventListener('error', failed);
+        this.socket.removeEventListener('close', failed);
+        if (error) rejectOpen(error);
+        else resolveOpen();
+      };
+      const opened = () => finish();
+      const failed = () => finish(new Error('browser WebSocket failed to open'));
+      const timer = setTimeout(
+        () => finish(new Error('browser WebSocket handshake timed out')),
+        PROTOCOL_TIMEOUT,
+      );
+      this.socket.addEventListener('open', opened, { once: true });
+      this.socket.addEventListener('error', failed, { once: true });
+      this.socket.addEventListener('close', failed, { once: true });
     });
+    const disconnected = () => {
+      for (const waiting of this.pending.values()) {
+        clearTimeout(waiting.timer);
+        waiting.reject(new Error(`${waiting.method}: browser connection closed`));
+      }
+      this.pending.clear();
+    };
+    this.socket.addEventListener('close', disconnected);
+    this.socket.addEventListener('error', disconnected);
     this.socket.addEventListener('message', (event) => {
       const message = JSON.parse(String(event.data));
       if (message.id !== undefined && message.id !== null) {
         const waiting = this.pending.get(message.id);
         if (!waiting) return;
+        clearTimeout(waiting.timer);
         this.pending.delete(message.id);
         if (message.error) {
           // DevTools answers `{ error: { message } }`, BiDi `{ error: 'code', message }`.
@@ -190,9 +217,21 @@ class Wire {
   send(method, params = {}) {
     this.nextId += 1;
     const id = this.nextId;
-    this.socket.send(JSON.stringify({ id, method, params }));
     return new Promise((resolveSend, rejectSend) => {
-      this.pending.set(id, { resolve: resolveSend, reject: rejectSend, method });
+      // Native WebSockets may leave no event-loop reference while a command waits. The bounded,
+      // referenced timer keeps the capture alive and turns a lost response into an explicit error.
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        rejectSend(new Error(`${method}: browser response timed out`));
+      }, PROTOCOL_TIMEOUT);
+      this.pending.set(id, { resolve: resolveSend, reject: rejectSend, method, timer });
+      try {
+        this.socket.send(JSON.stringify({ id, method, params }));
+      } catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        rejectSend(error);
+      }
     });
   }
 
@@ -234,7 +273,13 @@ function listening(browser, pattern) {
   return new Promise((resolveUrl, rejectUrl) => {
     let text = '';
     let found = false;
-    const timer = setTimeout(() => rejectUrl(new Error('the browser did not start')), 30_000);
+    const failed = (error) => {
+      if (found) return;
+      found = true;
+      clearTimeout(timer);
+      rejectUrl(error);
+    };
+    const timer = setTimeout(() => failed(new Error('the browser did not start')), 30_000);
     browser.stderr.on('data', (chunk) => {
       if (found) return;
       text += String(chunk);
@@ -245,24 +290,37 @@ function listening(browser, pattern) {
         resolveUrl(match[1]);
       }
     });
-    browser.on('exit', (code) => rejectUrl(new Error(`the browser exited (${code})`)));
+    browser.once('error', failed);
+    browser.once('exit', (code) => failed(new Error(`the browser exited (${code})`)));
   });
 }
 
-function stopBrowser(wire, browser, profile) {
+async function stopBrowser(wire, browser, profile) {
   try {
-    wire.close();
+    wire?.close();
   } catch {
     // already closed
   }
-  browser.kill();
-  setTimeout(() => {
-    try {
-      rmSync(profile, { recursive: true, force: true });
-    } catch {
-      // Windows may still hold the profile for a moment
-    }
-  }, 500);
+  try {
+    browser?.kill();
+  } catch {
+    // A failed or already-exited spawn must not replace the startup error.
+  }
+  const profilePath = resolve(profile);
+  const roots = [resolve(tmpdir()), resolve(ROOT, 'tmp')];
+  if (
+    !roots.some(
+      (root) => dirname(profilePath) === root && profilePath.startsWith(join(root, 'ui-shots-')),
+    )
+  )
+    return;
+  await sleep(500);
+  try {
+    rmSync(profilePath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch {
+    // Cleanup must not replace the capture's primary error if Windows still holds a file.
+    console.warn('ui-shots: could not remove its temporary browser profile');
+  }
 }
 
 /*
@@ -276,111 +334,118 @@ const LOAD_TIMEOUT = 20_000;
 
 async function launchChrome(path, touch) {
   const profile = mkdtempSync(join(tmpdir(), 'ui-shots-'));
-  const browser = spawn(
-    path,
-    [
-      '--headless=new',
-      '--remote-debugging-port=0',
-      `--user-data-dir=${profile}`,
-      '--no-first-run',
-      '--no-default-browser-check',
-      '--disable-extensions',
-      '--force-device-scale-factor=1',
-      '--window-size=1920,1080',
-      'about:blank',
-    ],
-    { stdio: ['ignore', 'ignore', 'pipe'] },
-  );
-  const endpoint = await listening(browser, /DevTools listening on (ws:\/\/\S+)/);
-  const port = new URL(endpoint).port;
-  const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  const page = targets.find((target) => target.type === 'page');
-  if (!page) throw new Error('no page target');
-  const cdp = new Wire(page.webSocketDebuggerUrl);
-  await cdp.open();
-  const state = newState();
-  cdp.on('Network.requestWillBeSent', (params) => {
-    if (params.request.url.startsWith('data:')) return;
-    state.inflight.set(params.requestId, params.request.url);
-    state.last = Date.now();
-  });
-  cdp.on('Network.loadingFinished', (params) => {
-    state.inflight.delete(params.requestId);
-    state.last = Date.now();
-  });
-  cdp.on('Network.loadingFailed', (params) => {
-    const url = state.inflight.get(params.requestId);
-    state.inflight.delete(params.requestId);
-    state.last = Date.now();
-    if (url && !params.canceled && !viteInternal(url))
-      state.failed.push(`${params.errorText} ${shortUrl(url)}`);
-  });
-  cdp.on('Network.responseReceived', (params) => {
-    noteResponse(state, params.response.status, params.response.url);
-  });
-  cdp.on('Runtime.exceptionThrown', (params) => {
-    const details = params.exceptionDetails;
-    state.errors.push(firstLine(details.exception?.description ?? details.text ?? 'exception'));
-  });
-  cdp.on('Runtime.consoleAPICalled', (params) => {
-    if (params.type !== 'error') return;
-    state.errors.push(
-      firstLine(params.args.map((arg) => arg.value ?? arg.description ?? '').join(' ')),
+  let browser;
+  let cdp;
+  try {
+    browser = spawn(
+      path,
+      [
+        '--headless=new',
+        '--remote-debugging-port=0',
+        `--user-data-dir=${profile}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-extensions',
+        '--force-device-scale-factor=1',
+        '--window-size=1920,1080',
+        'about:blank',
+      ],
+      { stdio: ['ignore', 'ignore', 'pipe'] },
     );
-  });
-  await cdp.send('Page.enable');
-  await cdp.send('Network.enable');
-  await cdp.send('Runtime.enable');
-  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: NO_PRINT });
-  // DevTools' touch emulation also makes the pointer coarse and takes hover away.
-  if (touch) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
-  return {
-    state,
-    viewport: (width, height) =>
-      cdp.send('Emulation.setDeviceMetricsOverride', {
-        width,
-        height,
-        deviceScaleFactor: 1,
-        mobile: false,
-      }),
-    cookie: (value) =>
-      cdp.send('Network.setCookie', {
-        name: COOKIE,
-        value,
-        domain: host,
-        path: COOKIE_PATH,
-        httpOnly: true,
-        sameSite: 'Strict',
-      }),
-    async navigate(url) {
-      let off = () => {};
-      const loaded = new Promise((resolveLoad) => {
-        const timer = setTimeout(resolveLoad, LOAD_TIMEOUT);
-        off = cdp.on('Page.loadEventFired', () => {
-          clearTimeout(timer);
-          resolveLoad();
+    const endpoint = await listening(browser, /DevTools listening on (ws:\/\/\S+)/);
+    const port = new URL(endpoint).port;
+    const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+    const page = targets.find((target) => target.type === 'page');
+    if (!page) throw new Error('no page target');
+    cdp = new Wire(page.webSocketDebuggerUrl);
+    await cdp.open();
+    const state = newState();
+    cdp.on('Network.requestWillBeSent', (params) => {
+      if (params.request.url.startsWith('data:')) return;
+      state.inflight.set(params.requestId, params.request.url);
+      state.last = Date.now();
+    });
+    cdp.on('Network.loadingFinished', (params) => {
+      state.inflight.delete(params.requestId);
+      state.last = Date.now();
+    });
+    cdp.on('Network.loadingFailed', (params) => {
+      const url = state.inflight.get(params.requestId);
+      state.inflight.delete(params.requestId);
+      state.last = Date.now();
+      if (url && !params.canceled && !viteInternal(url))
+        state.failed.push(`${params.errorText} ${shortUrl(url)}`);
+    });
+    cdp.on('Network.responseReceived', (params) => {
+      noteResponse(state, params.response.status, params.response.url);
+    });
+    cdp.on('Runtime.exceptionThrown', (params) => {
+      const details = params.exceptionDetails;
+      state.errors.push(firstLine(details.exception?.description ?? details.text ?? 'exception'));
+    });
+    cdp.on('Runtime.consoleAPICalled', (params) => {
+      if (params.type !== 'error') return;
+      state.errors.push(
+        firstLine(params.args.map((arg) => arg.value ?? arg.description ?? '').join(' ')),
+      );
+    });
+    await cdp.send('Page.enable');
+    await cdp.send('Network.enable');
+    await cdp.send('Runtime.enable');
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: NO_PRINT });
+    // DevTools' touch emulation also makes the pointer coarse and takes hover away.
+    if (touch) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+    return {
+      state,
+      viewport: (width, height) =>
+        cdp.send('Emulation.setDeviceMetricsOverride', {
+          width,
+          height,
+          deviceScaleFactor: 1,
+          mobile: false,
+        }),
+      cookie: (value) =>
+        cdp.send('Network.setCookie', {
+          name: COOKIE,
+          value,
+          domain: host,
+          path: COOKIE_PATH,
+          httpOnly: true,
+          sameSite: 'Strict',
+        }),
+      async navigate(url) {
+        let off = () => {};
+        const loaded = new Promise((resolveLoad) => {
+          const timer = setTimeout(resolveLoad, LOAD_TIMEOUT);
+          off = cdp.on('Page.loadEventFired', () => {
+            clearTimeout(timer);
+            resolveLoad();
+          });
         });
-      });
-      await cdp.send('Page.navigate', { url });
-      await loaded;
-      off();
-    },
-    async evaluate(expression) {
-      const answer = await cdp.send('Runtime.evaluate', {
-        expression,
-        awaitPromise: true,
-        returnByValue: true,
-      });
-      if (answer.exceptionDetails)
-        throw new Error(answer.exceptionDetails.text ?? 'evaluate failed');
-      return answer.result.value;
-    },
-    async screenshot() {
-      const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
-      return Buffer.from(shot.data, 'base64');
-    },
-    stop: () => stopBrowser(cdp, browser, profile),
-  };
+        await cdp.send('Page.navigate', { url });
+        await loaded;
+        off();
+      },
+      async evaluate(expression) {
+        const answer = await cdp.send('Runtime.evaluate', {
+          expression,
+          awaitPromise: true,
+          returnByValue: true,
+        });
+        if (answer.exceptionDetails)
+          throw new Error(answer.exceptionDetails.text ?? 'evaluate failed');
+        return answer.result.value;
+      },
+      async screenshot() {
+        const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
+        return Buffer.from(shot.data, 'base64');
+      },
+      stop: () => stopBrowser(cdp, browser, profile),
+    };
+  } catch (error) {
+    await stopBrowser(cdp, browser, profile);
+    throw error;
+  }
 }
 
 /** A throwaway Firefox profile: no first-run pages, no calls home, one device pixel per CSS pixel. */
@@ -414,114 +479,121 @@ async function launchFirefox(path, touch) {
   const pointer = touch
     ? '\nuser_pref("ui.primaryPointerCapabilities", 1);\nuser_pref("ui.allPointerCapabilities", 1);'
     : '';
-  writeFileSync(join(profile, 'user.js'), `${FIREFOX_PREFS}${pointer}\n`);
-  const browser = spawn(
-    path,
-    [
-      '--headless',
-      '--no-remote',
-      '--profile',
-      profile,
-      '--remote-debugging-port',
-      '0',
-      '--width',
-      '1920',
-      '--height',
-      '1080',
-      'about:blank',
-    ],
-    { stdio: ['ignore', 'ignore', 'pipe'] },
-  );
-  const endpoint = await listening(browser, /WebDriver BiDi listening on (ws:\/\/\S+)/);
-  const bidi = new Wire(`${endpoint}/session`);
-  await bidi.open();
-  await bidi.send('session.new', { capabilities: {} });
-  const tree = await bidi.send('browsingContext.getTree', { maxDepth: 0 });
-  const context = tree.contexts[0]?.context;
-  if (!context) throw new Error('no page target');
-  const state = newState();
-  bidi.on('network.beforeRequestSent', (params) => {
-    if (params.request.url.startsWith('data:')) return;
-    state.inflight.set(params.request.request, params.request.url);
-    state.last = Date.now();
-  });
-  bidi.on('network.responseCompleted', (params) => {
-    state.inflight.delete(params.request.request);
-    state.last = Date.now();
-    noteResponse(state, params.response.status, params.response.url);
-  });
-  bidi.on('network.fetchError', (params) => {
-    const url = state.inflight.get(params.request.request);
-    state.inflight.delete(params.request.request);
-    state.last = Date.now();
-    // A navigation ends the requests of the page before it: that is not a failure.
-    if (url && !/ABORT/.test(params.errorText) && !viteInternal(url))
-      state.failed.push(`${params.errorText} ${shortUrl(url)}`);
-  });
-  bidi.on('log.entryAdded', (params) => {
-    if (params.level === 'error') state.errors.push(firstLine(params.text ?? 'error'));
-  });
-  await bidi.send('script.addPreloadScript', {
-    functionDeclaration: `() => { ${NO_PRINT} }`,
-  });
-  await bidi.send('session.subscribe', {
-    events: [
-      'network.beforeRequestSent',
-      'network.responseCompleted',
-      'network.fetchError',
-      'log.entryAdded',
-    ],
-  });
-  return {
-    state,
-    viewport: (width, height) =>
-      bidi.send('browsingContext.setViewport', {
-        context,
-        viewport: { width, height },
-        devicePixelRatio: 1,
-      }),
-    cookie: (value) =>
-      bidi.send('storage.setCookie', {
-        cookie: {
-          name: COOKIE,
-          value: { type: 'string', value },
-          domain: host,
-          path: COOKIE_PATH,
-          httpOnly: true,
-          sameSite: 'strict',
-        },
-      }),
-    async navigate(url) {
-      const giveUp = new AbortController();
-      await Promise.race([
-        bidi
-          .send('browsingContext.navigate', { context, url, wait: 'complete' })
-          .catch(() => undefined),
-        sleep(LOAD_TIMEOUT, undefined, { signal: giveUp.signal }).catch(() => undefined),
-      ]);
-      giveUp.abort();
-    },
-    async evaluate(expression) {
-      // The value travels as JSON text: BiDi's own serialization is a tree of typed nodes.
-      const answer = await bidi.send('script.evaluate', {
-        expression: `Promise.resolve(${expression}).then((value) => JSON.stringify(value ?? null))`,
-        target: { context },
-        awaitPromise: true,
-        resultOwnership: 'none',
-      });
-      if (answer.type !== 'success')
-        throw new Error(answer.exceptionDetails?.text ?? 'evaluate failed');
-      return JSON.parse(answer.result.value);
-    },
-    async screenshot() {
-      const shot = await bidi.send('browsingContext.captureScreenshot', {
-        context,
-        origin: 'viewport',
-      });
-      return Buffer.from(shot.data, 'base64');
-    },
-    stop: () => stopBrowser(bidi, browser, profile),
-  };
+  let browser;
+  let bidi;
+  try {
+    writeFileSync(join(profile, 'user.js'), `${FIREFOX_PREFS}${pointer}\n`);
+    browser = spawn(
+      path,
+      [
+        '--headless',
+        '--no-remote',
+        '--profile',
+        profile,
+        '--remote-debugging-port',
+        '0',
+        '--width',
+        '1920',
+        '--height',
+        '1080',
+        'about:blank',
+      ],
+      { stdio: ['ignore', 'ignore', 'pipe'] },
+    );
+    const endpoint = await listening(browser, /WebDriver BiDi listening on (ws:\/\/\S+)/);
+    bidi = new Wire(`${endpoint}/session`);
+    await bidi.open();
+    await bidi.send('session.new', { capabilities: {} });
+    const tree = await bidi.send('browsingContext.getTree', { maxDepth: 0 });
+    const context = tree.contexts[0]?.context;
+    if (!context) throw new Error('no page target');
+    const state = newState();
+    bidi.on('network.beforeRequestSent', (params) => {
+      if (params.request.url.startsWith('data:')) return;
+      state.inflight.set(params.request.request, params.request.url);
+      state.last = Date.now();
+    });
+    bidi.on('network.responseCompleted', (params) => {
+      state.inflight.delete(params.request.request);
+      state.last = Date.now();
+      noteResponse(state, params.response.status, params.response.url);
+    });
+    bidi.on('network.fetchError', (params) => {
+      const url = state.inflight.get(params.request.request);
+      state.inflight.delete(params.request.request);
+      state.last = Date.now();
+      // A navigation ends the requests of the page before it: that is not a failure.
+      if (url && !/ABORT/.test(params.errorText) && !viteInternal(url))
+        state.failed.push(`${params.errorText} ${shortUrl(url)}`);
+    });
+    bidi.on('log.entryAdded', (params) => {
+      if (params.level === 'error') state.errors.push(firstLine(params.text ?? 'error'));
+    });
+    await bidi.send('script.addPreloadScript', {
+      functionDeclaration: `() => { ${NO_PRINT} }`,
+    });
+    await bidi.send('session.subscribe', {
+      events: [
+        'network.beforeRequestSent',
+        'network.responseCompleted',
+        'network.fetchError',
+        'log.entryAdded',
+      ],
+    });
+    return {
+      state,
+      viewport: (width, height) =>
+        bidi.send('browsingContext.setViewport', {
+          context,
+          viewport: { width, height },
+          devicePixelRatio: 1,
+        }),
+      cookie: (value) =>
+        bidi.send('storage.setCookie', {
+          cookie: {
+            name: COOKIE,
+            value: { type: 'string', value },
+            domain: host,
+            path: COOKIE_PATH,
+            httpOnly: true,
+            sameSite: 'strict',
+          },
+        }),
+      async navigate(url) {
+        const giveUp = new AbortController();
+        await Promise.race([
+          bidi
+            .send('browsingContext.navigate', { context, url, wait: 'complete' })
+            .catch(() => undefined),
+          sleep(LOAD_TIMEOUT, undefined, { signal: giveUp.signal }).catch(() => undefined),
+        ]);
+        giveUp.abort();
+      },
+      async evaluate(expression) {
+        // The value travels as JSON text: BiDi's own serialization is a tree of typed nodes.
+        const answer = await bidi.send('script.evaluate', {
+          expression: `Promise.resolve(${expression}).then((value) => JSON.stringify(value ?? null))`,
+          target: { context },
+          awaitPromise: true,
+          resultOwnership: 'none',
+        });
+        if (answer.type !== 'success')
+          throw new Error(answer.exceptionDetails?.text ?? 'evaluate failed');
+        return JSON.parse(answer.result.value);
+      },
+      async screenshot() {
+        const shot = await bidi.send('browsingContext.captureScreenshot', {
+          context,
+          origin: 'viewport',
+        });
+        return Buffer.from(shot.data, 'base64');
+      },
+      stop: () => stopBrowser(bidi, browser, profile),
+    };
+  } catch (error) {
+    await stopBrowser(bidi, browser, profile);
+    throw error;
+  }
 }
 
 async function idle(state, { quiet = 600, timeout = 15_000 } = {}) {
@@ -841,8 +913,8 @@ async function main() {
     .map((touch) => sizes.filter((size) => size.touch === touch))
     .filter((group) => group.length > 0);
   let stopCurrent = () => {};
-  process.on('SIGINT', () => {
-    stopCurrent();
+  process.on('SIGINT', async () => {
+    await stopCurrent();
     process.exit(130);
   });
   try {
@@ -857,7 +929,7 @@ async function main() {
       try {
         await captureAll(driver, session, group);
       } finally {
-        driver.stop();
+        await driver.stop();
         stopCurrent = () => {};
       }
     }
@@ -866,6 +938,9 @@ async function main() {
     writeFileSync(join(out, 'index.html'), gallery(report));
   }
   const skipped = report.routes.filter((route) => route.skipped);
+  if (!report.routes.some((route) => route.shots.length > 0)) {
+    throw new Error('no screenshots captured; check the route filter and available record ids');
+  }
   console.log(
     `done: ${report.routes.length - skipped.length} routes × ${sizes.length} sizes in ${relative(ROOT, out)}` +
       (skipped.length ? `; skipped ${skipped.map((route) => route.name).join(', ')}` : ''),
@@ -879,6 +954,9 @@ async function main() {
       { signedIn: false, routes: PUBLIC_ROUTES.filter(wanted) },
       { signedIn: true, routes: ROUTES.filter(wanted) },
     ];
+    // A normal sweep visits the public pages first. When --only omits them, initialize the
+    // site's storage with a normal navigation before handing the browser its refresh cookie.
+    if (passes[0].routes.length === 0) await driver.navigate(`${web}/login`);
     let cookieSet = false;
     for (const { signedIn, routes } of passes) {
       for (const size of group) {
@@ -937,7 +1015,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+await main().catch((error) => {
   console.error(
     error instanceof Error
       ? `${error.message}${error.cause ? ` (${error.cause.code ?? error.cause.message})` : ''}`
