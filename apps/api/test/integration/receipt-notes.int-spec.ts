@@ -257,11 +257,23 @@ describe('delivery notes read by the model', () => {
       await upload(keeper, page, 'image/jpeg'),
       await upload(keeper, PDF, 'application/pdf'),
     ];
-    const started = (await start({ fileIds, supplierId: supplier.id }).expect(201))
-      .body as ReadingJson;
-    expect(started.status).toBe('READING');
-    firstReading = started.id;
-    const done = await finished(started.id, accountant);
+    // Hold the scripted answer until the POST returns: even a fast model must run in the background.
+    const modelGate = Promise.withResolvers<void>();
+    const complete = llm.complete.bind(llm);
+    const heldRead = jest.spyOn(llm, 'complete').mockImplementationOnce(async (llmRequest) => {
+      await modelGate.promise;
+      return complete(llmRequest);
+    });
+    try {
+      const started = (await start({ fileIds, supplierId: supplier.id }).expect(201))
+        .body as ReadingJson;
+      firstReading = started.id;
+      expect(started.status).toBe('READING');
+    } finally {
+      modelGate.resolve();
+      heldRead.mockRestore();
+    }
+    const done = await finished(firstReading, accountant);
     expect(done).toMatchObject({
       status: 'READY',
       failure: null,
