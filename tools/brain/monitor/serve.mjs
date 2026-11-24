@@ -88,7 +88,25 @@ export function parseInboxItem(text) {
     landed: record.landed ? record.landed.slice(0, 8) : null,
     task: record.task || null,
     updatedAt: epoch(record.updated) ?? epoch(record.started),
+    // The automatic review (ADR-0249): what it decided, with which model, how long it took, and one
+    // cut line of why (never the review's text, which stays in the state folder).
+    review: record.review
+      ? {
+          state: record.review,
+          why: cut(record.review_why ?? ''),
+          model: record.review_model || null,
+          secs: /^\d+$/.test(record.review_secs ?? '')
+            ? Number.parseInt(record.review_secs, 10)
+            : null,
+        }
+      : null,
+    wording: Boolean(record.wording),
   };
+}
+
+function cut(text) {
+  const t = String(text).trim();
+  return t.length > TEXT_CUT ? `${t.slice(0, TEXT_CUT - 1)}…` : t;
 }
 
 /** A local «YYYY-MM-DD HH:MM:SS» (this PC's time zone) as epoch milliseconds, or null. */

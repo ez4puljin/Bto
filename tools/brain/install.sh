@@ -3,7 +3,8 @@
 # reviewer's definitions in ~/.claude/agents, the brain's own rules as the skill `tarhi` in
 # ~/.claude/skills, the guard as a PreToolUse hook in ~/.claude/settings.json, the team board's
 # messages as a UserPromptSubmit hook (ADR-0248), git's merge of mn.json by key, the monitor's page as the user service bto-brain-monitor, the job desk's
-# one-minute timer bto-brain-jobs (ADR-0229) and the inbox gate's timer bto-brain-inbox (ADR-0242).
+# one-minute timer bto-brain-jobs (ADR-0229), the inbox gate's timer bto-brain-inbox (ADR-0242) and
+# its automatic review's timer bto-brain-review (ADR-0249).
 # Run it again after changing anything under tools/brain/.
 #   bash tools/brain/install.sh
 set -euo pipefail
@@ -100,6 +101,18 @@ else
 fi
 gh auth status >/dev/null 2>&1 || echo "warning: gh is not signed in; the inbox gate cannot write its results to GitHub" >&2
 echo "inbox:   bash tools/brain/inbox.sh status (timer bto-brain-inbox, every 20 seconds)"
+# The automatic review (inbox.sh review, ADR-0249): its own timer, every minute, one review at a time;
+# never inside the tick. On unless turned off (inbox.sh auto off), which this leaves as it is.
+for unit in bto-brain-review.service bto-brain-review.timer; do
+  cp "$BRAIN_DIR/inbox/$unit" "$HOME/.config/systemd/user/$unit"
+done
+if command -v systemctl >/dev/null && systemctl --user daemon-reload 2>/dev/null; then
+  systemctl --user enable -q --now bto-brain-review.timer 2>/dev/null ||
+    echo "warning: could not enable bto-brain-review.timer" >&2
+else
+  echo "warning: systemctl --user is not available; run «bash tools/brain/inbox.sh review» by hand" >&2
+fi
+echo "review:  bash tools/brain/inbox.sh auto status (timer bto-brain-review, every minute; $(bash "$BRAIN_DIR/inbox.sh" auto status 2>/dev/null | head -n 1))"
 # The code graph (graph.sh): never installed or built from here; the build takes three minutes.
 if ! command -v graphify >/dev/null && [ ! -x "$HOME/.local/bin/graphify" ]; then
   echo "graph:   graphify is missing; install it once with «uv tool install graphifyy»"

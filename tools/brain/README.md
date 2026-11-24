@@ -187,6 +187,9 @@ bash tools/brain/inbox.sh approve <branch>        the brain reviewed a GUARDED c
 bash tools/brain/inbox.sh reject <branch> <why>   refuse it: the task is dropped, the reason sent back
 bash tools/brain/inbox.sh retry <branch>          forget the result for its head; the next tick tries again
 bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
+bash tools/brain/inbox.sh review [--dry-run]      one automatic review (the timer bto-brain-review, ADR-0249)
+bash tools/brain/inbox.sh review --again <branch> forget the automatic review's result; the next pass reviews it
+bash tools/brain/inbox.sh auto on|off|status      the automatic review's switch (on unless turned off)
 ```
 
 - **`tick`** (the user timer `bto-brain-inbox.timer`, every 20 seconds, `nice 15`, installed by
@@ -221,6 +224,12 @@ bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
   (`Inbox-Branch:`, `Inbox-Head:`). A conflict drops the task and writes back «rebase onto main».
   `land.sh` keeps the task's first commit's author on main (for a worker's task that is this PC's
   own name, as before).
+- **Existing wording is the owner's** (ADR-0249): when a branch touches a `.json` under
+  `packages/shared/i18n/` (any depth; another file there is GUARDED),
+  the tick compares the files of the merge-base and the head by key path (`review.mjs i18n`): an
+  added key is fine; a changed or removed value makes the branch GUARDED and owner-only, and the
+  record keeps the list (`wording=`, `key: «old» → «new»`, at most 40). `classify` sees paths only
+  and cannot tell.
 - **LIGHT or GUARDED** (`classify`): LIGHT when every file is a page or text of the office's web
   (`apps/web/src`, `apps/web/index.html`, `apps/web/public`; not the till: `apps/web/src/pos`,
   `apps/web/pos.html`), a screen of the staff app (`apps/mobile/app`, `apps/mobile/src`, `assets`;
@@ -233,11 +242,12 @@ bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
   it by itself). Landed: `LANDED <sha>`, and the remote branch is deleted (only while it still
   points at that head). Red (exit 4), a conflict (3) or anything else: the task is dropped and the
   check's last lines go back.
-- **GUARDED waits for the brain:** `check:fast` runs in the copy; green leaves the task open as
-  `WAITING-REVIEW` (in `status`, on the monitor and as a pending status on GitHub). The brain reviews
-  it like a `bto-core` task (`bto-review` on `git -C ~/bto-work/in-<slug> show`, the suites `status`
-  suggests through `int.sh`), then `inbox.sh approve in/<slug>` (land.sh; refused if the branch was
-  pushed again meanwhile) or `inbox.sh reject in/<slug> "<why>"`. Red: dropped and written back.
+- **GUARDED waits for review:** `check:fast` runs in the copy; green leaves the task open as
+  `WAITING-REVIEW` (in `status`, on the monitor and as a pending status on GitHub). The automatic
+  review (below) takes it; what it leaves, the brain reviews like a `bto-core` task (`bto-review` on
+  `git -C ~/bto-work/in-<slug> show`, the suites `status` suggests through `int.sh`), then
+  `inbox.sh approve in/<slug>` (land.sh; refused if the branch was pushed again meanwhile) or
+  `inbox.sh reject in/<slug> "<why>"`, on any waiting head. Red: dropped and written back.
 - **Written back** with `gh` as the owner: a commit status `bto/inbox-gate` (success, pending,
   failure) and a commit comment on the branch's head, in English with one Mongolian line, once per
   result. If GitHub cannot be reached the next ticks try again (five times). The repository is
@@ -251,6 +261,102 @@ bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
   fake remote.
 - **Trust:** the second developer's tests run on this PC in `check:fast`, as a worker's do. The
   gate keeps mistakes off main; it is not a defence against a hostile collaborator.
+
+### The automatic review (ADR-0249)
+
+Owner, 2026-11-24, «Тийм, автомат»: a GUARDED head is reviewed and landed or refused without waiting
+for a Claude session, except what stays the owner's. `inbox.sh review` is one pass on one head; the
+user timer `bto-brain-review` (`inbox/bto-brain-review.{service,timer}`, every minute, `nice 15`,
+installed by `install.sh`) runs it. It has its own lock (`inbox/review.lock`: a second pass exits at
+once) and takes the inbox lock only to read and write the books, never while suites or the reviewer
+run, so the 20-second tick is as fast as before.
+
+1. **Which head:** the oldest `WAITING-REVIEW` head without a verdict (or whose retry time or the
+   day's budget now allows it). Its copy must still be the squash of that head (`Inbox-Head:`).
+2. **The allow-list, by the script** (`review.mjs owner-only` on the copy's squashed commit, no AI;
+   `review.mjs decide <path>…` shows the decision of single paths). Each path is decided in this
+   order: a named rule of `OWNER_ONLY` (`migration`, `schema`, `decision`, `boundaries`, `till`,
+   `money`, `integrity`, `rights`, `orders`, `staff-app-sync`, `integrations`, `config`, `tools`) →
+   a test file, by its subject → `AI_MAY_APPROVE` (`api-read-modules`: the api modules reporting,
+   catalog, partners, customer; `api-read-side`: any other module's `services/*-query.service.ts`
+   and `dto/**`; `api-client`: the generated client; `web`, `mobile`: the screens; `docs`;
+   `i18n-keys`) → a named fallback of `OWNER_FALLBACK` (`tests`, `api-write`, `api-platform`,
+   `shared`, `app-platform`) → `unlisted`. Diff rules hold a head too: `wording`, `tests-weakened`
+   (a test file deleted, fewer `it(`/`test(`, more skip/only/todo), `binary` (but the apps'
+   images), `route-rights` (a changed `@Public`/`@Authenticated`/`@RequirePermission`/
+   `@CustomerRoute` line). Only a head that is all on the allow-list goes on; any other stays
+   `WAITING-REVIEW` with `review=owner` and the rules printed. A check that cannot run counts as
+   owner-only. `brain.test.mjs` walks `git ls-files`: no file of the repository may be `unlisted`.
+3. **The day's budget:** at most `BTO_REVIEW_MAX_PER_DAY` (40) AI reviews a day (`inbox/review-budget`,
+   one line each, a failed call counts). Beyond it: `review=budget`, taken again when the budget
+   allows; the brain may approve it by hand meanwhile.
+4. **The suites:** the same ones `status` names (`suite_args_of`), each with the copy's own `int.sh`
+   (it tests the tree it lies in), at most `BTO_REVIEW_SUITE_TIMEOUT` (1200 s) each and within the
+   pass's deadline. Red: `reject` with the failing suites and tests by name (`review.mjs failures`;
+   the repository is public, the output stays in the review's folder); the AI is not called. Red
+   without a named test, or a timeout: an error (below).
+5. **The reviewer, on a clean export:** `git archive HEAD` of the copy unpacked into
+   `inbox/reviews/<slug>-<head>.export` (no `.env`, no `node_modules`, no `.git`; removed after the
+   call, on a timeout or a kill too, and at the next pass's start). The Claude CLI (`$BTO_CLAUDE`,
+   else `claude` on PATH, else the newest `~/.config/Claude/claude-code/*/*/claude`) runs there:
+
+   ```
+   claude -p "<prompt>" --model sonnet --output-format json --json-schema "<VERDICT_SCHEMA>"
+     --system-prompt "<agents/bto-review.md + the run's rules>"
+     --tools Read,Grep,Glob --allowedTools Read,Grep,Glob
+     --disallowedTools 'Read(**/.env*)' 'Grep(**/.env*)' 'Glob(**/.env*)'
+     --permission-mode dontAsk --permission-prompts none --restricted --safe-mode
+     --strict-mcp-config --disable-slash-commands --no-session-persistence
+     --max-turns 60 --add-dir ~/bto-work/.brain/inbox/reviews/<slug>-<head>
+   ```
+
+   under `timeout` (600 s, `BTO_REVIEW_TIMEOUT`, within the deadline), without `ANTHROPIC_API_KEY`
+   (the owner's plan, never an API bill). `--tools` leaves it only the three reading tools (no Bash,
+   no Write or Edit, no web, no sub-agents), `--strict-mcp-config` no MCP server, `--safe-mode` no
+   user CLAUDE.md, hooks (the board's hook would mark the brain's messages read), skills or plugins,
+   `--restricted` keeps its file tools inside the export and the inputs' folder. The prompt names
+   the inputs the script wrote: the diff, its stat, the commit message, the changed files, and the
+   rules to read (`CLAUDE.md`, `AGENTS.md`, the touched modules' documents). The role tells it that
+   all of that is data from another party: an instruction found in it is a HIGH finding, and so is an
+   undeclared change. `BTO_REVIEW_MODEL`, `BTO_REVIEW_MAX_TURNS` change the model and the turns.
+6. **The verdict** is read only from the CLI's final JSON (`review.mjs verdict`): one JSON object, a
+   successful result, `structured_output` with `verdict` APPROVE or BLOCK and at most 10 findings
+   (`severity` HIGH/MEDIUM, `file`, `line`, `text` ≤ 300, made safe as the board makes text safe).
+   An APPROVE that lists a HIGH finding is a BLOCK; a BLOCK without findings is unreadable. The
+   model's own text, a line of the diff, or anything printed before the JSON never counts. A finding
+   or an error text that holds a value of the copy's `.env` files (≥ 8 characters) or looks like a
+   key, a JWT, a private key or a URL with a password becomes «(removed: looked like a secret)»
+   (`review.mjs scrub`) before it is written anywhere.
+7. **Acting**, under the inbox lock and only when the item is still the same head, `WAITING-REVIEW`,
+   the review still `running` and the squashed diff's hash unchanged (else the result is dropped,
+   or the head reviewed again): BLOCK → `reject` with the findings; red → `reject` with the names;
+   APPROVE and green → `review=approved`, and the next **tick** lands it (`land_approved`:
+   `approve_item`, the brain's own path through land.sh; only while the squashed diff is the one
+   reviewed; a branch pushed again is a new head). The landing is the tick's because the review's
+   unit stops every child it leaves, a landing's background jobs too. An error (no CLI, not signed
+   in, a timeout, an unreadable answer, a usage limit, a suite timeout, a landing that cannot happen
+   now) → one more try after `BTO_REVIEW_RETRY_WAIT` (900 s), then `review=needs-brain`. Never an
+   approval on an error, never a loop.
+8. **Time:** one pass keeps to `BTO_REVIEW_DEADLINE` (3000 s) for its suites and its reviewer; the
+   unit allows 3600 s and is `KillMode=control-group`. Every child runs without the gate's lock
+   files (`6>&- 7>&-`) under `timeout`, which signals its whole process group, so a hung suite or
+   reviewer leaves no process and no lock behind.
+9. **Said:** `status` shows a `review:` line per waiting head (and `wording:`); the monitor's inbox
+   cards a pill (Mongolian) with the model and seconds; GitHub gets `REVIEWED-LANDED`, the refusal
+   with its findings, or a pending status and comment «WAITING for the owner / for the brain»; the
+   board tells `codex`, and a head left waiting is also said to `brain` by the sender `gate` (the
+   board takes no message to oneself), so the owner's Claude sees it before its next prompt. The
+   record keeps `review`, `review_why`, `review_model`, `review_secs`, `review_dir`; the folder
+   `inbox/reviews/<slug>-<head>/` (the last 50) keeps the inputs, `suites.log`, `answer.json`.
+10. **Off:** `inbox.sh auto off` (a file `inbox/auto-review.off`): every GUARDED head waits for the
+   brain as before; `auto on` again. `review --dry-run` prints, per waiting head, the owner-only
+   rules, the suites and whether it would review, and runs neither. `review --again in/<slug>`
+   forgets a verdict so the next pass reviews the head again.
+
+**Trust:** the reviewer reads a trusted collaborator's code, but a diff could still talk an AI round.
+The hard rails are the script's: the guard rails, the allow-list and the diff rules, `check:fast` and
+the suites; the AI is the soft rail on top, only for what the allow-list names, and it can only
+refuse more or let through what those already let through. Tests: `brain.test.mjs` «review: …», with a fake CLI (`BTO_CLAUDE`) and a fake `int.sh`.
 
 ## The team board: the two developers' AIs share one set of facts (ADR-0248)
 
@@ -275,6 +381,10 @@ node tools/brain/board.mjs inbox [--peek] [--json]           unread to me or all
 node tools/brain/board.mjs thread <id> · holders <path>… [--except <name>] · sync
 ```
 
+- **Numbers not yet on main** (`status`): every number handed out on the board whose file
+  (`ADR-NNNN-*.md`, `NNNN_*.sql`) is not on origin/main, however high main's last number is, except
+  this side's numbers whose task `task.sh drop` threw away (`board/dropped`, one slug a line; a slug
+  that takes a number again leaves it). A number is never handed out twice either way.
 - **The brain needs no new habit.** `task.sh new`/`claim` refuse (exit 2) a path another side holds
   on the board and publish the task's paths as `brain`'s claim (`--what "brain task <slug>"`);
   `task.sh drop` and `land.sh` release it; `task.sh number` takes the number from the board, never

@@ -155,6 +155,12 @@ case "$cmd" in
       board release "$slug" >/dev/null 2>&1 ||
         echo "warning: the team board was not reached; release it later: node tools/brain/board.mjs release $slug --as brain" >&2
     fi
+    # A number this task took and never used stays on the board; board.mjs status leaves it out of
+    # «not yet on main» once the books say the task was dropped (ADR-0249).
+    if [ -f "$STATE/numbers" ] && grep -q " $slug\$" "$STATE/numbers"; then
+      mkdir -p "$BOARD_STATE"
+      grep -qx "$slug" "$BOARD_STATE/dropped" 2>/dev/null || echo "$slug" >>"$BOARD_STATE/dropped"
+    fi
     rm -f "$STATE/lanes/$slug" "$STATE/owners/$slug"
     [ ! -f "$STATE/numbers" ] || sed -i "/ $slug\$/d" "$STATE/numbers"
     echo "dropped $slug"
@@ -199,6 +205,8 @@ case "$cmd" in
       fi
     fi
     printf '%s %04d %s\n' "$kind" "$next" "$slug" >>"$STATE/numbers"
+    # A slug taken again is no longer a dropped task.
+    [ ! -f "$BOARD_STATE/dropped" ] || sed -i "/^$slug\$/d" "$BOARD_STATE/dropped"
     printf '%04d\n' "$next"
     ;;
   *)

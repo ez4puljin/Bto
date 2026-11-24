@@ -1,0 +1,17 @@
+[Unit]
+Description=Bto inbox gate: the automatic review of one waiting GUARDED head (tools/brain/inbox.sh review, ADR-0249)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/bto-dev
+Environment=PATH=%h/.local/opt/node/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env bash %h/bto-dev/tools/brain/inbox.sh review
+Nice=15
+CPUWeight=20
+IOWeight=20
+# Every child of a pass (int.sh, jest, the reviewer) is stopped with it: nothing is left holding
+# review.lock or int.lock. The pass never lands (the tick does, in bto-brain-inbox), so no landing's
+# background job lives here.
+KillMode=control-group
+# The pass keeps to BTO_REVIEW_DEADLINE (3000 s: the suites and the reviewer); this is the net.
+TimeoutStartSec=3600

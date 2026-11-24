@@ -1,0 +1,10 @@
+[Unit]
+Description=Bto inbox gate: look for a GUARDED head to review every minute (ADR-0249)
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

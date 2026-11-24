@@ -654,18 +654,42 @@ function landingsOf(ctx, n = 8) {
     });
 }
 
-/** The numbers handed out on the board that main does not have yet and that are above main's last. */
-function openNumbers(ctx, board) {
+/**
+ * The numbers handed out on the board whose file (`ADR-NNNN-*.md`, `NNNN_*.sql`) is not on main yet,
+ * whatever main's highest number is (a number handed out earlier and not used yet stays shown), but
+ * not those of this side's tasks known to be dropped (`dropped`: their slugs, written by task.sh drop).
+ */
+export function openNumbersOf(board, onMainByKind, { me = null, dropped = new Set() } = {}) {
   const open = [];
   for (const kind of Object.keys(KINDS)) {
-    const onMain = numbersIn(kind, mainNames(ctx, kind));
-    const last = Math.max(0, ...onMain);
-    const have = new Set(onMain);
+    const have = new Set(onMainByKind[kind] ?? []);
     for (const n of board.numbers) {
-      if (n.kind === kind && n.number > last && !have.has(n.number)) open.push(n);
+      if (n.kind !== kind || have.has(n.number)) continue;
+      if (me && n.who === me && dropped.has(n.slug)) continue;
+      open.push(n);
     }
   }
   return open;
+}
+
+/** The slugs of this side's tasks that were dropped (task.sh drop writes `<state>/dropped`). */
+function droppedSlugs(ctx) {
+  try {
+    return new Set(
+      readFileSync(path.join(ctx.state, 'dropped'), 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function openNumbers(ctx, board) {
+  const onMain = {};
+  for (const kind of Object.keys(KINDS)) onMain[kind] = numbersIn(kind, mainNames(ctx, kind));
+  return openNumbersOf(board, onMain, { me: ctx.me, dropped: droppedSlugs(ctx) });
 }
 
 // ---------------------------------------------------------------------------------------------

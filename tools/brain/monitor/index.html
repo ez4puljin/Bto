@@ -748,6 +748,17 @@
           REFUSED: ['bad', 'татгалзсан'],
           WITHDRAWN: ['done', 'буцаасан'],
         };
+        // The automatic review (ADR-0249).
+        const REVIEW = {
+          running: ['run', 'автомат хяналт явж байна'],
+          retry: ['warn', 'автомат хяналт дахин оролдоно'],
+          owner: ['bad', 'эзэн шийднэ'],
+          'needs-brain': ['bad', 'тархи хянана'],
+          budget: ['warn', 'өдрийн хязгаар дууссан'],
+          approved: ['run', 'автомат хяналт зөвшөөрсөн'],
+          blocked: ['bad', 'автомат хяналт татгалзсан'],
+          red: ['bad', 'интеграцийн тест улаан'],
+        };
         const inbox = s.inbox || [];
         const inboxOpen = inbox.filter(
           (i) => i.state === 'WAITING' || i.state === 'WAITING-REVIEW',
@@ -779,6 +790,31 @@
                       i.landed ? [' · main ', el('code', {}, i.landed)] : '',
                       i.updatedAt ? [' · ', el('b', {}, when(i.updatedAt))] : '',
                     ),
+                    i.review
+                      ? el(
+                          'div',
+                          { class: 'row' },
+                          pill(...(REVIEW[i.review.state] || ['done', i.review.state])),
+                          el(
+                            'span',
+                            { class: 'meta' },
+                            [
+                              i.review.model ? `загвар ${i.review.model}` : '',
+                              i.review.secs != null ? `${i.review.secs} сек` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · '),
+                          ),
+                        )
+                      : i.state === 'WAITING-REVIEW'
+                        ? el('div', { class: 'row' }, pill('warn', 'автомат хяналт хүлээж байна'))
+                        : null,
+                    i.wording && i.state === 'WAITING-REVIEW'
+                      ? el('div', { class: 'meta' }, 'Одоо байгаа текстийг өөрчилсөн: эзэн шийднэ.')
+                      : null,
+                    i.review && i.review.why && i.state === 'WAITING-REVIEW'
+                      ? el('div', { class: 'meta' }, i.review.why)
+                      : null,
                     i.reason && i.state !== 'LANDED'
                       ? el('div', { class: 'meta' }, i.reason)
                       : null,

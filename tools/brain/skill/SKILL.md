@@ -100,13 +100,30 @@ waits for it, by the job desk, never by you or a worker:
 ## The second developer's inbox (ADR-0242)
 
 A second developer (OpenAI Codex, `AGENTS.md`) pushes branches `in/<slug>`; the timer
-`bto-brain-inbox` takes them: LIGHT ones land by themselves, GUARDED ones wait for you.
+`bto-brain-inbox` takes them: LIGHT ones land by themselves; GUARDED ones are checked, then the
+automatic review (ADR-0249, timer `bto-brain-review`) lands or refuses by itself only what its
+allow-list names (reports, master data, read-side queries and DTOs, screens, documents, new texts,
+added tests): their integration suites, then a headless read-only Claude reviewer. Everything else,
+and whatever it cannot finish, is yours.
 
-- At the start of a turn, and whenever the owner mentions the other developer:
-  `bash ~/bto-dev/tools/brain/inbox.sh status`. A `WAITING-REVIEW` item is a finished `bto-core`
-  task: review it the same way (`bto-review` on its copy `~/bto-work/in-<slug>`, the suites `status`
-  suggests through `int.sh`), then `inbox.sh approve in/<slug>` or
-  `inbox.sh reject in/<slug> "<why, in English>"`. Tell the owner in Mongolian what you did.
+- At the start of a turn, when a board message from `gate` says so (the hook shows it), and whenever
+  the owner mentions the other developer: `bash ~/bto-dev/tools/brain/inbox.sh status`. A
+  `WAITING-REVIEW` item has a `review:` line:
+  - `waits for the automatic review` / `is running` / `failed once …` / `approved` (the next tick
+    lands it): leave it; it is not yours yet.
+  - `OWNER-ONLY …` (the rule names it: `api-write`, `money`, `migration`, `shared`, `rights`,
+    `wording`, `tests-weakened`, `route-rights`, …): tell the owner in Mongolian what it changes
+    and why it waits, with the old → new list for texts; review it as a `bto-core` task (`bto-review`
+    on its copy `~/bto-work/in-<slug>`, the suites `status` names through `int.sh`) and approve or
+    reject on the owner's word.
+  - `NEEDS THE BRAIN …` (the reviewer timed out, its answer could not be read, the CLI is missing or
+    not signed in, the day's budget): review it yourself the same way; `inbox.sh review --again
+    in/<slug>` hands it back to the automatic review instead.
+  Then `inbox.sh approve in/<slug>` or `inbox.sh reject in/<slug> "<why, in English>"` (both work on
+  any waiting head). Tell the owner in Mongolian what you did.
+- The automatic review's switch: `inbox.sh auto off|on|status` (on unless turned off; off leaves
+  every GUARDED head to you, as before). `inbox.sh review --dry-run` says what it would do. Its
+  inputs and the reviewer's answer for a head are in `~/bto-work/.brain/inbox/reviews/`.
 - The `in-*` tasks are the gate's: never open, land (`land.sh`) or drop one yourself. A task of
   yours refused because an `in-*` task holds a path waits for it like any other holder.
 - A landed staff-app change needs an APK like any other: request it as above.
