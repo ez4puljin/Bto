@@ -133,7 +133,7 @@ const FIRST_FAVOURITES: readonly MenuKey[] = [
 export function favouritesOf(stored: unknown, groups: readonly MenuGroup[]): MenuItem[] {
   const items = groups.flatMap((group) => group.items);
   const keys = Array.isArray(stored) ? (stored as unknown[]) : FIRST_FAVOURITES;
-  return keys.flatMap((key) => items.filter((item) => item.key === key));
+  return [...new Set(keys)].flatMap((key) => items.filter((item) => item.key === key));
 }
 
 /** The chosen list with `key` added at the end or taken out. */

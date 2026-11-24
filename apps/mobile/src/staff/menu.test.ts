@@ -85,6 +85,13 @@ describe('the favourites', () => {
     expect(keys).toEqual(['thanks', 'rep']);
   });
 
+  it('shows each saved favourite once in the order it was first chosen', () => {
+    const keys = favouritesOf(['thanks', 'rep', 'thanks', 'community', 'rep'], rep).map(
+      (item) => item.key,
+    );
+    expect(keys).toEqual(['thanks', 'rep', 'community']);
+  });
+
   it('adds at the end and takes out', () => {
     expect(toggledFavourites(['rep'], 'thanks')).toEqual(['rep', 'thanks']);
     expect(toggledFavourites(['rep', 'thanks'], 'rep')).toEqual(['thanks']);
