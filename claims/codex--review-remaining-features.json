@@ -1,9 +1,0 @@
-{
-  "who": "codex",
-  "slug": "review-remaining-features",
-  "paths": [
-    "docs/reviews/2026-11-24-inbox-feature-plan.md"
-  ],
-  "what": "Review of split feature paths, additive SQL adaptations and synchronous module ports",
-  "since": "2026-11-24T09:02:17.821Z"
-}
