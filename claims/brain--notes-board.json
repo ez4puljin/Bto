@@ -1,0 +1,10 @@
+{
+  "who": "brain",
+  "slug": "notes-board",
+  "paths": [
+    "docs/STATUS.md",
+    "docs/decisions/README.md"
+  ],
+  "what": "brain task notes-board",
+  "since": "2026-11-24T09:49:02.389Z"
+}
