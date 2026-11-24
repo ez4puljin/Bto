@@ -1,6 +1,14 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ListTable, SpacerCell, SpacerHead, TruncateCell } from '@/components/list';
+import {
+  ListTable,
+  SegmentedControl,
+  SpacerCell,
+  SpacerHead,
+  TruncateCell,
+} from '@/components/list';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 /** A box of the given width in px: jsdom lays nothing out, so `clientWidth` is faked. */
@@ -14,6 +22,66 @@ const COLUMNS = [
   { key: 'spacer', kind: 'spacer' },
   { key: 'amount', kind: 'money' },
 ] as const;
+
+describe('SegmentedControl keyboard navigation', () => {
+  function Tabs() {
+    const [value, setValue] = useState('Second');
+    return (
+      <>
+        <SegmentedControl
+          options={['First', 'Second', 'Third']}
+          value={value}
+          label={(option) => option}
+          onChange={setValue}
+          name="Views"
+        />
+        <button type="button">After tabs</button>
+      </>
+    );
+  }
+
+  it('has one Tab stop and lets arrows wrap while selecting the focused tab', async () => {
+    const user = userEvent.setup();
+    render(<Tabs />);
+    await user.tab();
+    expect(screen.getByRole('tab', { name: 'Second' })).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Third', selected: true })).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'First', selected: true })).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(screen.getByRole('tab', { name: 'Third', selected: true })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'After tabs' })).toHaveFocus();
+  });
+
+  it('supports Home/End without intercepting browser navigation shortcuts', async () => {
+    const user = userEvent.setup();
+    render(<Tabs />);
+    await user.tab();
+    await user.keyboard('{End}');
+    expect(screen.getByRole('tab', { name: 'Third', selected: true })).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(screen.getByRole('tab', { name: 'First', selected: true })).toHaveFocus();
+    await user.keyboard('{Alt>}{ArrowRight}{/Alt}');
+    expect(screen.getByRole('tab', { name: 'First', selected: true })).toHaveFocus();
+  });
+
+  it('still allows entry when a URL contains an unavailable choice', async () => {
+    const user = userEvent.setup();
+    render(
+      <SegmentedControl
+        options={['First', 'Second']}
+        value="Unavailable"
+        label={(option) => option}
+        onChange={vi.fn()}
+      />,
+    );
+    await user.tab();
+    expect(screen.getByRole('tab', { name: 'First' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Second' })).toHaveAttribute('tabindex', '-1');
+  });
+});
 
 function Demo() {
   return (

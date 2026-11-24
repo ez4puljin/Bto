@@ -139,6 +139,8 @@ export function SegmentedControl<T extends string>(props: {
 }) {
   const field = props.size === 'field';
   const list = useRef<HTMLDivElement>(null);
+  const selectedIndex = props.options.indexOf(props.value);
+  const tabStop = selectedIndex < 0 ? 0 : selectedIndex;
   // Only the control scrolls, never the page: a control below the fold stays where it is.
   useLayoutEffect(() => {
     const box = list.current;
@@ -159,7 +161,7 @@ export function SegmentedControl<T extends string>(props: {
         field ? 'grid h-10 w-full auto-cols-fr grid-flow-col' : 'inline-flex w-fit',
       )}
     >
-      {props.options.map((value) => {
+      {props.options.map((value, index) => {
         const selected = value === props.value;
         return (
           <button
@@ -167,6 +169,7 @@ export function SegmentedControl<T extends string>(props: {
             type="button"
             role="tab"
             aria-selected={selected}
+            tabIndex={index === tabStop ? 0 : -1}
             className={cn(
               'shrink-0 rounded-full px-3.5 font-medium whitespace-nowrap transition-[color,background-color,box-shadow] duration-200 ease-apple outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
               field ? 'h-full text-sm' : 'h-7.5 text-[0.8125rem] touch:h-9.5',
@@ -182,6 +185,25 @@ export function SegmentedControl<T extends string>(props: {
                 : 'text-muted-foreground hover:text-foreground',
             )}
             onClick={() => props.onChange(value)}
+            onKeyDown={(event) => {
+              if (event.altKey || event.ctrlKey || event.metaKey) return;
+              const next =
+                event.key === 'ArrowRight'
+                  ? (index + 1) % props.options.length
+                  : event.key === 'ArrowLeft'
+                    ? (index - 1 + props.options.length) % props.options.length
+                    : event.key === 'Home'
+                      ? 0
+                      : event.key === 'End'
+                        ? props.options.length - 1
+                        : null;
+              if (next === null) return;
+              const option = props.options[next];
+              if (option === undefined) return;
+              event.preventDefault();
+              list.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+              props.onChange(option);
+            }}
           >
             {props.label(value)}
           </button>
