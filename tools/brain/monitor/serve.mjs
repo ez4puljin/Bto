@@ -2,11 +2,13 @@
 // надад хэрэгтэй байна»): http://<this PC>:3310 on the store's LAN shows, refreshing by itself, what
 // the brain (ADR-0213, tools/brain/README.md) is doing: the open tasks and what they hold, the
 // workers running or finished, the landings and whether the real system runs them, the code graph,
-// and the inbox gate's branches (ADR-0242).
+// the inbox gate's branches (ADR-0242) and the team board (ADR-0248): who holds what on each side,
+// the numbers handed out and the last messages between the two developers' AIs.
 //
 // Read-only. It reads the brain's books (~/bto-work/.brain), the task copies (git), Claude Code's
 // subagent transcripts (~/.claude/projects/*/<session>/subagents), the real system's /health and
-// the auto-deploy log; it writes nothing anywhere. The page is open to the whole LAN, so a worker
+// the auto-deploy log; it writes nothing anywhere, except that it fetches the team board's branch
+// into the board's own clone at most once a minute (board.mjs sync). The page is open to the whole LAN, so a worker
 // shows only its description, task, type, model, times, the name of its last tool call, one line of
 // its last text and its tokens: never a tool's input or output, a file's content, or the brief.
 // Not published outside the LAN (CLAUDE.md: nothing new goes through the tunnel without a decision).
@@ -21,6 +23,7 @@ import { createServer } from 'node:http';
 import { homedir, networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readBoard } from '../board.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HOME = homedir();
@@ -57,6 +60,10 @@ export function parseLane(text) {
 /** States of the inbox gate (ADR-0242) that still wait for something. */
 export const INBOX_OPEN = new Set(['WAITING', 'WAITING-REVIEW']);
 const INBOX_SHOWN = 10;
+const BOARD_STATE = path.join(STATE, 'board');
+const BOARD_MESSAGES_SHOWN = 10;
+const BOARD_NUMBERS_SHOWN = 12;
+const BOARD_SYNC_EVERY = MINUTE;
 
 /**
  * One record of the inbox gate (`inbox/items/<key>`, key=value lines; tools/brain/inbox.sh), as the
@@ -660,6 +667,60 @@ async function gatherInbox() {
   return [...open, ...done];
 }
 
+/**
+ * The team board as the page shows it: claims by side, the newest numbers, the last messages
+ * (newest first). `fetchedAt` is when this PC last reached it.
+ */
+export function boardView(board, fetchedAt) {
+  const sides = new Map();
+  for (const c of board.claims) {
+    if (!sides.has(c.who)) sides.set(c.who, []);
+    sides
+      .get(c.who)
+      .push({ slug: c.slug, paths: c.paths, what: c.what ?? '', since: c.since ?? null });
+  }
+  return {
+    tip: board.tip ? board.tip.slice(0, 8) : null,
+    fetchedAt,
+    sides: [...sides].map(([who, claims]) => ({ who, claims })),
+    numbers: [...board.numbers]
+      .sort((a, b) => String(b.at ?? '').localeCompare(String(a.at ?? '')) || b.number - a.number)
+      .slice(0, BOARD_NUMBERS_SHOWN)
+      .map((n) => ({
+        kind: n.kind,
+        number: String(n.number).padStart(4, '0'),
+        who: n.who,
+        slug: n.slug,
+      })),
+    messages: board.messages
+      .slice(-BOARD_MESSAGES_SHOWN)
+      .reverse()
+      .map((m) => ({
+        id: m.id,
+        from: m.from,
+        to: m.to,
+        at: m.at,
+        text: m.text,
+        slug: m.slug ?? null,
+      })),
+  };
+}
+
+let boardSynced = 0;
+async function gatherBoard() {
+  const gitDir = path.join(BOARD_STATE, 'repo.git');
+  if (!(await statOf(path.join(gitDir, 'HEAD')))) return null;
+  if (Date.now() - boardSynced > BOARD_SYNC_EVERY) {
+    boardSynced = Date.now();
+    // In the background: this gathering shows the last fetched board.
+    run(process.execPath, [path.join(HERE, '..', 'board.mjs'), 'sync', '--state', BOARD_STATE], {
+      timeout: 20_000,
+    });
+  }
+  const fetched = (await readText(path.join(BOARD_STATE, 'fetched')))?.trim();
+  return boardView(readBoard({ gitDir }), fetched ? Date.parse(fetched) : null);
+}
+
 /** Each part on its own: one that fails is named in `errors`, the rest is still shown. */
 async function gather() {
   const now = Date.now();
@@ -671,12 +732,13 @@ async function gather() {
       return fallback;
     });
   const running = await gatherRunning();
-  const [tasks, people, landed, graph, inbox] = await Promise.all([
+  const [tasks, people, landed, graph, inbox, board] = await Promise.all([
     part('tasks', gatherTasks(), []),
     part('workers', gatherWorkers(now), { workers: [], sessions: [] }),
     part('landings', gatherLandings(running), { landings: [], deploy: [] }),
     part('graph', gatherGraph(now), null),
     part('inbox', gatherInbox(), []),
+    part('board', gatherBoard(), null),
   ]);
   const newest = new Map();
   for (const w of people.workers) if (w.slug && !newest.has(w.slug)) newest.set(w.slug, w.id);
@@ -690,6 +752,7 @@ async function gather() {
     deploy: landed.deploy,
     graph,
     inbox,
+    board,
     errors,
   };
 }

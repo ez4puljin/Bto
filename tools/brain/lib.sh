@@ -94,3 +94,31 @@ ensure_gate() {
   fi
   link_modules "$GATE"
 }
+
+# The team board (board.mjs, ADR-0248): this PC speaks there as «brain». Off in a trial of these
+# tools (another BASE_REF), with BTO_BOARD=off, and where board.mjs is not beside this file.
+BOARD_STATE="$STATE/board"
+board_on() {
+  [ "${BTO_BOARD:-on}" != off ] && [ "$BASE_REF" = origin/main ] && [ -f "$BRAIN_DIR/board.mjs" ]
+}
+# board <command> …: exit as board.mjs (2 refused, 3 the board cannot be reached). The fixed options
+# come first, so that a caller can end its own with «--» before paths or text it does not control.
+# BOARD_TIMEOUT (seconds a git call may take) is short where a lock is held (land.sh, the gate).
+board() {
+  PATH="$HOME/.local/opt/node/bin:$PATH" node "$BRAIN_DIR/board.mjs" --as brain --state "$BOARD_STATE" \
+    --timeout "${BOARD_TIMEOUT:-${BTO_BOARD_TIMEOUT:-20}}" "$@"
+}
+# True when the board could not be reached less than a minute ago: the gate then leaves it alone.
+board_down() {
+  [ -n "$(find "$BOARD_STATE/unreachable" -mmin -1 2>/dev/null)" ]
+}
+# Once: the numbers this PC handed out before the board existed (codex-big was reserved by hand for
+# the second developer). Quiet when the board cannot be reached; the next call tries again.
+board_import() {
+  [ ! -f "$BOARD_STATE/imported" ] || return 0
+  [ -f "$STATE/numbers" ] || { mkdir -p "$BOARD_STATE" && touch "$BOARD_STATE/imported"; return 0; }
+  if board import "$STATE/numbers" --map codex-big=codex >/dev/null 2>&1; then
+    touch "$BOARD_STATE/imported"
+  fi
+  return 0
+}

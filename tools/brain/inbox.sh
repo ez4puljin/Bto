@@ -16,6 +16,12 @@
 # brain's `approve`; a guard-rail path is refused. Results go back to GitHub as a commit status and
 # a commit comment on the branch's head. Exit: 0 done · 1 failed · 2 nothing to approve or reject ·
 # 64 usage.
+#
+# The team board (board.mjs, ADR-0248): a REFUSED or WAITING-REVIEW result is also said there to the
+# branches' side (BTO_INBOX_SIDE, default codex), once per result; LANDED and a branch deleted
+# without landing (WITHDRAWN) release that side's claim of the same slug (a refused branch keeps it:
+# its side fixes it and pushes again). A path another side holds on the board is named in
+# status, never a reason to refuse. A branch whose side never uses the board lands as before.
 set -euo pipefail
 # shellcheck source=tools/brain/lib.sh
 . "$(dirname "$0")/lib.sh"
@@ -30,6 +36,7 @@ GH=${BTO_INBOX_GH:-gh}
 CONTEXT=bto/inbox-gate
 NS=refs/inbox
 DRY=no
+SIDE=${BTO_INBOX_SIDE:-codex}
 
 usage() {
   sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
@@ -95,9 +102,12 @@ classify() {
   REFUSALS=${REFUSALS%$'\n'}
 }
 
-# The api's integration suites a reviewer may want (a hint in status, never run by the tick).
+# The api's integration suites a reviewer may want (a hint in status, never run by the tick):
+# suites_of <copy> <path>…. int.sh tests the tree it lies in, so the hint names the copy's own int.sh:
+# ~/bto-dev's would test ~/bto-dev.
 suites_of() {
-  local path mod integrity=no
+  local copy=$1 path mod integrity=no
+  shift
   local -A mods=()
   for path in "$@"; do
     case "$path" in
@@ -112,8 +122,8 @@ suites_of() {
         apps/api/src/modules/pos/* | apps/api/src/modules/procurement/*) integrity=yes ;;
     esac
   done
-  [ "${#mods[@]}" -eq 0 ] || echo "bash tools/brain/int.sh ${!mods[*]}"
-  [ "$integrity" = no ] || echo "bash tools/brain/int.sh --integrity"
+  [ "${#mods[@]}" -eq 0 ] || echo "bash $copy/tools/brain/int.sh ${!mods[*]}"
+  [ "$integrity" = no ] || echo "bash $copy/tools/brain/int.sh --integrity"
   return 0
 }
 
@@ -157,6 +167,37 @@ set_state() {
   set_key "$item" public "${4:-$3}"
   set_key "$item" updated "$(date +%s)"
   log_line "$2" "$(get "$item" branch)" "$(get "$item" head)" "$3"
+}
+
+# --- the team board (ADR-0248): never a reason to stop; a board that is not reached is skipped ---
+
+# The branch's side's claim of its slug goes once the attempt is over for good.
+board_release() {
+  local item=$1 name
+  name=$(get "$item" branch)
+  name=${name#in/}
+  [ "$DRY" = no ] && board_on || return 0
+  BOARD_TIMEOUT=5 board release "$name" --of "$SIDE" >/dev/null 2>>"$ISTATE/board.log" ||
+    echo "  warning: the team board was not reached; $SIDE's claim of $name stays" >&2
+  return 0
+}
+
+# A REFUSED or WAITING-REVIEW result, said to the branch's side on the board once (GitHub gets it too).
+board_tell() {
+  local item=$1 state name
+  state=$(get "$item" state)
+  case "$state" in REFUSED | WAITING-REVIEW) ;; *) return 0 ;; esac
+  [ "$(get "$item" told)" != "$state" ] || return 0
+  board_on && ! board_down || return 0
+  name=$(get "$item" branch)
+  name=${name#in/}
+  if BOARD_TIMEOUT=5 board say "$SIDE" --slug "$name" -- "inbox gate: in/$name @ $(get "$item" head | cut -c1-8): $SHORT" \
+    >/dev/null 2>>"$ISTATE/board.log"; then
+    set_key "$item" told "$state"
+  else
+    echo "  warning: the team board was not reached; the result is on GitHub only" >&2
+    set_key "$item" told "$state"
+  fi
 }
 
 # --- writing back to GitHub ---------------------------------------------------------------------
@@ -216,6 +257,7 @@ report() {
   if [ "$DRY" = yes ]; then
     return 0
   fi
+  board_tell "$item"
   repo=$(repo_of)
   # GitHub refuses a short sha (422): always the full 40-hex one.
   head=$(git -C "$MAIN" rev-parse -q --verify "${head}^{commit}" 2>/dev/null || echo "$head")
@@ -342,6 +384,7 @@ land_item() {
     set_state "$item" LANDED "$live"
     echo "  LANDED ${sha:0:8}"
     delete_branch "$item"
+    board_release "$item"
     return 0
   fi
   drop_task "$task"
@@ -466,12 +509,16 @@ attempt() {
     return 0
   fi
   set_key "$item" class "$CLASS"
+  # Paths another side than the branch's holds on the team board: named for the review, nothing more.
+  if [ "$DRY" = no ] && board_on && ! board_down; then
+    set_key "$item" board "$(BOARD_TIMEOUT=5 board holders --except "$SIDE" -- "${files[@]}" 2>/dev/null | head -n 5 | tr '\n' ';' | sed 's/;$//; s/;/; /g')"
+  fi
   if [ "$DRY" = yes ]; then
     if [ "$CLASS" = light ]; then what="LIGHT: open task $task, squash, land.sh"; else what="GUARDED: open task $task, squash, check:fast, wait for the brain's approve"; fi
     echo "  would $what"
     printf '    %s\n' "${files[@]}"
     [ -z "$MIGRATIONS" ] || echo "    migration: $MIGRATIONS"
-    suites_of "${files[@]}" | sed 's/^/    suites: /'
+    suites_of "$WORK/$task" "${files[@]}" | sed 's/^/    suites: /'
     return 0
   fi
 
@@ -528,18 +575,26 @@ heads() {
   git -C "$MAIN" for-each-ref --sort=committerdate --format='%(refname:lstrip=2) %(objectname)' "$NS/"
 }
 
-# A branch deleted on the remote takes its waiting attempt with it.
+# A branch deleted on the remote takes its waiting attempt with it. A refused branch its side deleted
+# was given up: its claim on the team board goes too (once).
 withdraw_gone() {
   local item branch state name
   for item in "$ISTATE"/items/*; do
     [ -f "$item" ] || continue
     state=$(get "$item" state)
-    case "$state" in WAITING | WAITING-REVIEW) ;; *) continue ;; esac
     branch=$(get "$item" branch)
     name=${branch#in/}
+    if [ "$state" = REFUSED ] && [ -z "$(get "$item" released)" ] &&
+      ! git -C "$MAIN" show-ref -q --verify "$NS/$name"; then
+      board_release "$item"
+      set_key "$item" released yes
+      continue
+    fi
+    case "$state" in WAITING | WAITING-REVIEW) ;; *) continue ;; esac
     git -C "$MAIN" show-ref -q --verify "$NS/$name" && continue
     drop_task "$(get "$item" task)"
     set_state "$item" WITHDRAWN "$branch was deleted"
+    board_release "$item"
     echo "$branch: deleted on $REMOTE; its attempt is withdrawn"
   done
 }
@@ -712,12 +767,13 @@ case "$cmd" in
       branch=$(get "$item" branch) task=$(get "$item" task)
       echo "$state  $branch @ $(get "$item" head | cut -c1-8)  $(get "$item" class | tr a-z A-Z)  $(ago "$(get "$item" updated)")"
       echo "  files:  $(get "$item" files)"
+      [ -z "$(get "$item" board)" ] || echo "  board:  $(get "$item" board)"
       if [ "$state" = WAITING ]; then
         echo "  why:    $(get "$item" reason)"
       else
         echo "  copy:   $WORK/$task  (git -C $WORK/$task show HEAD)"
         mapfile -t f < <(get "$item" files | tr ' ' '\n')
-        suites_of "${f[@]}" | sed 's/^/  suites: /'
+        suites_of "$WORK/$task" "${f[@]}" | sed 's/^/  suites: /'
         echo "  then:   bash $BRAIN_DIR/inbox.sh approve $branch   |   reject $branch \"<reason>\""
       fi
     done

@@ -10,6 +10,11 @@
 #   task.sh drop <slug>            throw a task away: its copy, its branch, its claims
 #   task.sh number adr|migration <slug>
 #                                  the next free ADR or migration number, never handed out twice
+#
+# The team board (board.mjs, ADR-0248): new/claim also refuse (exit 2) a path another developer's AI
+# holds there and publish the task's paths as «brain»'s claim; drop releases it; number takes the
+# number from the board's one sequence. A board that cannot be reached never blocks: a warning, and
+# the books here decide (a number then comes from these books alone, with a loud warning).
 set -euo pipefail
 # shellcheck source=tools/brain/lib.sh
 . "$(dirname "$0")/lib.sh"
@@ -60,6 +65,23 @@ claim() {
     echo "$found" >&2
     DIE_CODE=2 die "Refused: give these to the task that holds them, or wait for it to land."
   fi
+  # The gate's own in-* tasks are the other developer's work, held on the board by its own side.
+  if [ "${BTO_TASK_OWNER:-}" != inbox ] && board_on; then
+    board_import
+    local out code
+    set +e
+    out=$(board claim "$slug" --what "brain task $slug" -- "${paths[@]}" 2>&1)
+    code=$?
+    set -e
+    case "$code" in
+      0) ;;
+      2)
+        printf '%s\n' "$out" | grep ' is held by ' >&2 || printf '%s\n' "$out" >&2
+        DIE_CODE=2 die "Refused: the other developer holds these on the team board (board.mjs status); wait for it to land, or ask: node tools/brain/board.mjs say <who> \"…\"."
+        ;;
+      *) echo "warning: the team board was not reached; $slug's paths are not published there ($(printf '%s' "$out" | tail -n 1))" >&2 ;;
+    esac
+  fi
   printf '%s\n' "${paths[@]}" >>"$STATE/lanes/$slug"
   sort -u -o "$STATE/lanes/$slug" "$STATE/lanes/$slug"
 }
@@ -89,6 +111,7 @@ case "$cmd" in
     fetch_main
     ensure_merge_driver
     if ! git -C "$MAIN" worktree add -q -b "task/$slug" "$WORK/$slug" "$BASE_REF"; then
+      [ "${BTO_TASK_OWNER:-}" = inbox ] || ! board_on || board release "$slug" >/dev/null 2>&1 || true
       rm -f "$STATE/lanes/$slug" "$STATE/owners/$slug"
       die "Could not make the copy for $slug."
     fi
@@ -128,6 +151,10 @@ case "$cmd" in
     valid_slug "$slug"
     [ ! -d "$WORK/$slug" ] || git -C "$MAIN" worktree remove --force "$WORK/$slug"
     git -C "$MAIN" branch -q -D "task/$slug" 2>/dev/null || true
+    if [ "$(cat "$STATE/owners/$slug" 2>/dev/null)" != inbox ] && board_on; then
+      board release "$slug" >/dev/null 2>&1 ||
+        echo "warning: the team board was not reached; release it later: node tools/brain/board.mjs release $slug --as brain" >&2
+    fi
     rm -f "$STATE/lanes/$slug" "$STATE/owners/$slug"
     [ ! -f "$STATE/numbers" ] || sed -i "/ $slug\$/d" "$STATE/numbers"
     echo "dropped $slug"
@@ -154,6 +181,23 @@ case "$cmd" in
     held=$(awk -v kind="$kind" '$1 == kind { print $2 }' "$STATE/numbers" | sort -n | tail -n 1)
     next=$((10#${last:-0} + 1))
     [ -z "$held" ] || [ "$((10#$held + 1))" -le "$next" ] || next=$((10#$held + 1))
+    # One sequence with the other developer: the board hands it out, at least what these books say.
+    if board_on; then
+      board_import
+      set +e
+      out=$(board number "$kind" "$slug" --floor "$next" 2>"$STATE/board-number.err")
+      code=$?
+      set -e
+      if [ "$code" -eq 0 ] && [[ "$out" =~ ^[0-9]{4}$ ]]; then
+        next=$((10#$out))
+      else
+        {
+          echo "WARNING: the team board could not hand out this number ($(tail -n 1 "$STATE/board-number.err"))."
+          echo "WARNING: $kind $(printf '%04d' "$next") comes from this PC's books alone; the other developer may take it too."
+          echo "WARNING: once the board is back, tell them: node tools/brain/board.mjs say codex \"$kind $(printf '%04d' "$next") is $slug's\"."
+        } >&2
+      fi
+    fi
     printf '%s %04d %s\n' "$kind" "$next" "$slug" >>"$STATE/numbers"
     printf '%04d\n' "$next"
     ;;

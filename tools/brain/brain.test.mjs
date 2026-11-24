@@ -1,5 +1,5 @@
 // The brain's tools (ADR-0213): mn.json merged by key, the key scan, the scripts' syntax, the guard,
-// the monitor's readers, the job desk (ADR-0229).
+// the monitor's readers, the job desk (ADR-0229), the inbox gate (ADR-0242), the team board (ADR-0248).
 //   node --test tools/brain/brain.test.mjs
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -19,10 +19,13 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+// The team board's own tests (ADR-0248) run with these.
+import './board.test.mjs';
 import { check } from './guard.mjs';
 import { deskRefusal, isRunner, parseRecord, runningJobs } from './jobs/desk.mjs';
 import { merge, parse, print } from './merge-json.mjs';
 import {
+  boardView,
   feedTranscript,
   isBrainWorker,
   landingState,
@@ -1086,7 +1089,7 @@ const FAKE_CHECK = [
 const FAKE_GH =
   '#!/usr/bin/env bash\n{ printf "%s\\t" "$@" | tr "\\n" " "; echo; } >>"$INBOX_DIR/gh"\n';
 
-function makeInbox() {
+function makeInbox({ board = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'bto-inbox-'));
   const main = join(dir, 'bto-dev');
   const devDir = join(dir, 'dev');
@@ -1118,6 +1121,8 @@ function makeInbox() {
   mkdirSync(join(main, 'tools/brain'), { recursive: true });
   for (const name of ['lib.sh', 'task.sh', 'land.sh', 'inbox.sh', 'merge-json.mjs'])
     cpSync(join(here, name), join(main, 'tools/brain', name));
+  // The team board (ADR-0248) only where a test asks for it: the gate works the same without it.
+  if (board) cpSync(join(here, 'board.mjs'), join(main, 'tools/brain/board.mjs'));
   const files = {
     '.gitignore': 'node_modules/\n.fastcheck/\n',
     'tools/fast-check/check-fast.mjs': `${FAKE_CHECK}\n`,
@@ -1147,7 +1152,7 @@ function makeInbox() {
     for (const [file, text] of Object.entries(change)) {
       mkdirSync(dirname(join(devDir, file)), { recursive: true });
       writeFileSync(join(devDir, file), text);
-      dev('add', file);
+      dev('add', '--', file);
     }
     dev('commit', '-q', '-m', message);
     dev('push', '-q', '-f', 'origin', `HEAD:refs/heads/in/${branch}`);
@@ -1184,10 +1189,41 @@ function makeInbox() {
   const hasBranch = (branch) =>
     spawnSync('git', ['show-ref', '-q', '--verify', `refs/heads/${branch}`], { cwd: origin, env })
       .status === 0;
+  // The second developer's side of the board, from its own clone (ADR-0248).
+  const codex = (...args) =>
+    spawnSync(
+      process.execPath,
+      [
+        join(devDir, 'tools/brain/board.mjs'),
+        ...args,
+        '--as',
+        'codex',
+        '--state',
+        join(dir, 'state-codex'),
+      ],
+      { cwd: devDir, env: devEnv, encoding: 'utf8' },
+    );
+  const task = (...args) =>
+    spawnSync('bash', [join(main, 'tools/brain/task.sh'), ...args], {
+      cwd: main,
+      env: gateEnv,
+      encoding: 'utf8',
+    });
+  const boardFiles = () => {
+    const list = spawnSync('git', ['ls-tree', '-r', '--name-only', 'board'], {
+      cwd: origin,
+      env,
+      encoding: 'utf8',
+    });
+    return list.status === 0 ? list.stdout.split('\n').filter(Boolean) : [];
+  };
   return {
     dir,
     main,
     books,
+    codex,
+    task,
+    boardFiles,
     push,
     run,
     runAsync,
@@ -1337,7 +1373,10 @@ test('inbox: a GUARDED branch is checked, waits for review, and lands on approve
     assert.equal(inbox.originGit('log', '-1', '--format=%s', 'main'), 'start');
     const status = inbox.run('status');
     assert.match(status.stdout, /WAITING-REVIEW {2}in\/sales-rule @ [0-9a-f]{8} {2}GUARDED/);
-    assert.match(status.stdout, /suites: bash tools\/brain\/int.sh sales/);
+    assert.match(
+      status.stdout,
+      /suites: bash \/\S+\/bto-work\/in-sales-rule\/tools\/brain\/int.sh sales/,
+    );
     assert.match(status.stdout, /approve in\/sales-rule/);
     // Ticks leave it alone until the brain decides.
     inbox.run('tick');
@@ -1692,6 +1731,265 @@ test('inbox: an in-* copy the gate did not open is never dropped, and task.sh ke
     assert.equal(readFileSync(join(copy, 'apps/web/src/a.tsx'), 'utf8'), 'my unsaved work\n');
     const told = inbox.gh().filter((line) => line.includes(head));
     for (const line of told) assert.doesNotMatch(line, /bto-work|\/tmp\//);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+// --- the team board (ADR-0248) through the brain's own tools --------------------------------------
+
+const claimOf = (inbox, file) => {
+  const run = spawnSync('git', ['show', `board:${file}`], {
+    cwd: join(inbox.dir, 'origin.git'),
+    encoding: 'utf8',
+  });
+  return run.status === 0 ? JSON.parse(run.stdout) : null;
+};
+
+test("board: task.sh refuses what codex holds, publishes the brain's claims, drop and land.sh release them", () => {
+  const inbox = makeInbox({ board: true });
+  try {
+    assert.equal(inbox.codex('claim', 'orders', 'apps/web/src/a.tsx').status, 0);
+    let run = inbox.task('new', 'wide', 'apps/web/src');
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /apps\/web\/src is held by codex \(orders: apps\/web\/src\/a\.tsx\)/);
+    assert.ok(!existsSync(join(inbox.books, 'lanes/wide')));
+    assert.ok(!existsSync(join(inbox.dir, 'bto-work/wide')));
+    run = inbox.task('new', 'side', 'apps/web/src/b.tsx', 'packages/shared/i18n/mn.json');
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(claimOf(inbox, 'claims/brain--side.json').paths, ['apps/web/src/b.tsx']);
+    assert.equal(inbox.task('claim', 'side', 'docs/a.md').status, 0);
+    assert.deepEqual(claimOf(inbox, 'claims/brain--side.json').paths, [
+      'apps/web/src/b.tsx',
+      'docs/a.md',
+    ]);
+    // codex is refused what the brain holds.
+    run = inbox.codex('claim', 'docs', 'docs');
+    assert.equal(run.status, 2);
+    assert.match(run.stderr, /held by brain \(side/);
+    assert.equal(inbox.task('drop', 'side').status, 0);
+    assert.equal(claimOf(inbox, 'claims/brain--side.json'), null);
+    // A landing releases its task's claim.
+    assert.equal(inbox.task('new', 'doc', 'docs/a.md').status, 0);
+    const copy = join(inbox.dir, 'bto-work/doc');
+    writeFileSync(join(copy, 'docs/a.md'), 'b\n');
+    spawnSync('git', ['add', 'docs/a.md'], { cwd: copy, env: inbox.env });
+    spawnSync('git', ['commit', '-q', '-m', 'docs: b'], { cwd: copy, env: inbox.env });
+    assert.ok(claimOf(inbox, 'claims/brain--doc.json'));
+    run = spawnSync('bash', [join(inbox.main, 'tools/brain/land.sh'), 'doc'], {
+      cwd: inbox.main,
+      env: inbox.env,
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.equal(claimOf(inbox, 'claims/brain--doc.json'), null);
+    assert.ok(claimOf(inbox, 'claims/codex--orders.json'));
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('board: task.sh number shares one sequence with codex; the local books are published once', () => {
+  const inbox = makeInbox({ board: true });
+  try {
+    mkdirSync(inbox.books, { recursive: true });
+    writeFileSync(
+      join(inbox.books, 'numbers'),
+      'adr 0005 codex-big\nmigration 0007 codex-big\nadr 0006 team-board\n',
+    );
+    let run = inbox.task('number', 'adr', 'mine');
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stdout.trim(), '0007');
+    assert.equal(claimOf(inbox, 'numbers/adr-0005.json').who, 'codex');
+    assert.equal(claimOf(inbox, 'numbers/adr-0005.json').slug, 'codex-big');
+    assert.equal(claimOf(inbox, 'numbers/adr-0006.json').who, 'brain');
+    assert.equal(claimOf(inbox, 'numbers/migration-0007.json').who, 'codex');
+    assert.equal(claimOf(inbox, 'numbers/adr-0007.json').who, 'brain');
+    assert.equal(inbox.codex('number', 'adr', 'theirs').stdout.trim(), '0008');
+    assert.equal(inbox.codex('number', 'migration', 'theirs').stdout.trim(), '0008');
+    run = inbox.task('number', 'adr', 'again');
+    assert.equal(run.stdout.trim(), '0009');
+    assert.match(readFileSync(join(inbox.books, 'numbers'), 'utf8'), /adr 0009 again\n$/);
+    // Published once: a later change of the local books is not imported again.
+    assert.ok(existsSync(join(inbox.books, 'board/imported')));
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test("board: the gate releases codex's claim on landing and tells codex what waits or is refused", () => {
+  const inbox = makeInbox({ board: true });
+  try {
+    assert.equal(inbox.codex('claim', 'page', 'apps/web/src/a.tsx').status, 0);
+    inbox.push('page', { 'apps/web/src/a.tsx': 'export const a = 5;\n' });
+    let tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.equal(inbox.item('page').state, 'LANDED');
+    assert.equal(claimOf(inbox, 'claims/codex--page.json'), null);
+    assert.ok(!inbox.boardFiles().some((f) => f.startsWith('claims/brain--')));
+    // A branch that never used the board, on a path the brain holds there: checked as before, the
+    // holder named for the review, and codex told it waits.
+    spawnSync(
+      process.execPath,
+      [
+        join(inbox.main, 'tools/brain/board.mjs'),
+        'claim',
+        'plan',
+        'apps/api/src/modules/sales',
+        '--as',
+        'brain',
+        '--state',
+        join(inbox.books, 'board'),
+      ],
+      { cwd: inbox.main, env: inbox.env },
+    );
+    inbox.push('rule', { 'apps/api/src/modules/sales/s.ts': 'export const s = 3;\n' });
+    tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.equal(inbox.item('rule').state, 'WAITING-REVIEW');
+    assert.match(
+      inbox.run('status').stdout,
+      /board: {2}apps\/api\/src\/modules\/sales\/s\.ts is held by brain \(plan/,
+    );
+    let mail = JSON.parse(inbox.codex('inbox', '--json').stdout);
+    assert.equal(mail.length, 1);
+    assert.match(mail[0].text, /^inbox gate: in\/rule @ [0-9a-f]{8}: WAITING-REVIEW/);
+    assert.equal(mail[0].slug, 'rule');
+    // Said once, not on every tick.
+    inbox.run('tick');
+    assert.equal(JSON.parse(inbox.codex('inbox', '--json').stdout).length, 0);
+    // Refused: said too; codex keeps its claim while it fixes the branch, and loses it only when it
+    // deletes the branch (gave up).
+    assert.equal(inbox.codex('claim', 'rule', 'apps/api/src/modules/sales/s.ts').status, 2);
+    spawnSync(
+      process.execPath,
+      [
+        join(inbox.main, 'tools/brain/board.mjs'),
+        'release',
+        'plan',
+        '--as',
+        'brain',
+        '--state',
+        join(inbox.books, 'board'),
+      ],
+      { cwd: inbox.main, env: inbox.env },
+    );
+    assert.equal(inbox.codex('claim', 'rule', 'apps/api/src/modules/sales/s.ts').status, 0);
+    assert.equal(inbox.run('reject', 'in/rule', 'not this way').status, 0);
+    mail = JSON.parse(inbox.codex('inbox', '--json').stdout);
+    assert.match(mail[0].text, /REFUSED: the brain's review: not this way/);
+    assert.ok(claimOf(inbox, 'claims/codex--rule.json'));
+    inbox.run('tick');
+    assert.ok(claimOf(inbox, 'claims/codex--rule.json'));
+    inbox.dev('push', '-q', 'origin', ':refs/heads/in/rule');
+    inbox.run('tick');
+    assert.equal(claimOf(inbox, 'claims/codex--rule.json'), null);
+    inbox.push('rails', { 'tools/brain/x.sh': 'x\n' });
+    inbox.run('tick');
+    mail = JSON.parse(inbox.codex('inbox', '--json').stdout);
+    assert.match(mail[0].text, /in\/rails .*REFUSED: it changes the guard rails/);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('board: an unreachable board never blocks task.sh; a number then warns loudly', () => {
+  const inbox = makeInbox({ board: true });
+  try {
+    spawnSync('git', ['remote', 'set-url', 'origin', join(inbox.dir, 'gone.git')], {
+      cwd: inbox.main,
+      env: inbox.env,
+    });
+    let run = inbox.task('new', 'offline', 'docs/a.md');
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stderr, /team board was not reached/);
+    assert.ok(existsSync(join(inbox.dir, 'bto-work/offline')));
+    run = inbox.task('number', 'adr', 'offline');
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stdout.trim(), '0001');
+    assert.match(run.stderr, /WARNING: adr 0001 comes from this PC's books alone/);
+    assert.equal(inbox.task('drop', 'offline').status, 0);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('monitor: the team board is shown by side, newest numbers and messages first', () => {
+  const view = boardView(
+    {
+      tip: '0123456789abcdef',
+      claims: [
+        { who: 'codex', slug: 'orders', paths: ['apps/web/src/a.tsx'], what: 'list', since: 'x' },
+        { who: 'brain', slug: 'fix', paths: ['docs'] },
+      ],
+      numbers: [
+        { kind: 'adr', number: 248, who: 'brain', slug: 'a', at: '2026-11-24T01:00:00Z' },
+        { kind: 'migration', number: 128, who: 'codex', slug: 'b', at: '2026-11-24T02:00:00Z' },
+      ],
+      messages: Array.from({ length: 12 }, (_, i) => ({
+        id: `m${String(i).padStart(2, '0')}`,
+        from: 'codex',
+        to: 'brain',
+        at: '2026-11-24T02:00:00Z',
+        text: `мессеж ${i}`,
+      })),
+    },
+    5,
+  );
+  assert.equal(view.tip, '01234567');
+  assert.deepEqual(
+    view.sides.map((s) => [s.who, s.claims.map((c) => c.slug)]),
+    [
+      ['codex', ['orders']],
+      ['brain', ['fix']],
+    ],
+  );
+  assert.deepEqual(
+    view.numbers.map((n) => `${n.kind} ${n.number}`),
+    ['migration 0128', 'adr 0248'],
+  );
+  assert.equal(view.messages.length, 10);
+  assert.equal(view.messages[0].text, 'мессеж 11');
+});
+
+test('board: paths a branch controls are never read as options, and a down board is left alone', () => {
+  const inbox = makeInbox({ board: true });
+  try {
+    const asBrain = (...args) =>
+      spawnSync(
+        process.execPath,
+        [
+          join(inbox.main, 'tools/brain/board.mjs'),
+          '--as',
+          'brain',
+          '--state',
+          join(inbox.books, 'board'),
+          ...args,
+        ],
+        { cwd: inbox.main, env: inbox.env, encoding: 'utf8' },
+      );
+    // A top-level file named like an option, held by the brain on the board.
+    assert.equal(asBrain('claim', 'plan', '--', '--except=codex').status, 0);
+    inbox.push('odd', { '--except=codex': 'x\n' });
+    let tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.equal(inbox.item('odd').state, 'WAITING-REVIEW');
+    assert.match(inbox.item('odd').board, /^--except=codex is held by brain \(plan/);
+    // task.sh passes its paths after «--» too.
+    let run = inbox.task('new', 'odd-task', '--hook');
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(claimOf(inbox, 'claims/brain--odd-task.json').paths, ['--hook']);
+    // The board could not be reached a moment ago: the tick does not ask it who holds what.
+    writeFileSync(join(inbox.books, 'board/unreachable'), 'now\n');
+    inbox.push('later', { 'apps/api/src/modules/sales/s.ts': 'export const s = 9;\n' });
+    asBrain('claim', 'sales', 'apps/api/src/modules/sales');
+    writeFileSync(join(inbox.books, 'board/unreachable'), 'now\n');
+    tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.equal(inbox.item('later').state, 'WAITING-REVIEW');
+    assert.equal(inbox.item('later').board ?? '', '');
+    run = inbox.run('status');
+    assert.match(run.stdout, /suites: bash \/\S+\/bto-work\/in-later\/tools\/brain\/int\.sh sales/);
   } finally {
     rmSync(inbox.dir, { recursive: true, force: true });
   }

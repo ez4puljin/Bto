@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Puts the brain where every Claude session on this PC finds it (ADR-0213): the workers' and the
 # reviewer's definitions in ~/.claude/agents, the brain's own rules as the skill `tarhi` in
-# ~/.claude/skills, the guard as a PreToolUse hook in ~/.claude/settings.json, git's merge of
-# mn.json by key, the monitor's page as the user service bto-brain-monitor, the job desk's
+# ~/.claude/skills, the guard as a PreToolUse hook in ~/.claude/settings.json, the team board's
+# messages as a UserPromptSubmit hook (ADR-0248), git's merge of mn.json by key, the monitor's page as the user service bto-brain-monitor, the job desk's
 # one-minute timer bto-brain-jobs (ADR-0229) and the inbox gate's timer bto-brain-inbox (ADR-0242).
 # Run it again after changing anything under tools/brain/.
 #   bash tools/brain/install.sh
@@ -33,9 +33,29 @@ settings.hooks.PreToolUse = groups;
 fs.writeFileSync(`${file}.tmp`, `${JSON.stringify(settings, null, 2)}\n`);
 fs.renameSync(`${file}.tmp`, file);
 JS
+# The team board (board.mjs, ADR-0248): every prompt of a Claude session here first shows the
+# messages the other developer's AI left for «brain» (nothing when there are none or the board cannot
+# be reached; at most a few seconds). One entry however often this runs.
+BOARD="$MAIN/tools/brain/board.mjs"
+node - "$HOME/.claude/settings.json" "$(command -v node) $BOARD inbox --hook --as brain --state $STATE/board" <<'JS'
+const fs = require('node:fs');
+const [file, command] = process.argv.slice(2);
+const settings = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+settings.hooks ??= {};
+const groups = (settings.hooks.UserPromptSubmit ?? []).flatMap((group) => {
+  const hooks = (group.hooks ?? []).filter((hook) => !String(hook.command ?? '').includes('tools/brain/board.mjs'));
+  return hooks.length === 0 && (group.hooks ?? []).length > 0 ? [] : [{ ...group, hooks }];
+});
+groups.push({ hooks: [{ type: 'command', command, timeout: 10 }] });
+settings.hooks.UserPromptSubmit = groups;
+fs.writeFileSync(`${file}.tmp`, `${JSON.stringify(settings, null, 2)}\n`);
+fs.renameSync(`${file}.tmp`, file);
+JS
+[ -f "$STATE/board/me" ] || node "$BOARD" join brain --state "$STATE/board" >/dev/null
 echo "workers: $(ls "$HOME/.claude/agents" | grep '^bto-' | tr '\n' ' ')"
 echo "skill:   $HOME/.claude/skills/tarhi/SKILL.md"
 echo "guard:   PreToolUse Bash → $GUARD (in $HOME/.claude/settings.json)"
+echo "board:   UserPromptSubmit → board.mjs inbox --hook --as brain (node $BOARD status)"
 echo "tasks:   $WORK (books in $STATE)"
 # The monitor (monitor/serve.mjs): a read-only page of the brain's work on the LAN, port 3310.
 # Restarted when already running, so that a changed serve.mjs is taken.

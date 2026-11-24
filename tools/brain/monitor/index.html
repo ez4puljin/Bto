@@ -224,6 +224,11 @@
         border-radius: 6px;
         padding: 1px 6px;
       }
+      .message {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        margin-top: 4px;
+      }
       .empty {
         color: var(--muted);
         background: var(--card);
@@ -344,6 +349,9 @@
 
       <h2>Гаднаас ирсэн (inbox) <span id="inbox-count" class="count"></span></h2>
       <div id="inbox"></div>
+
+      <h2>Хамтын самбар <span id="board-count" class="count"></span></h2>
+      <div id="board"></div>
 
       <h2>Кодын зураглал</h2>
       <div id="graph"></div>
@@ -778,6 +786,93 @@
                 ),
               )
             : el('div', { class: 'empty' }, 'Гаднаас ирсэн салбар алга (tools/brain/inbox.sh).'),
+        );
+
+        // The team board (ADR-0248): what each developer's AI holds, the numbers, the messages.
+        const b = s.board;
+        const SIDE = { brain: 'Тархи (энэ PC)', codex: 'Codex (хамтрагч)' };
+        document.getElementById('board-count').textContent =
+          b && b.sides.length
+            ? `(${b.sides.reduce((n, x) => n + x.claims.length, 0)} барьж байна)`
+            : '';
+        document.getElementById('board').replaceChildren(
+          !b
+            ? el(
+                'div',
+                { class: 'empty' },
+                'Хамтын самбар хараахан ашиглагдаагүй (tools/brain/board.mjs).',
+              )
+            : el(
+                'div',
+                { class: 'grid' },
+                el(
+                  'div',
+                  { class: 'card' },
+                  el('div', { class: 'row' }, el('span', { class: 'title' }, 'Хэн юу барьж байна')),
+                  b.sides.length
+                    ? b.sides.map((side) =>
+                        el(
+                          'div',
+                          { class: 'meta' },
+                          el('b', {}, SIDE[side.who] || side.who),
+                          side.claims.map((c) =>
+                            el(
+                              'div',
+                              {},
+                              el('code', {}, c.slug),
+                              c.what ? ` · ${c.what}` : '',
+                              c.since ? [' · ', when(Date.parse(c.since))] : '',
+                              el(
+                                'ul',
+                                { class: 'paths' },
+                                c.paths.map((p) => el('li', {}, el('code', {}, p))),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : el('div', { class: 'meta' }, 'Хэн ч юу ч барьдаггүй.'),
+                ),
+                el(
+                  'div',
+                  { class: 'card' },
+                  el('div', { class: 'row' }, el('span', { class: 'title' }, 'Олгосон дугаарууд')),
+                  b.numbers.length
+                    ? b.numbers.map((n) =>
+                        el(
+                          'div',
+                          { class: 'meta' },
+                          n.kind === 'adr' ? 'ADR ' : 'Migration ',
+                          el('b', {}, n.number),
+                          ` · ${SIDE[n.who] || n.who} · `,
+                          el('code', {}, n.slug),
+                        ),
+                      )
+                    : el('div', { class: 'meta' }, 'Дугаар олгоогүй.'),
+                ),
+                el(
+                  'div',
+                  { class: 'card' },
+                  el(
+                    'div',
+                    { class: 'row' },
+                    el('span', { class: 'title' }, 'Сүүлийн мессежүүд'),
+                    b.fetchedAt ? pill('done', `шинэчилсэн ${when(b.fetchedAt)}`) : null,
+                  ),
+                  b.messages.length
+                    ? b.messages.map((m) =>
+                        el(
+                          'div',
+                          { class: 'meta' },
+                          el('b', {}, `${m.from} → ${m.to === 'all' ? 'бүгд' : m.to}`),
+                          ` · ${when(Date.parse(m.at))}`,
+                          m.slug ? [' · ', el('code', {}, m.slug)] : '',
+                          el('div', { class: 'message' }, m.text),
+                        ),
+                      )
+                    : el('div', { class: 'meta' }, 'Мессеж алга.'),
+                ),
+              ),
         );
 
         const g = s.graph;

@@ -122,6 +122,12 @@ for attempt in 1 2 3; do
     for slug in "$@"; do
       git -C "$MAIN" worktree remove --force "$WORK/$slug"
       git -C "$MAIN" branch -q -D "task/$slug" 2>/dev/null || true
+      # Its claim on the team board (ADR-0248) goes with it; the gate's in-* tasks hold none there
+      # (inbox.sh releases the other side's claim). Never delays or fails a landing.
+      if [ "$(cat "$STATE/owners/$slug" 2>/dev/null)" != inbox ] && board_on; then
+        BOARD_TIMEOUT=5 board release "$slug" >/dev/null 2>&1 ||
+          echo "warning: the team board was not reached; release it later: node tools/brain/board.mjs release $slug --as brain" >&2
+      fi
       rm -f "$STATE/lanes/$slug" "$STATE/owners/$slug"
       [ ! -f "$STATE/numbers" ] || sed -i "/ $slug\$/d" "$STATE/numbers"
     done

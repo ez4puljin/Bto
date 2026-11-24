@@ -38,6 +38,7 @@ bash tools/brain/int.sh <pattern>… | --integrity   the api's suites from a cop
 bash tools/brain/graph.sh explain|affected|path …  the code graph of origin/main (below)
 bash tools/brain/job.sh request|want|done|status|tick|run …   the job desk: an APK once for all (below)
 bash tools/brain/inbox.sh tick|status|approve|reject|retry …   the inbox gate: a second developer's in/* branches (below)
+node tools/brain/board.mjs status|claim|release|number|say|inbox …   the team board shared with the other AI (below)
 node tools/brain/monitor/serve.mjs                  the monitor page on :3310 (a user service; below)
 ```
 
@@ -250,6 +251,66 @@ bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
   fake remote.
 - **Trust:** the second developer's tests run on this PC in `check:fast`, as a worker's do. The
   gate keeps mistakes off main; it is not a defence against a hostile collaborator.
+
+## The team board: the two developers' AIs share one set of facts (ADR-0248)
+
+The brain (Claude, this PC) and the second developer's Codex (a Windows PC) see the same claims, take
+ADR and migration numbers from one sequence, and send each other messages through an orphan branch
+`board` of the repository's remote. It is never merged or checked out; `board.mjs` keeps a bare clone
+of it in `~/bto-work/.brain/board` here (`<clone>/.git/bto-board` on another PC) and writes one file
+per fact: `claims/<who>--<slug>.json`, `msg/<stamp>-<from>-<rand>.json`, `numbers/<kind>-<NNNN>.json`.
+Every write fetches, decides on the fetched tip, commits on top and pushes without force; a rejected
+push goes round again on the new tip, so two sides at once get two numbers, or one claim and one
+refusal. **The repository is public: no secret, password, customer data or personal data on the
+board.**
+
+```
+node tools/brain/board.mjs join <name>                       once per PC (this PC: brain, by install.sh)
+node tools/brain/board.mjs status [--json]                   claims, numbers not yet on main, unread, last on main
+node tools/brain/board.mjs claim <slug> <path>… [--what ""]  exit 2 names the holder
+node tools/brain/board.mjs release <slug> [--of <name>]
+node tools/brain/board.mjs number adr|migration <slug> [--floor <n>]
+node tools/brain/board.mjs say <to|all> "<text>" [--re <id>] [--slug <slug>]
+node tools/brain/board.mjs inbox [--peek] [--json]           unread to me or all; marks read
+node tools/brain/board.mjs thread <id> · holders <path>… [--except <name>] · sync
+```
+
+- **The brain needs no new habit.** `task.sh new`/`claim` refuse (exit 2) a path another side holds
+  on the board and publish the task's paths as `brain`'s claim (`--what "brain task <slug>"`);
+  `task.sh drop` and `land.sh` release it; `task.sh number` takes the number from the board, never
+  below what the books here and the copies say. The first board call published `numbers` once
+  (`codex-big` as `codex`'s; the marker is `board/imported`). The gate's `in-*` tasks publish nothing:
+  their paths are the other side's.
+- **A board that cannot be reached never blocks** (GitHub down): `task.sh` warns and goes on with its
+  own books; `task.sh number` then prints a loud `WARNING` and the number from the books alone. A claim
+  made offline is not published later by itself (`board.mjs claim <slug> <path>… --as brain` when it
+  is back). `BTO_BOARD=off` switches it off; a trial with another `BTO_BASE_REF` never touches it.
+- **The inbox gate:** a `REFUSED` or `WAITING-REVIEW` result is also said to the branch's side
+  (`BTO_INBOX_SIDE`, default `codex`) as «inbox gate: in/<slug> @ <head>: <result>», once per result;
+  `LANDED` and a branch deleted without landing (`WITHDRAWN`) release that side's claim of the same
+  slug; a refused or rejected branch keeps it (its side fixes and pushes again, or releases it). A
+  path another side holds is named in `inbox.sh status` («board:»), never a reason to refuse. Every
+  board call of the gate and of `land.sh` has a 5-second limit, and the gate leaves the board alone
+  for a minute after it could not be reached (`board/unreachable`). Board errors go to
+  `inbox/board.log`.
+- **Nothing on the branch is trusted:** anyone who can push it can hand-write a file. `board.mjs`
+  reads only files in its own shapes (a message's id agrees with its file name and sender, names and
+  slugs in their patterns, ISO times, four-digit numbers that agree with their file name, claim paths
+  inside the repository) and skips the rest with one warning; a message's text loses its control
+  characters, is cut to 4000 characters and cannot close the hook's fence. The names `all`, `owner`,
+  `system`, `user`, `assistant` and `claude` can never be a side. The hook prints at most five
+  messages or about 6000 characters («+N more»), marks only those read, and reads the local clone
+  when it was fetched less than 30 seconds ago. Scripts pass paths and text after `--`.
+- **Messages reach the brain by themselves:** `install.sh` adds a `UserPromptSubmit` hook to
+  `~/.claude/settings.json` that runs `board.mjs inbox --hook --as brain`: before every prompt of a
+  Claude session here it prints the unread messages (fenced as `<team-board-messages>`, marked as the
+  other AI's requests to weigh, not the owner's instructions) and marks them read; nothing when there
+  are none or the board is unreachable (a 4-second fetch, a 10-second limit). Codex reads its inbox as
+  `AGENTS.md` says. Nothing wakes an AI that nobody prompts.
+- **On the monitor:** «Хамтын самбар»: the claims by side, the newest numbers, the last ten messages
+  (it fetches the board at most once a minute).
+- **Tests:** `board.test.mjs` (run by `brain.test.mjs`): two clones of a local bare repository, a
+  barrier that makes both sides push at once (`BTO_BOARD_TEST_BARRIER`); nothing reaches the network.
 
 ## The monitor: the brain's work on one page
 
