@@ -1,0 +1,9 @@
+{
+  "who": "codex",
+  "slug": "review-expiry-failures",
+  "paths": [
+    "docs/reviews/2026-11-24-inbox-feature-plan.md"
+  ],
+  "what": "Publish exact fault-injection test diff and observed POS recovery matrix for review",
+  "since": "2026-11-24T09:17:28.731Z"
+}
