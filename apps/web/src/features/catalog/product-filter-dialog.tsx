@@ -1,10 +1,10 @@
-import { useDeferredValue, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { CheckboxGroup } from '@/components/checkbox-group';
 import { FormField } from '@/components/form';
-import { SearchField, SegmentedControl } from '@/components/list';
+import { SegmentedControl } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useWarehouses } from '@/features/identity/api';
-import { useSuppliers, useSuppliersByIds } from '@/features/partners/api';
 import { usePriceProfileChoices } from '@/features/pricing/api';
 import { useSegments } from '@/features/segments/api';
 import {
@@ -34,6 +33,7 @@ import {
   withFilter,
 } from './product-filters';
 import { DateInput } from '@/components/date-input';
+import { SupplierFilterChoices } from './supplier-filter-choices';
 
 /** Warehouses that sell: the ones homes, stock and minimums are kept for (ADR-0049). */
 const SELLING_KINDS: readonly string[] = ['WHOLESALE', 'STORE'];
@@ -53,7 +53,7 @@ export function ProductFilterDialog(props: EditorProps & { field: ProductFilterF
   const { t } = useTranslation();
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : props.close())}>
-      <DialogContent closeLabel={t('common.close')} size="sm">
+      <DialogContent closeLabel={t('common.close')} size={props.field === 'supplier' ? 'lg' : 'sm'}>
         <DialogHeader>
           <DialogTitle>{t(`catalog.products.filters.fields.${props.field}`)}</DialogTitle>
           <DialogDescription>{t('catalog.products.filters.hint')}</DialogDescription>
@@ -169,18 +169,8 @@ function SegmentEditor({ filters, apply, close }: EditorProps) {
 
 function SupplierEditor({ filters, apply, close }: EditorProps) {
   const { t } = useTranslation();
-  const [main, setMain] = useState(filters.supplier?.main ?? false);
+  const [main, setMain] = useState(filters.supplier?.main ?? true);
   const [ids, setIds] = useState<number[]>(filters.supplier?.ids ?? []);
-  const [search, setSearch] = useState('');
-  const q = useDeferredValue(search.trim());
-  const found = useSuppliers({ q }, { limit: 20 });
-  // The suppliers chosen when the dialog opened stay listed while the search shows others.
-  const [initial] = useState(ids);
-  const chosen = useSuppliersByIds(initial);
-  const options = new Map<number, string>();
-  for (const row of [...(chosen.data ?? []), ...(found.data?.pages[0]?.data ?? [])]) {
-    options.set(row.id, row.name);
-  }
   return (
     <FilterForm
       close={close}
@@ -189,36 +179,12 @@ function SupplierEditor({ filters, apply, close }: EditorProps) {
       }
     >
       <SegmentedControl
-        options={['IN', 'MAIN_IN'] as const}
+        options={['MAIN_IN', 'IN'] as const}
         value={main ? 'MAIN_IN' : 'IN'}
         label={(mode) => t(`catalog.products.filters.supplierModes.${mode}`)}
         onChange={(mode) => setMain(mode === 'MAIN_IN')}
       />
-      <SearchField
-        className="sm:w-full"
-        aria-label={t('catalog.products.filters.searchSupplier')}
-        placeholder={t('catalog.products.filters.searchSupplier')}
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-      />
-      <ChoiceList>
-        {options.size === 0 ? (
-          found.isPending ? (
-            <Loading />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {t('catalog.products.filters.noMatches')}
-            </p>
-          )
-        ) : (
-          <CheckboxGroup
-            name="filter-supplier"
-            options={[...options].map(([value, label]) => ({ value, label }))}
-            value={ids}
-            onChange={setIds}
-          />
-        )}
-      </ChoiceList>
+      <SupplierFilterChoices ids={ids} onChange={setIds} />
     </FilterForm>
   );
 }

@@ -384,7 +384,7 @@ describe('product registration', () => {
         'МСМ ХХК · S0009',
       );
       expect(screen.getByLabelText(mn.catalog.product.factor)).toHaveValue('6');
-      expect(await screen.findByText(/AI бөглөсөн: ангилал, нэр, суурь нэгж/)).toBeInTheDocument();
+      expect(await screen.findByText(/AI бөглөсөн: ангилал, нэр, хэмжих нэгж/)).toBeInTheDocument();
       expect(screen.getByText(/Хайрцагны баркод харагдсангүй/)).toBeInTheDocument();
       // A barcode a product already carries is named, with a way to that product, and left out.
       expect(

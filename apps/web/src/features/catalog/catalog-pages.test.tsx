@@ -329,6 +329,7 @@ describe('products list', () => {
     });
     const fetchMock = signedIn(ADMIN_ME, {
       ...LIST_ROUTES,
+      'GET /api/v1/supplier-categories': () => json([]),
       'GET /api/v1/suppliers': (request) =>
         new URL(request.url).searchParams.getAll('ids').length > 0
           ? list([supplierRow(7, 'МСМ ХХК')])
