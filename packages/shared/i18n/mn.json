@@ -4148,7 +4148,9 @@
         "boxQty": "Хайрцаг|Хайрцагт|Хайрцаг дахь ширхэг",
         "homeWarehouse": "Харьяалагдах агуулах",
         "fixedBin": "Тавиур",
-        "weightKg": "Жин"
+        "weightKg": "Жин",
+        "baseUnit": "Суурь нэгж",
+        "boxBarcodes": "Хайрцагны баркод"
       },
       "CUSTOMERS": {
         "code": "Харилцагчийн код",
@@ -4186,7 +4188,8 @@
         "name": "Барааны нэр",
         "warehousePrice": "Бөөний үнэ|Үнэ",
         "profile": "Тохиргоо",
-        "validFrom": "Огноо|Эхлэх огноо"
+        "validFrom": "Огноо|Эхлэх огноо",
+        "baseUnit": "Суурь нэгж"
       },
       "RECEIPTS": {
         "date": "Падааны огноо|Огноо (YYYY-MM-DD)",

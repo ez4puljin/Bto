@@ -129,6 +129,49 @@ describe('import sheet reader (ADR-0036 #1)', () => {
     expect(columnLabels('OPENING_STOCK', 'qty')).toEqual(['Тоо', 'Тоо ширхэг', 'Үлдэгдэл']);
   });
 
+  it('reads the unit and box barcode columns under the template wording of before 2026-11-24 too', async () => {
+    // 6894e222 renamed these template labels; sheets made from the earlier template keep working.
+    const productHeaders = (unit: string, boxBarcodes: string) => [
+      'Код *',
+      'Нэр *',
+      'Ангилал *',
+      unit,
+      boxBarcodes,
+    ];
+    for (const [unit, boxBarcodes] of [
+      ['Суурь нэгж', 'Хайрцагны баркод'],
+      ['Хэмжих нэгж', 'Хайрцгийн баркод'],
+    ] as const) {
+      const products = await readSheet(
+        await workbook([
+          productHeaders(unit, boxBarcodes),
+          ['0012', 'Ус', 'Ус', 'ш', '5449000000996'],
+        ]),
+        'PRODUCTS',
+      );
+      if (!products.ok) throw new Error(products.issue.code);
+      expect(products.rows[0]?.values).toMatchObject({
+        baseUnit: 'ш',
+        boxBarcodes: '5449000000996',
+      });
+      const prices = await readSheet(
+        await workbook([
+          ['Код *', 'Нэр', unit, 'Агуулахын үнэ'],
+          ['0012', 'Ус', 'ш', 1500],
+        ]),
+        'PRICES',
+      );
+      if (!prices.ok) throw new Error(prices.issue.code);
+      expect(prices.rows[0]?.values).toMatchObject({ baseUnit: 'ш', warehousePrice: '1500' });
+    }
+    expect(columnLabels('PRODUCTS', 'baseUnit')).toEqual(['Хэмжих нэгж', 'Суурь нэгж']);
+    expect(columnLabels('PRODUCTS', 'boxBarcodes')).toEqual([
+      'Хайрцгийн баркод',
+      'Хайрцагны баркод',
+    ]);
+    expect(columnLabels('PRICES', 'baseUnit')).toEqual(['Хэмжих нэгж', 'Суурь нэгж']);
+  });
+
   it('fills the price sheet with its rows and a reference sheet the reader skips (ADR-0054)', async () => {
     const template = await buildTemplate('PRICES', {
       rows: [
