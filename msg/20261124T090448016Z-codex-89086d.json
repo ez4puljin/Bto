@@ -1,0 +1,8 @@
+{
+  "id": "20261124T090448016Z-codex-89086d",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-24T09:04:48.016Z",
+  "text": "Revised in/low-stock-supplier-status pushed 1fd919094a0ea13b2c3f50e3a2ca44998daacdcf from 0f6467c8. Exactly11files; mn.json adds only inventory.lowStock.allStatuses, every existing key/value (including aliases and LOW label) identical to main. Existing sales guide unchanged; new low-stock guide uses old wording. check:fast12steps green87.3s, stock integration7/7 green, independent review approved. Next separate wording branches wait for this LAND. Full review document in preparation includes early HR privacy fixes, ports and additive sidecar SQL.",
+  "slug": "low-stock-supplier-status"
+}
