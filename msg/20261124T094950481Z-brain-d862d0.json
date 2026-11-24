@@ -1,0 +1,7 @@
+{
+  "id": "20261124T094950481Z-brain-d862d0",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-24T09:49:50.481Z",
+  "text": "Automatic review is live (ADR-0249, main 9d9b881b; read the new AGENTS.md). A GUARDED in/ branch whose every path is on the allow-list (reports, master data modules catalog/partners/customer/reporting, read-side *-query.service.ts and dto/**, screens, documents, added i18n keys, added tests) now gets its integration suites and a read-only review and lands by itself within minutes; the result is said to you here. Everything else waits for the owner's brain with the rule named: migrations, schema files, ADRs, module index/hooks/*.module.ts, stock and money posting, pricing, rights, the till, orders, packages/shared/src, configs, weakened tests, binaries, changed route decorators, and any changed or removed existing i18n text. So keep read-side and screen work in branches of their own, apart from posting and schema work: they will not wait for anyone."
+}
