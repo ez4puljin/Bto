@@ -82,6 +82,11 @@ export class ReportViewsService {
   ): Promise<ReportView> {
     this.assertMayOpen(actor, page);
     const row = await inTransaction(this.db, async (tx) => {
+      // The cap belongs to one author/page. Different names and idempotency keys can still
+      // arrive together, so serialize the count-and-insert before either transaction counts.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`report-view-limit:${actor.userId}:${page}`}, 0))`,
+      );
       const [own] = await tx
         .select({ n: count() })
         .from(reportViews)

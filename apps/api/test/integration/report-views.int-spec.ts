@@ -168,6 +168,28 @@ describe('report views', () => {
     await http().delete(`/api/v1/reports/views/${own.id}`).set(bearer(dulam)).expect(204);
   });
 
+  it('keeps the per-person/page cap when distinct saves arrive concurrently', async () => {
+    const tester = await customRoleUser(app, admin, ['reports.view']);
+    for (let n = 1; n < REPORT_VIEW_LIMIT; n += 1) {
+      await create(tester, view(`Concurrent baseline ${n}`, { page: 'stock' })).expect(201);
+    }
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, (_, n) =>
+        create(tester, view(`Concurrent new ${n}`, { page: 'stock' })),
+      ),
+    );
+    expect(responses.filter((response) => response.status === 201)).toHaveLength(1);
+    expect(responses.filter((response) => response.status === 409)).toHaveLength(7);
+    for (const response of responses.filter((result) => result.status === 409)) {
+      expect(response.body).toMatchObject({ code: 'REPORT_VIEW_LIMIT' });
+    }
+    const own = (await list(tester, 'stock')).filter((row) => row.mine);
+    expect(own).toHaveLength(REPORT_VIEW_LIMIT);
+    // The same author can still save on another page, and another author on this page.
+    await create(tester, view('Concurrent other page', { page: 'stock-balance' })).expect(201);
+    await create(bold, view('Concurrent other author', { page: 'stock' })).expect(201);
+  });
+
   it('checks what it is given', async () => {
     await create(dulam, view('Буруу хуудас', { page: 'dashboard' })).expect(422);
     await create(dulam, view('Буруу хаяг', { query: 'by=brand name' })).expect(422);
