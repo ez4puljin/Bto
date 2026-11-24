@@ -36497,6 +36497,10 @@ export interface operations {
                 cursor?: string;
                 limit?: number;
                 warehouseId: number;
+                /** @description Without a status, both apply */
+                status?: "OUT" | "LOW";
+                /** @description Supplier ids separated by commas; prefix main: to match only the main supplier */
+                supplier?: string;
             };
             header?: never;
             path?: never;

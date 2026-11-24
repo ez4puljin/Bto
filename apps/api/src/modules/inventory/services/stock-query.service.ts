@@ -306,9 +306,37 @@ export class StockQueryService {
    */
   async lowStock(query: {
     warehouseId: number;
+    status?: LowStockStatus;
+    supplier?: string;
     cursor?: string;
     limit?: number;
   }): Promise<{ data: LowStockRow[]; nextCursor: string | null }> {
+    // Resolve relationships through catalog's public segment interface, as the stock list does.
+    // Restrict the SQL candidates before the keyset and LIMIT, so later matching rows fill a page.
+    const onlyIds =
+      query.supplier === undefined
+        ? null
+        : await this.productQuery.within({
+            where: {
+              match: 'ALL',
+              groups: [
+                {
+                  match: 'ALL',
+                  conditions: [
+                    {
+                      field: 'supplier',
+                      op: query.supplier.startsWith('main:') ? 'MAIN_IN' : 'IN',
+                      ids: query.supplier
+                        .replace(/^main:/, '')
+                        .split(',')
+                        .map(Number),
+                    },
+                  ],
+                },
+              ],
+            },
+          });
+    if (onlyIds?.length === 0) return { data: [], nextCursor: null };
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const start = decodeCursor(query.cursor);
     let after =
@@ -318,7 +346,13 @@ export class StockQueryService {
     const data: LowStockRow[] = [];
     for (let round = 0; round < LOW_STOCK_ROUNDS; round += 1) {
       const need = limit - data.length;
-      const rows = await this.lowStockRows(query.warehouseId, after, need + 1);
+      const rows = await this.lowStockRows(
+        query.warehouseId,
+        after,
+        need + 1,
+        query.status,
+        onlyIds,
+      );
       const taken = rows.slice(0, need);
       data.push(...(await this.toLowStock(taken)));
       const last = taken.at(-1);
@@ -339,10 +373,15 @@ export class StockQueryService {
     warehouseId: number,
     after: { rank: number; id: number } | null,
     take: number,
+    status?: LowStockStatus,
+    onlyIds: readonly number[] | null = null,
   ) {
-    const keyset = after
-      ? sql`WHERE (x.rank, x.product_id) > (${after.rank}::int, ${after.id}::bigint)`
-      : sql``;
+    const filters: SQL[] = [];
+    if (after)
+      filters.push(sql`(x.rank, x.product_id) > (${after.rank}::int, ${after.id}::bigint)`);
+    if (status) filters.push(sql`x.rank = ${status === 'OUT' ? 0 : 1}`);
+    if (onlyIds !== null) filters.push(idIn(sql`x.product_id`, onlyIds));
+    const where = filters.length ? sql`WHERE ${and(...filters)}` : sql``;
     const result = await this.db.execute<{
       product_id: string;
       on_hand: string;
@@ -372,7 +411,7 @@ export class StockQueryService {
          WHERE (l.min_qty IS NOT NULL AND COALESCE(s.on_hand, 0) <= l.min_qty)
             OR (l.min_qty IS NULL AND s.product_id IS NOT NULL AND s.on_hand = 0)
       ) x
-      ${keyset}
+      ${where}
       ORDER BY x.rank, x.product_id
       LIMIT ${take}`);
     return result.rows;

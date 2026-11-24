@@ -7,18 +7,22 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
   EmptyState,
   FilterBar,
+  FilterChip,
   ListCard,
   ListTable,
   LoadMore,
   SkeletonRows,
   TruncateCell,
 } from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ProductFilterDialog } from '@/features/catalog/product-filter-dialog';
+import { filterParam, readFilters } from '@/features/catalog/product-filters';
 import { useProductSuppliersOf } from '@/features/partners/api';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatQty } from '@/lib/money';
@@ -69,7 +73,12 @@ export function LowStockPage() {
     positiveId(params.get('warehouseId')) ??
     (mine.options.length === 1 ? mine.options[0]?.id : undefined);
   const warehouse = warehouses.options.find((option) => option.id === warehouseId);
-  const low = useLowStock(warehouseId);
+  const rawStatus = params.get('status');
+  const status = rawStatus === 'OUT' || rawStatus === 'LOW' ? rawStatus : undefined;
+  const supplierFilters = { supplier: readFilters(params).supplier };
+  const supplier = filterParam('supplier', supplierFilters) ?? undefined;
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const low = useLowStock(warehouseId, { status, supplier });
   const rows = low.data?.pages.flatMap((page) => page.data) ?? [];
   const isStore = warehouse?.kind === 'STORE';
   const suppliers = useProductSuppliersOf(
@@ -81,7 +90,16 @@ export function LowStockPage() {
     return (links.find((link) => link.isMain) ?? links[0])?.supplier.name;
   };
   const requestable = isStore && canRequest && warehouseId !== undefined && canWrite(warehouseId);
-  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
+  // Reset synchronously for every filter transition, including history navigation. Keeping the
+  // filter key with the selection also prevents old selections returning from the query cache.
+  const selectionKey = JSON.stringify([warehouseId, status, supplier]);
+  const [selection, setSelection] = useState<{ key: string; ids: ReadonlySet<number> }>({
+    key: selectionKey,
+    ids: new Set(),
+  });
+  if (selection.key !== selectionKey) setSelection({ key: selectionKey, ids: new Set() });
+  const selected = selection.key === selectionKey ? selection.ids : new Set<number>();
+  const setSelected = (next: ReadonlySet<number>) => setSelection({ key: selectionKey, ids: next });
   const chosen = rows.filter((row) => selected.has(row.product.id));
   const allChosen = rows.length > 0 && chosen.length === rows.length;
 
@@ -90,11 +108,11 @@ export function LowStockPage() {
     setParam('warehouseId', id === undefined ? null : String(id));
   };
   const toggle = (productId: number, on: boolean) =>
-    setSelected((previous) => {
-      const next = new Set(previous);
+    setSelection((previous) => {
+      const next = new Set(previous.key === selectionKey ? previous.ids : []);
       if (on) next.add(productId);
       else next.delete(productId);
-      return next;
+      return { key: selectionKey, ids: next };
     });
 
   const wholesale = warehouse?.kind === 'WHOLESALE';
@@ -125,6 +143,7 @@ export function LowStockPage() {
           // The bulk action is the page's main button, counting the ticked rows (docs/ui.md).
           requestable && warehouseId !== undefined ? (
             <RequestTransfer
+              key={selectionKey}
               storeId={warehouseId}
               rows={chosen}
               onCreated={() => setSelected(new Set())}
@@ -140,7 +159,45 @@ export function LowStockPage() {
           emptyLabel={t('inventory.pickWarehouse')}
           onChange={pickWarehouse}
         />
+        <NativeSelect
+          variant="filter"
+          aria-label={t('inventory.lowStock.columns.status')}
+          value={status ?? ''}
+          onChange={(event) => setParam('status', event.target.value)}
+        >
+          <option value="">{t('inventory.lowStock.allStatuses')}</option>
+          <option value="OUT">{t('inventory.lowStock.statuses.OUT')}</option>
+          <option value="LOW">{t('inventory.lowStock.statuses.LOW')}</option>
+        </NativeSelect>
+        {supplier ? (
+          <FilterChip
+            clearLabel={t('catalog.products.filters.clear', {
+              name: t('catalog.products.filters.fields.supplier'),
+            })}
+            onClear={() => setParam('supplier', null)}
+          >
+            <button type="button" className="cursor-pointer" onClick={() => setSupplierOpen(true)}>
+              {t('catalog.products.filters.fields.supplier')} (
+              {supplierFilters.supplier?.ids.length})
+            </button>
+          </FilterChip>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setSupplierOpen(true)}>
+            {t('catalog.products.filters.fields.supplier')}
+          </Button>
+        )}
       </FilterBar>
+      {supplierOpen ? (
+        <ProductFilterDialog
+          field="supplier"
+          filters={supplierFilters}
+          apply={(next) => {
+            setParam('supplier', filterParam('supplier', next));
+            setSupplierOpen(false);
+          }}
+          close={() => setSupplierOpen(false)}
+        />
+      ) : null}
       {warehouseId === undefined ? (
         <ListCard>
           <EmptyState icon={PackageMinus} title={t('inventory.lowStock.pickWarehouse')} />

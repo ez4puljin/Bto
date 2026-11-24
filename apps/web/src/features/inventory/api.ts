@@ -216,16 +216,21 @@ export function useStockMovements(filter: MovementFilter) {
 }
 
 /** The low-stock list of a warehouse (ADR-0039), 100 rows at a time; off without a warehouse. */
-export function useLowStock(warehouseId: number | undefined) {
+export function useLowStock(
+  warehouseId: number | undefined,
+  filter: { status?: 'OUT' | 'LOW'; supplier?: string } = {},
+) {
   const api = useApiClient();
   return useInfiniteQuery({
-    queryKey: [...KEYS.stock, 'low', warehouseId],
+    queryKey: [...KEYS.stock, 'low', warehouseId, filter],
     enabled: warehouseId !== undefined,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.GET('/api/v1/stock/low', {
-          params: { query: { warehouseId: warehouseId ?? 0, cursor: pageParam, limit: 100 } },
+          params: {
+            query: { warehouseId: warehouseId ?? 0, ...filter, cursor: pageParam, limit: 100 },
+          },
           signal,
         }),
       ),

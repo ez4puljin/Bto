@@ -10934,6 +10934,29 @@
               "minimum": 1,
               "type": "number"
             }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Without a status, both apply",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OUT",
+                "LOW"
+              ]
+            }
+          },
+          {
+            "name": "supplier",
+            "required": false,
+            "in": "query",
+            "description": "Supplier ids separated by commas; prefix main: to match only the main supplier",
+            "schema": {
+              "example": "main:1,2",
+              "type": "string"
+            }
           }
         ],
         "responses": {

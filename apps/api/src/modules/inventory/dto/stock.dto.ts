@@ -15,6 +15,7 @@ import {
 import { PageQueryDto } from '../../../common/pagination/page';
 import { SegmentDefinitionDto } from '../../../common/segments/segment-definition.dto';
 import { PRODUCT_STATUSES, type ProductStatus } from '../../catalog';
+import { MAX_CONDITION_IDS } from '@tugeel/shared/segments';
 import { BIN_TYPES, MOVEMENT_TYPES, STOCK_DOC_TYPES } from '@tugeel/shared/inventory';
 import { RECONCILIATION_STATUSES } from '../schema';
 import { BinDto, queryBoolean } from './bins.dto';
@@ -274,6 +275,20 @@ const LOW_STOCK_STATUSES = ['OUT', 'LOW'] as const;
 
 export class LowStockQueryDto extends PageQueryDto {
   @ApiProperty() @Type(() => Number) @IsInt() @Min(1) warehouseId: number;
+
+  @ApiPropertyOptional({ enum: LOW_STOCK_STATUSES, description: 'Without a status, both apply' })
+  @IsOptional()
+  @IsIn(LOW_STOCK_STATUSES)
+  status?: (typeof LOW_STOCK_STATUSES)[number];
+
+  @ApiPropertyOptional({
+    description: 'Supplier ids separated by commas; prefix main: to match only the main supplier',
+    example: 'main:1,2',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(new RegExp(`^(main:)?[1-9]\\d{0,14}(,[1-9]\\d{0,14}){0,${MAX_CONDITION_IDS - 1}}$`))
+  supplier?: string;
 }
 
 /** A row of a warehouse's low-stock list (ADR-0039); quantities in the base unit. */

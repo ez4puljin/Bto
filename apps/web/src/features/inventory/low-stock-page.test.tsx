@@ -70,12 +70,145 @@ const WATER: Schemas['LowStockRow'] = {
   homeWarehouseId: WH1.id,
 };
 
+const requestLabel = (count: number) =>
+  mn.inventory.lowStock.request.replace('{{count}}', String(count));
+
 const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: string) =>
   fetchMock.mock.calls
     .map(([request]) => request)
     .filter((request) => request.method === method && new URL(request.url).pathname === path);
 
 describe('low-stock list', () => {
+  it('restores the URL filters and clears selected rows on status changes and history navigation', async () => {
+    const fetchMock = signedIn(CLERK_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/stock/low': (request) => {
+        const status = new URL(request.url).searchParams.get('status');
+        return list(status === 'OUT' ? [WATER] : status === 'LOW' ? [COLA] : [WATER, COLA]);
+      },
+    });
+    const { router } = renderApp(
+      '/inventory/low-stock?warehouseId=2&supplier=main:3&status=LOW',
+      fetchMock,
+    );
+    const user = userEvent.setup();
+    await screen.findByText(COLA.product.name);
+    expect(
+      screen.getByRole('combobox', { name: mn.inventory.lowStock.columns.status }),
+    ).toHaveValue('LOW');
+    const first = new URL(calls(fetchMock, 'GET', '/api/v1/stock/low').at(-1)!.url);
+    expect(first.searchParams.get('supplier')).toBe('main:3');
+    expect(first.searchParams.get('status')).toBe('LOW');
+    await user.click(screen.getByRole('checkbox', { name: mn.inventory.lowStock.selectAll }));
+    expect(screen.getByRole('button', { name: requestLabel(1) })).toBeEnabled();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: mn.inventory.lowStock.columns.status }),
+      'OUT',
+    );
+    await screen.findByText(WATER.product.name);
+    expect(screen.getByRole('button', { name: requestLabel(0) })).toBeDisabled();
+    expect(new URLSearchParams(router.state.location.search).get('supplier')).toBe('main:3');
+    expect(
+      new URL(calls(fetchMock, 'GET', '/api/v1/stock/low').at(-1)!.url).searchParams.get('cursor'),
+    ).toBeNull();
+    await user.click(screen.getByRole('checkbox', { name: mn.inventory.lowStock.selectAll }));
+    await user.click(screen.getByRole('button', { name: requestLabel(1) }));
+    await screen.findByRole('dialog');
+    await router.navigate('/inventory/low-stock?warehouseId=2&status=LOW&supplier=3');
+    await screen.findByText(COLA.product.name);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(calls(fetchMock, 'POST', '/api/v1/transfers')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: requestLabel(0) })).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: mn.inventory.lowStock.selectAll }));
+    await router.navigate(-1);
+    await screen.findByText(WATER.product.name);
+    expect(screen.getByRole('button', { name: requestLabel(0) })).toBeDisabled();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: mn.inventory.lowStock.columns.status }),
+      '',
+    );
+    await screen.findByText(COLA.product.name);
+    expect(new URLSearchParams(router.state.location.search).has('status')).toBe(false);
+  });
+
+  it('uses the categorized searchable supplier picker, main by default, with clearing', async () => {
+    const supplier = { id: 3, code: 'S3', name: 'Supplier Three', status: 'ACTIVE' };
+    const fetchMock = signedIn(CLERK_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/stock/low': () => list([WATER, COLA]),
+      'GET /api/v1/supplier-categories': () =>
+        json([
+          {
+            id: 9,
+            parentId: null,
+            name: 'Drinks',
+            path: 'Drinks',
+            depth: 0,
+            active: true,
+            sortOrder: 0,
+            supplierCount: 1,
+          },
+        ]),
+      'GET /api/v1/suppliers': () => list([supplier]),
+    });
+    const { router } = renderApp('/inventory/low-stock?warehouseId=2&status=OUT', fetchMock);
+    const user = userEvent.setup();
+    await screen.findByText(COLA.product.name);
+    await user.click(screen.getByRole('checkbox', { name: mn.inventory.lowStock.selectAll }));
+    await user.click(
+      screen.getByRole('button', { name: mn.catalog.products.filters.fields.supplier }),
+    );
+    let dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('tab', { name: mn.catalog.products.filters.supplierModes.MAIN_IN }),
+    ).toHaveAttribute('aria-selected', 'true');
+    await user.click(await within(dialog).findByRole('button', { name: /Drinks/ }));
+    await user.type(
+      within(dialog).getByRole('searchbox', { name: mn.catalog.products.filters.searchSupplier }),
+      'Three',
+    );
+    await user.click(await within(dialog).findByRole('checkbox', { name: supplier.name }));
+    await user.click(
+      within(dialog).getByRole('button', { name: mn.catalog.products.filters.apply }),
+    );
+    await waitFor(() =>
+      expect(new URLSearchParams(router.state.location.search).get('supplier')).toBe('main:3'),
+    );
+    expect(screen.getByRole('button', { name: requestLabel(0) })).toBeDisabled();
+    expect(new URLSearchParams(router.state.location.search).get('status')).toBe('OUT');
+    await waitFor(() =>
+      expect(
+        new URL(calls(fetchMock, 'GET', '/api/v1/stock/low').at(-1)!.url).searchParams.get(
+          'supplier',
+        ),
+      ).toBe('main:3'),
+    );
+    await user.click(
+      screen.getByRole('button', { name: `${mn.catalog.products.filters.fields.supplier} (1)` }),
+    );
+    dialog = await screen.findByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('tab', {
+        name: mn.catalog.products.filters.supplierModes.IN,
+      }),
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: mn.catalog.products.filters.apply }),
+    );
+    await waitFor(() =>
+      expect(new URLSearchParams(router.state.location.search).get('supplier')).toBe('3'),
+    );
+    const clearLabel = mn.catalog.products.filters.clear.replace(
+      '{{name}}',
+      mn.catalog.products.filters.fields.supplier,
+    );
+    await user.click(screen.getByRole('button', { name: clearLabel }));
+    await waitFor(() =>
+      expect(new URLSearchParams(router.state.location.search).has('supplier')).toBe(false),
+    );
+    expect(new URLSearchParams(router.state.location.search).get('status')).toBe('OUT');
+  });
+
   it('shows a wholesale warehouse what ran out or reached its minimum, with the supplier', async () => {
     const fetchMock = signedIn(WAREHOUSE_ME, {
       'GET /api/v1/warehouses': warehouses,
@@ -97,8 +230,9 @@ describe('low-stock list', () => {
     expect(new URL(read!.url).searchParams.get('warehouseId')).toBe('1');
     const nav = getSidebar();
     expect(within(nav).getByRole('link', { name: mn.nav.lowStock })).toBeInTheDocument();
-    expect(screen.getByText(mn.inventory.lowStock.statuses.OUT)).toBeInTheDocument();
-    expect(screen.getByText(mn.inventory.lowStock.statuses.LOW)).toBeInTheDocument();
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText(mn.inventory.lowStock.statuses.OUT)).toBeInTheDocument();
+    expect(table.getByText(mn.inventory.lowStock.statuses.LOW)).toBeInTheDocument();
     expect(screen.getByText('24')).toBeInTheDocument();
     expect(await screen.findByText('МСМ ХХК')).toBeInTheDocument();
     // No transfer request from a wholesale warehouse.
@@ -158,10 +292,10 @@ describe('low-stock list', () => {
     await screen.findByText(COLA.product.name);
     // The home warehouse is shown at the store, the supplier is not.
     expect(screen.getAllByText(WH1.name).length).toBeGreaterThan(0);
-    const request = screen.getByRole('button', { name: 'Шилжүүлэг хүсэх (0)' });
+    const request = screen.getByRole('button', { name: requestLabel(0) });
     expect(request).toBeDisabled();
     await user.click(screen.getByRole('checkbox', { name: mn.inventory.lowStock.selectAll }));
-    await user.click(screen.getByRole('button', { name: 'Шилжүүлэг хүсэх (2)' }));
+    await user.click(screen.getByRole('button', { name: requestLabel(2) }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByRole('combobox', { name: mn.inventory.lowStock.source }),

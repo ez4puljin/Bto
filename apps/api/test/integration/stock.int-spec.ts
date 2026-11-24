@@ -466,6 +466,88 @@ describe('stock queries', () => {
     expect(first.data.map((row) => row.product.sku)).toEqual(['12']);
     const second = await low(wh1.id, { limit: 1, cursor: first.nextCursor ?? '' });
     expect(second.data.map((row) => row.product.sku)).toEqual(['10']);
+
+    // Equality belongs to LOW; zero belongs to OUT even with a zero minimum.
+    await levels(wh1.id, cola.id, '44', '100');
+    await levels(wh1.id, coffee.id, '0');
+    const ids = (page: { data: LowJson[] }) => page.data.map((row) => row.product.id);
+    expect(ids(await low(wh1.id, { status: 'LOW' }))).toEqual([cola.id]);
+    expect(ids(await low(wh1.id, { status: 'OUT' }))).toEqual([coffee.id]);
+    expect(ids(await low(wh2.id, { status: 'OUT' }))).toEqual([rice.id]);
+    expect((await low(wh2.id, { status: 'LOW' })).data).toEqual([]);
+
+    const primary = (await partnersApi(app, admin).supplier({ name: 'Low stock primary' })).id;
+    const secondary = (await partnersApi(app, admin).supplier({ name: 'Low stock secondary' })).id;
+    for (const link of [
+      { productId: cola.id, supplierId: primary },
+      { productId: cola.id, supplierId: secondary },
+      { productId: coffee.id, supplierId: secondary },
+    ]) {
+      const linked = await http()
+        .post('/api/v1/product-suppliers')
+        .set(bearer(admin))
+        .send(link)
+        .expect(201);
+      if (link.supplierId === primary || link.productId === coffee.id) {
+        await http()
+          .post(`/api/v1/product-suppliers/${(linked.body as { id: number }).id}/main`)
+          .set(bearer(admin))
+          .expect(200);
+      }
+    }
+    expect(ids(await low(wh1.id, { supplier: `main:${primary}` }))).toEqual([cola.id]);
+    expect(ids(await low(wh1.id, { supplier: `main:${secondary}` }))).toEqual([coffee.id]);
+    expect(ids(await low(wh1.id, { supplier: String(secondary) }))).toEqual([coffee.id, cola.id]);
+    expect(ids(await low(wh1.id, { supplier: `main:${primary},${secondary}` }))).toEqual([
+      coffee.id,
+      cola.id,
+    ]);
+    expect(ids(await low(wh1.id, { supplier: String(secondary), status: 'LOW' }))).toEqual([
+      cola.id,
+    ]);
+    expect((await low(wh1.id, { supplier: `main:${primary}`, status: 'OUT' })).data).toEqual([]);
+    expect((await low(wh2.id, { supplier: String(secondary) })).data).toEqual([]);
+    expect(await low(wh1.id, { supplier: '999999999' })).toEqual({ data: [], nextCursor: null });
+
+    // Filtering must fill the page after an earlier nonmatching OUT row, before LIMIT.
+    const matchingLater = await low(wh1.id, { supplier: `main:${primary}`, limit: 1 });
+    expect(ids(matchingLater)).toEqual([cola.id]);
+    expect(matchingLater.nextCursor).toBeNull();
+    const supplierFirst = await low(wh1.id, { supplier: String(secondary), limit: 1 });
+    expect(ids(supplierFirst)).toEqual([coffee.id]);
+    expect(supplierFirst.nextCursor).not.toBeNull();
+    const supplierSecond = await low(wh1.id, {
+      supplier: String(secondary),
+      limit: 1,
+      cursor: supplierFirst.nextCursor,
+    });
+    expect(ids(supplierSecond)).toEqual([cola.id]);
+    expect(supplierSecond.nextCursor).toBeNull();
+
+    for (const invalid of [
+      { status: 'ALL' },
+      { status: 'out' },
+      { supplier: '' },
+      { supplier: 'main:' },
+      { supplier: '0' },
+      { supplier: '-1' },
+      { supplier: '1.5' },
+      { supplier: '1,,2' },
+      { supplier: '1, 2' },
+      { supplier: '1000000000000000' },
+      { supplier: Array.from({ length: 201 }, (_, index) => index + 1).join(',') },
+    ]) {
+      await http()
+        .get('/api/v1/stock/low')
+        .query({ warehouseId: wh1.id, ...invalid })
+        .set(bearer(worker))
+        .expect(422);
+    }
+    // The read contract still excludes costs and requires authentication.
+    expect(JSON.stringify(await low(wh1.id, { supplier: String(secondary) }))).not.toMatch(
+      /avgCost|unitCost|"value"/,
+    );
+    await http().get('/api/v1/stock/low').query({ warehouseId: wh1.id }).expect(401);
     await levels(wh1.id, cola.id, '40', '100');
     expect((await low(wh1.id)).data.map((row) => row.product.sku)).toEqual(['12']);
     await http().get('/api/v1/stock/low').set(bearer(worker)).expect(422);
