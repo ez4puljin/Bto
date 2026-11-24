@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 import { clearToasts } from '@/lib/toast';
+import { clearQueryClients } from '@/test/query-clients';
 
 // The shelves are on hold on screen (lib/features.ts); the tests cover the shelf paths as built.
 vi.mock('@/lib/features', () => ({ BINS_SOON: false, EBARIMT_PER_PRODUCT: true }));
@@ -31,6 +32,8 @@ if (!('ResizeObserver' in globalThis)) {
 
 afterEach(() => {
   cleanup();
+  // QueryClientProvider unmounts observers but leaves their five-minute query GC timers alive.
+  clearQueryClients();
   // Toasts live in a module-level store (lib/toast); each test starts with none.
   clearToasts();
   // Lists remember hidden columns in localStorage (ADR-0037); each test starts with none.

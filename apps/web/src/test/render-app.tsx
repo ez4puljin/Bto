@@ -9,6 +9,7 @@ import { vi } from 'vitest';
 import { AppProviders } from '@/app/providers';
 import { routes } from '@/app/router';
 import { AuthSession } from '@/lib/auth/auth-session';
+import { registerQueryClient } from '@/test/query-clients';
 
 export type Me = components['schemas']['Me'];
 type Handler = (request: Request) => Response | Promise<Response>;
@@ -98,7 +99,9 @@ export function renderApp(path: string, fetchMock: (request: Request) => Promise
     fetch: fetchMock,
     randomUUID: () => '00000000-0000-4000-8000-000000000000',
   });
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = registerQueryClient(
+    new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   render(
     <AppProviders session={session} queryClient={queryClient}>
