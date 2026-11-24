@@ -342,6 +342,9 @@
       <h2>Сүүлд нэвтэрсэн <span id="landings-count" class="count"></span></h2>
       <div id="landings"></div>
 
+      <h2>Гаднаас ирсэн (inbox) <span id="inbox-count" class="count"></span></h2>
+      <div id="inbox"></div>
+
       <h2>Кодын зураглал</h2>
       <div id="graph"></div>
 
@@ -728,6 +731,53 @@
                 s.deploy.map((d) => el('div', {}, `${when(d.at)} ${d.text}`)),
               )
             : null,
+        );
+
+        const INBOX = {
+          WAITING: ['warn', 'дараалалд'],
+          'WAITING-REVIEW': ['info', 'тархи хянана'],
+          LANDED: ['run', 'main-д орсон'],
+          REFUSED: ['bad', 'татгалзсан'],
+          WITHDRAWN: ['done', 'буцаасан'],
+        };
+        const inbox = s.inbox || [];
+        const inboxOpen = inbox.filter(
+          (i) => i.state === 'WAITING' || i.state === 'WAITING-REVIEW',
+        );
+        document.getElementById('inbox-count').textContent = inboxOpen.length
+          ? `(${inboxOpen.length} хүлээж байна)`
+          : '';
+        document.getElementById('inbox').replaceChildren(
+          inbox.length
+            ? el(
+                'div',
+                { class: 'grid' },
+                inbox.map((i) =>
+                  el(
+                    'div',
+                    { class: 'card' },
+                    el(
+                      'div',
+                      { class: 'row' },
+                      el('span', { class: 'title' }, el('code', {}, i.branch)),
+                      pill(...(INBOX[i.state] || ['done', i.state])),
+                      i.kind ? pill('done', i.kind.toUpperCase()) : null,
+                    ),
+                    el(
+                      'div',
+                      { class: 'meta' },
+                      el('code', {}, i.head),
+                      ` · ${i.files} файл`,
+                      i.landed ? [' · main ', el('code', {}, i.landed)] : '',
+                      i.updatedAt ? [' · ', el('b', {}, when(i.updatedAt))] : '',
+                    ),
+                    i.reason && i.state !== 'LANDED'
+                      ? el('div', { class: 'meta' }, i.reason)
+                      : null,
+                  ),
+                ),
+              )
+            : el('div', { class: 'empty' }, 'Гаднаас ирсэн салбар алга (tools/brain/inbox.sh).'),
         );
 
         const g = s.graph;

@@ -1,7 +1,8 @@
 // The brain's monitor (owner 2026-11-20: «Тархи болон тархины удирдаж буй agents хянах UI дэлгэц
 // надад хэрэгтэй байна»): http://<this PC>:3310 on the store's LAN shows, refreshing by itself, what
 // the brain (ADR-0213, tools/brain/README.md) is doing: the open tasks and what they hold, the
-// workers running or finished, the landings and whether the real system runs them, the code graph.
+// workers running or finished, the landings and whether the real system runs them, the code graph,
+// and the inbox gate's branches (ADR-0242).
 //
 // Read-only. It reads the brain's books (~/bto-work/.brain), the task copies (git), Claude Code's
 // subagent transcripts (~/.claude/projects/*/<session>/subagents), the real system's /health and
@@ -51,6 +52,36 @@ export function parseLane(text) {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+/** States of the inbox gate (ADR-0242) that still wait for something. */
+export const INBOX_OPEN = new Set(['WAITING', 'WAITING-REVIEW']);
+const INBOX_SHOWN = 10;
+
+/**
+ * One record of the inbox gate (`inbox/items/<key>`, key=value lines; tools/brain/inbox.sh), as the
+ * page shows it: the branch, its head, the state and class, how many files, one cut line of why.
+ */
+export function parseInboxItem(text) {
+  const record = {};
+  for (const line of String(text).split('\n')) {
+    const at = line.indexOf('=');
+    if (at > 0) record[line.slice(0, at)] = line.slice(at + 1);
+  }
+  if (!record.branch || !record.state) return null;
+  const epoch = (value) => (/^\d+$/.test(value ?? '') ? Number.parseInt(value, 10) * 1000 : null);
+  const reason = (record.reason ?? '').trim();
+  return {
+    branch: record.branch,
+    head: (record.head ?? '').slice(0, 8),
+    state: record.state,
+    kind: record.class || null,
+    files: (record.files ?? '').split(' ').filter(Boolean).length,
+    reason: reason.length > TEXT_CUT ? `${reason.slice(0, TEXT_CUT - 1)}…` : reason,
+    landed: record.landed ? record.landed.slice(0, 8) : null,
+    task: record.task || null,
+    updatedAt: epoch(record.updated) ?? epoch(record.started),
+  };
 }
 
 /** A local «YYYY-MM-DD HH:MM:SS» (this PC's time zone) as epoch milliseconds, or null. */
@@ -614,6 +645,21 @@ async function gatherGraph(now) {
   };
 }
 
+/** The inbox gate: what waits, then the newest results. */
+async function gatherInbox() {
+  const dir = path.join(STATE, 'inbox', 'items');
+  const names = await readdir(dir).catch(() => []);
+  const items = (
+    await Promise.all(
+      names.map(async (name) => parseInboxItem((await readText(path.join(dir, name))) ?? '')),
+    )
+  ).filter(Boolean);
+  items.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const open = items.filter((item) => INBOX_OPEN.has(item.state));
+  const done = items.filter((item) => !INBOX_OPEN.has(item.state)).slice(0, INBOX_SHOWN);
+  return [...open, ...done];
+}
+
 /** Each part on its own: one that fails is named in `errors`, the rest is still shown. */
 async function gather() {
   const now = Date.now();
@@ -625,11 +671,12 @@ async function gather() {
       return fallback;
     });
   const running = await gatherRunning();
-  const [tasks, people, landed, graph] = await Promise.all([
+  const [tasks, people, landed, graph, inbox] = await Promise.all([
     part('tasks', gatherTasks(), []),
     part('workers', gatherWorkers(now), { workers: [], sessions: [] }),
     part('landings', gatherLandings(running), { landings: [], deploy: [] }),
     part('graph', gatherGraph(now), null),
+    part('inbox', gatherInbox(), []),
   ]);
   const newest = new Map();
   for (const w of people.workers) if (w.slug && !newest.has(w.slug)) newest.set(w.slug, w.id);
@@ -642,6 +689,7 @@ async function gather() {
     landings: landed.landings,
     deploy: landed.deploy,
     graph,
+    inbox,
     errors,
   };
 }

@@ -30,6 +30,7 @@ import {
   newSummary,
   parseDeployLine,
   parseGraphLog,
+  parseInboxItem,
   parseLandingLine,
   parseLane,
   slugFromBrief,
@@ -980,4 +981,672 @@ test('the guard stops a hand-made Gradle build while the desk builds', () => {
   assert.equal(check('./gradlew assembleRelease', mirror, home, { androidBusy: false }), null);
   assert.equal(check('./gradlew assembleRelease', mirror, home), null);
   assert.equal(check('ls', mirror, home, { androidBusy: true }), null);
+});
+
+// --- the inbox gate (ADR-0242) ------------------------------------------------------------------
+
+const inboxScript = join(here, 'inbox.sh');
+
+function classifyPaths(...paths) {
+  const work = mkdtempSync(join(tmpdir(), 'bto-inbox-class-'));
+  try {
+    const run = spawnSync('bash', [inboxScript, 'classify', ...paths], {
+      env: { ...process.env, BTO_WORK: work },
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stderr);
+    return run.stdout.trim().split('\n');
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+test('inbox: pages, texts, staff-app screens and documents are LIGHT', () => {
+  const light = [
+    'apps/web/src/features/sales/orders-page.tsx',
+    'apps/web/src/features/guide/content/sales/01-orders.md',
+    'apps/web/index.html',
+    'packages/shared/i18n/mn.json',
+    'apps/mobile/app/(staff)/picking.tsx',
+    'apps/mobile/src/cart/cart-list.tsx',
+    'apps/mobile/assets/icon.png',
+    'docs/ui.md',
+    'docs/modules/sales.md',
+  ];
+  const lines = classifyPaths(...light);
+  assert.equal(lines.at(-1), '= LIGHT');
+  for (const path of light) assert.ok(lines.includes(`LIGHT  ${path}`), path);
+});
+
+test('inbox: the api, packages, migrations, the till, configs and decisions are GUARDED', () => {
+  for (const path of [
+    'apps/api/src/modules/sales/orders.service.ts',
+    'apps/api/src/db/migrations/0300_add_x.sql',
+    'apps/api/test/integration/x.int-spec.ts',
+    'apps/api/.env.example',
+    'packages/shared/src/money/index.ts',
+    'packages/api-client/src/schema.ts',
+    'apps/web/src/pos/tender-dialog.tsx',
+    'apps/web/pos.html',
+    'apps/web/vite.config.ts',
+    'apps/mobile/src/outbox/queue.ts',
+    'apps/mobile/src/api/client.ts',
+    'apps/mobile/app.config.ts',
+    'apps/mobile/variants.json',
+    'docs/decisions/ADR-0300-x.md',
+    'docs/STATUS.md',
+    'docker-compose.yml',
+  ]) {
+    const lines = classifyPaths('apps/web/src/a.tsx', path);
+    assert.deepEqual(lines, ['LIGHT  apps/web/src/a.tsx', `GUARDED  ${path}`, '= GUARDED'], path);
+  }
+});
+
+test('inbox: the guard rails are refused, whatever else comes with them', () => {
+  for (const path of [
+    '.github/workflows/ci.yml',
+    'deploy/store/setup.sh',
+    'tools/brain/land.sh',
+    'tools/brain/inbox.sh',
+    'CLAUDE.md',
+    'AGENTS.md',
+    'apps/web/AGENTS.md',
+    '.claude/settings.json',
+    'tools/fast-check/check-fast.mjs',
+    'tools/lint-guards/guards.test.mjs',
+    'tools/finance-core/whitelist.mjs',
+    'ci/rehearse.sh',
+    'scripts/gen-api-check.mjs',
+    'eslint.config.mjs',
+    'package.json',
+    'apps/api/package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    'apps/api/.env',
+    '.env.production',
+    'apps/web/src/a"b.tsx',
+    'apps/web/src/tab\there.tsx',
+    'apps/web/src/back\\slash.tsx',
+  ]) {
+    const lines = classifyPaths('apps/web/src/a.tsx', path);
+    assert.match(lines[1], new RegExp(`^REFUSE  ${path.replace(/[.*\\]/g, '\\$&')}: `), path);
+    assert.equal(lines.at(-1), '= REFUSED', path);
+  }
+});
+
+const FAKE_CHECK = [
+  "import { existsSync } from 'node:fs';",
+  'if (existsSync(`${process.env.INBOX_DIR}/red`)) {',
+  "  console.log('FAIL    0.1s  web types');",
+  "  console.log('/home/u/bto-work/in-x/apps/web/src/a.tsx(1,1): error TS2322: wrong');",
+  '  process.exit(1);',
+  '}',
+  "console.log('check:fast green');",
+].join('\n');
+const FAKE_GH =
+  '#!/usr/bin/env bash\n{ printf "%s\\t" "$@" | tr "\\n" " "; echo; } >>"$INBOX_DIR/gh"\n';
+
+function makeInbox() {
+  const dir = mkdtempSync(join(tmpdir(), 'bto-inbox-'));
+  const main = join(dir, 'bto-dev');
+  const devDir = join(dir, 'dev');
+  const origin = join(dir, 'origin.git');
+  writeFileSync(join(dir, 'gh.sh'), FAKE_GH, { mode: 0o755 });
+  const env = {
+    ...process.env,
+    BTO_WORK: join(dir, 'bto-work'),
+    BTO_BASE_REF: 'origin/main',
+    BTO_INBOX_GH: join(dir, 'gh.sh'),
+    BTO_INBOX_REPO: 'owner/repo',
+    BTO_INBOX_LOCK_WAIT: '60',
+    INBOX_DIR: dir,
+    GIT_COMMITTER_NAME: 'gate',
+    GIT_COMMITTER_EMAIL: 'gate@example.invalid',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+  };
+  const gateEnv = { ...env, GIT_AUTHOR_NAME: 'gate', GIT_AUTHOR_EMAIL: 'gate@example.invalid' };
+  const gitIn = (cwd, runEnv, ...args) => {
+    const run = spawnSync('git', args, { cwd, env: runEnv, encoding: 'utf8' });
+    assert.equal(run.status, 0, `git ${args.join(' ')}: ${run.stderr}`);
+    return run.stdout.trim();
+  };
+  const git = (...args) => gitIn(main, gateEnv, ...args);
+  spawnSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin], { env });
+  spawnSync('git', ['clone', '-q', origin, main], { env });
+  git('checkout', '-q', '-b', 'main');
+  mkdirSync(join(main, 'tools/brain'), { recursive: true });
+  for (const name of ['lib.sh', 'task.sh', 'land.sh', 'inbox.sh', 'merge-json.mjs'])
+    cpSync(join(here, name), join(main, 'tools/brain', name));
+  const files = {
+    '.gitignore': 'node_modules/\n.fastcheck/\n',
+    'tools/fast-check/check-fast.mjs': `${FAKE_CHECK}\n`,
+    'apps/web/src/a.tsx': 'export const a = 1;\n',
+    'apps/web/src/b.tsx': 'export const b = 1;\n',
+    'apps/api/src/modules/sales/s.ts': 'export const s = 1;\n',
+    'packages/shared/i18n/mn.json': '{\n  "a": "А"\n}\n',
+    'docs/a.md': 'a\n',
+  };
+  for (const [file, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(main, file)), { recursive: true });
+    writeFileSync(join(main, file), text);
+  }
+  mkdirSync(join(main, 'deploy/store'), { recursive: true });
+  cpSync(join(root, 'deploy/store/auto-deploy.sh'), join(main, 'deploy/store/auto-deploy.sh'));
+  git('add', '.gitignore', 'tools', 'apps', 'packages', 'docs', 'deploy');
+  git('commit', '-q', '-m', 'start');
+  git('push', '-q', 'origin', 'main');
+  // The second developer's own clone, on another PC.
+  spawnSync('git', ['clone', '-q', origin, devDir], { env });
+  const devEnv = { ...env, GIT_AUTHOR_NAME: 'Dev Two', GIT_AUTHOR_EMAIL: 'dev@example.invalid' };
+  const dev = (...args) => gitIn(devDir, devEnv, ...args);
+  // push(branch, { file: text }, message, { from }): a branch from origin/main (or `from`), pushed.
+  const push = (branch, change, message = `change for ${branch}`, { from, onTop } = {}) => {
+    dev('fetch', '-q', 'origin');
+    if (!onTop) dev('checkout', '-q', '-B', `w-${branch}`, from ?? 'origin/main');
+    for (const [file, text] of Object.entries(change)) {
+      mkdirSync(dirname(join(devDir, file)), { recursive: true });
+      writeFileSync(join(devDir, file), text);
+      dev('add', file);
+    }
+    dev('commit', '-q', '-m', message);
+    dev('push', '-q', '-f', 'origin', `HEAD:refs/heads/in/${branch}`);
+    return dev('rev-parse', 'HEAD');
+  };
+  const run = (...args) => {
+    const extra = typeof args.at(-1) === 'object' ? args.pop() : {};
+    return spawnSync('bash', [join(main, 'tools/brain/inbox.sh'), ...args], {
+      cwd: main,
+      env: { ...gateEnv, ...extra },
+      encoding: 'utf8',
+    });
+  };
+  const runAsync = (...args) =>
+    new Promise((done) => {
+      const child = spawn('bash', [join(main, 'tools/brain/inbox.sh'), ...args], {
+        cwd: main,
+        env: gateEnv,
+      });
+      let out = '';
+      child.stdout.on('data', (chunk) => (out += chunk));
+      child.on('close', (status) => done({ status, stdout: out }));
+    });
+  const books = join(dir, 'bto-work/.brain');
+  const item = (name) => {
+    const file = join(books, 'inbox/items', name);
+    return existsSync(file) ? parseRecord(readFileSync(file, 'utf8')) : null;
+  };
+  const gh = () =>
+    existsSync(join(dir, 'gh'))
+      ? readFileSync(join(dir, 'gh'), 'utf8').trim().split('\n').filter(Boolean)
+      : [];
+  const originGit = (...args) => gitIn(origin, env, ...args);
+  const hasBranch = (branch) =>
+    spawnSync('git', ['show-ref', '-q', '--verify', `refs/heads/${branch}`], { cwd: origin, env })
+      .status === 0;
+  return {
+    dir,
+    main,
+    books,
+    push,
+    run,
+    runAsync,
+    item,
+    gh,
+    originGit,
+    hasBranch,
+    dev,
+    env: gateEnv,
+  };
+}
+
+const statusesOf = (lines, head) =>
+  lines
+    .filter((line) => line.includes(`statuses/${head}`))
+    .map((line) => /state=(\w+)/.exec(line)?.[1]);
+
+test('inbox: a LIGHT branch lands at once, keeps its author, and the branch is deleted', () => {
+  const inbox = makeInbox();
+  try {
+    const head = inbox.push(
+      'orders-label',
+      { 'apps/web/src/a.tsx': 'export const a = 2;\n' },
+      'feat(web): label',
+    );
+    const tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.match(tick.stdout, /LANDED/);
+    const item = inbox.item('orders-label');
+    assert.equal(item.state, 'LANDED');
+    assert.equal(item.class, 'light');
+    const landed = inbox.originGit('rev-parse', 'main');
+    assert.equal(item.landed, landed);
+    assert.equal(
+      inbox.originGit('log', '-1', '--format=%an <%ae>', 'main'),
+      'Dev Two <dev@example.invalid>',
+    );
+    const message = inbox.originGit('log', '-1', '--format=%B', 'main');
+    assert.match(message, /^feat\(web\): label/);
+    assert.match(message, /Inbox-Branch: in\/orders-label\nInbox-Head: [0-9a-f]{40}/);
+    assert.equal(inbox.originGit('show', 'main:apps/web/src/a.tsx'), 'export const a = 2;');
+    assert.equal(inbox.hasBranch('in/orders-label'), false);
+    assert.ok(!existsSync(join(inbox.books, 'lanes/in-orders-label')));
+    assert.ok(!existsSync(join(inbox.dir, 'bto-work/in-orders-label')));
+    const gh = inbox.gh();
+    assert.deepEqual(statusesOf(gh, head), ['success']);
+    assert.ok(
+      gh.some(
+        (line) =>
+          line.includes(`commits/${head}/comments`) &&
+          line.includes(`LANDED ${landed.slice(0, 8)}`),
+      ),
+    );
+    // Handled once: another tick does nothing.
+    inbox.run('tick');
+    assert.equal(inbox.gh().length, gh.length);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: several commits become one, their messages in the body', () => {
+  const inbox = makeInbox();
+  try {
+    inbox.push(
+      'two',
+      { 'apps/web/src/a.tsx': 'export const a = 3;\n' },
+      'feat(web): first\n\nwhy it is',
+    );
+    inbox.push('two', { 'apps/web/src/b.tsx': 'export const b = 3;\n' }, 'fix(web): second', {
+      onTop: true,
+    });
+    const before = inbox.originGit('rev-parse', 'main');
+    assert.equal(inbox.run('tick').status, 0);
+    assert.equal(inbox.originGit('rev-list', '--count', `${before}..main`), '1');
+    const message = inbox.originGit('log', '-1', '--format=%B', 'main');
+    assert.match(message, /^feat\(web\): first\n/);
+    assert.match(message, /Squashed from in\/two \(2 commits\):/);
+    assert.match(message, /\* feat\(web\): first\n\n {2}why it is/);
+    assert.match(message, /\* fix\(web\): second/);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a GUARDED branch is checked, waits for review, and lands on approve', () => {
+  const inbox = makeInbox();
+  try {
+    const head = inbox.push('sales-rule', {
+      'apps/api/src/modules/sales/s.ts': 'export const s = 2;\n',
+    });
+    const tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.equal(inbox.item('sales-rule').state, 'WAITING-REVIEW');
+    assert.equal(inbox.item('sales-rule').class, 'guarded');
+    assert.equal(
+      readFileSync(join(inbox.books, 'lanes/in-sales-rule'), 'utf8'),
+      'apps/api/src/modules/sales/s.ts\n',
+    );
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['pending']);
+    assert.equal(inbox.originGit('log', '-1', '--format=%s', 'main'), 'start');
+    const status = inbox.run('status');
+    assert.match(status.stdout, /WAITING-REVIEW {2}in\/sales-rule @ [0-9a-f]{8} {2}GUARDED/);
+    assert.match(status.stdout, /suites: bash tools\/brain\/int.sh sales/);
+    assert.match(status.stdout, /approve in\/sales-rule/);
+    // Ticks leave it alone until the brain decides.
+    inbox.run('tick');
+    assert.equal(inbox.gh().length, 2);
+    const approve = inbox.run('approve', 'in/sales-rule');
+    assert.equal(approve.status, 0, approve.stdout + approve.stderr);
+    assert.equal(inbox.item('sales-rule').state, 'LANDED');
+    assert.equal(
+      inbox.originGit('show', 'main:apps/api/src/modules/sales/s.ts'),
+      'export const s = 2;',
+    );
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['pending', 'success']);
+    assert.equal(inbox.hasBranch('in/sales-rule'), false);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: reject drops the task and writes the reason back; a new push is a new attempt', () => {
+  const inbox = makeInbox();
+  try {
+    const head = inbox.push('rule', { 'apps/api/src/modules/sales/s.ts': 'export const s = 9;\n' });
+    inbox.run('tick');
+    const reject = inbox.run('reject', 'in/rule', 'money', 'must', 'go', 'through', 'Decimal');
+    assert.equal(reject.status, 0, reject.stderr);
+    assert.equal(inbox.item('rule').state, 'REFUSED');
+    assert.ok(!existsSync(join(inbox.books, 'lanes/in-rule')));
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['pending', 'failure']);
+    assert.ok(inbox.gh().some((line) => line.includes('money must go through Decimal')));
+    assert.equal(inbox.hasBranch('in/rule'), true);
+    const again = inbox.push('rule', {
+      'apps/api/src/modules/sales/s.ts': 'export const s = 10;\n',
+    });
+    inbox.run('tick');
+    assert.equal(inbox.item('rule').head, again);
+    assert.equal(inbox.item('rule').state, 'WAITING-REVIEW');
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a new push replaces an attempt that waits for review', () => {
+  const inbox = makeInbox();
+  try {
+    inbox.push('api', { 'apps/api/src/modules/sales/s.ts': 'export const s = 3;\n' });
+    inbox.run('tick');
+    const second = inbox.push(
+      'api',
+      { 'apps/api/src/modules/sales/s.ts': 'export const s = 4;\n' },
+      'second',
+      { onTop: true },
+    );
+    // The old head can no longer be approved.
+    inbox.run('tick');
+    assert.equal(inbox.item('api').head, second);
+    assert.equal(inbox.item('api').state, 'WAITING-REVIEW');
+    assert.equal(inbox.run('approve', 'api').status, 0);
+    assert.equal(
+      inbox.originGit('show', 'main:apps/api/src/modules/sales/s.ts'),
+      'export const s = 4;',
+    );
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a guard-rail path is refused at once and only once; nothing opens', () => {
+  const inbox = makeInbox();
+  try {
+    const head = inbox.push('sneaky', {
+      'apps/web/src/a.tsx': 'export const a = 5;\n',
+      'tools/fast-check/check-fast.mjs': "console.log('check:fast green');\n",
+    });
+    inbox.run('tick');
+    const item = inbox.item('sneaky');
+    assert.equal(item.state, 'REFUSED');
+    assert.match(item.reason, /tools\/fast-check\/check-fast\.mjs: the checks themselves/);
+    assert.ok(!existsSync(join(inbox.books, 'lanes/in-sneaky')));
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['failure']);
+    inbox.run('tick');
+    assert.equal(inbox.gh().length, 2);
+    assert.equal(inbox.originGit('log', '-1', '--format=%s', 'main'), 'start');
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a branch not from main, a bad name and a red check are refused', () => {
+  const inbox = makeInbox();
+  try {
+    inbox.dev('checkout', '-q', '--orphan', 'alien');
+    inbox.dev('rm', '-rq', '--cached', '.');
+    writeFileSync(join(inbox.dir, 'dev/alien.txt'), 'x\n');
+    inbox.dev('add', 'alien.txt');
+    inbox.dev('commit', '-q', '-m', 'alien');
+    inbox.dev('push', '-q', 'origin', 'HEAD:refs/heads/in/alien');
+    inbox.dev('checkout', '-q', '-f', 'main');
+    inbox.dev('clean', '-fdq');
+    inbox.push('Bad_Name', { 'apps/web/src/a.tsx': 'export const a = 6;\n' });
+    writeFileSync(join(inbox.dir, 'red'), '');
+    inbox.push('red-page', { 'apps/web/src/b.tsx': 'export const b = 6;\n' });
+    inbox.run('tick');
+    assert.match(inbox.item('alien').reason, /not on top of a commit of main's history/);
+    assert.match(inbox.item('Bad_Name').reason, /the branch is in\/<slug>/);
+    assert.equal(inbox.item('red-page').state, 'REFUSED');
+    assert.match(inbox.item('red-page').reason, /check:fast is red: .*TS2322/);
+    // GitHub (a public repository) gets the step's name, never the output or a local path.
+    const told = inbox.gh().filter((line) => line.includes(inbox.item('red-page').head));
+    assert.ok(told.length > 0);
+    for (const line of told) {
+      assert.doesNotMatch(line, /TS2322|\/home\//);
+    }
+    assert.ok(told.some((line) => line.includes("red (web types); details in the gate's log")));
+    assert.ok(!existsSync(join(inbox.books, 'lanes/in-red-page')));
+    assert.ok(!existsSync(join(inbox.dir, 'bto-work/in-red-page')));
+    assert.equal(inbox.originGit('log', '-1', '--format=%s', 'main'), 'start');
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a path a running task holds waits, then lands by itself', () => {
+  const inbox = makeInbox();
+  try {
+    mkdirSync(join(inbox.books, 'lanes'), { recursive: true });
+    writeFileSync(join(inbox.books, 'lanes/brain-task'), 'apps/web/src\n');
+    const head = inbox.push('page', { 'apps/web/src/a.tsx': 'export const a = 7;\n' });
+    inbox.run('tick');
+    assert.equal(inbox.item('page').state, 'WAITING');
+    assert.match(inbox.item('page').reason, /held by brain-task/);
+    inbox.run('tick');
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['pending']);
+    rmSync(join(inbox.books, 'lanes/brain-task'));
+    inbox.run('tick');
+    assert.equal(inbox.item('page').state, 'LANDED');
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['pending', 'success']);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a branch that no longer fits on main is sent back to rebase', () => {
+  const inbox = makeInbox();
+  try {
+    const base = inbox.originGit('rev-parse', 'main');
+    inbox.push('first', { 'apps/web/src/a.tsx': 'export const a = "first";\n' });
+    inbox.run('tick');
+    assert.equal(inbox.item('first').state, 'LANDED');
+    inbox.push('second', { 'apps/web/src/a.tsx': 'export const a = "second";\n' }, 'x', {
+      from: base,
+    });
+    inbox.run('tick');
+    assert.equal(inbox.item('second').state, 'REFUSED');
+    assert.match(
+      inbox.item('second').reason,
+      /conflicts with main: rebase onto main \(apps\/web\/src\/a\.tsx\)/,
+    );
+    assert.ok(!existsSync(join(inbox.books, 'lanes/in-second')));
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a dry run says what it would do and changes nothing', () => {
+  const inbox = makeInbox();
+  try {
+    inbox.push('light', { 'apps/web/src/a.tsx': 'export const a = 8;\n' });
+    inbox.push('guarded', { 'apps/api/src/db/migrations/0300_x.sql': 'select 1;\n' });
+    inbox.push('rails', { 'deploy/store/setup.sh': 'echo\n' });
+    const dry = inbox.run('tick', '--dry-run');
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.match(dry.stdout, /in\/light @ [0-9a-f]{8}\n.*\n {2}would LIGHT: open task in-light/);
+    assert.match(
+      dry.stdout,
+      /would GUARDED: open task in-guarded[^\n]*\n.*0300_x\.sql\n {4}migration: /,
+    );
+    assert.match(dry.stdout, /would REFUSE: guard rails:\n {4}deploy\/store\/setup\.sh: /);
+    assert.deepEqual(inbox.gh(), []);
+    assert.deepEqual(readdirSync(join(inbox.books, 'inbox/items')), []);
+    assert.deepEqual(readdirSync(join(inbox.books, 'lanes')), []);
+    assert.equal(inbox.originGit('log', '-1', '--format=%s', 'main'), 'start');
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: two ticks at once land a branch once', async () => {
+  const inbox = makeInbox();
+  try {
+    inbox.push('once', { 'apps/web/src/a.tsx': 'export const a = 9;\n' });
+    const before = inbox.originGit('rev-parse', 'main');
+    const ticks = await Promise.all([inbox.runAsync('tick'), inbox.runAsync('tick')]);
+    assert.deepEqual(
+      ticks.map((tick) => tick.status),
+      [0, 0],
+    );
+    assert.equal(ticks.filter((tick) => tick.stdout.includes('LANDED')).length, 1);
+    assert.equal(inbox.originGit('rev-list', '--count', `${before}..main`), '1');
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('monitor: an inbox record is shown without its files or the whole check output', () => {
+  const long = `pnpm check:fast is red: ${'x'.repeat(400)}`;
+  const item = parseInboxItem(
+    [
+      'branch=in/orders-label',
+      `head=${'a'.repeat(40)}`,
+      'state=REFUSED',
+      'class=light',
+      'files=apps/web/src/a.tsx packages/shared/i18n/mn.json',
+      `reason=${long}`,
+      'updated=1790000000',
+    ].join('\n'),
+  );
+  assert.equal(item.branch, 'in/orders-label');
+  assert.equal(item.head, 'aaaaaaaa');
+  assert.equal(item.kind, 'light');
+  assert.equal(item.files, 2);
+  assert.equal(item.reason.length, 160);
+  assert.equal(item.updatedAt, 1790000000000);
+  assert.equal(parseInboxItem('state=LANDED'), null);
+});
+
+test('inbox: branches of another remote are only ever looked at (land.sh pushes to origin)', () => {
+  const work = mkdtempSync(join(tmpdir(), 'bto-inbox-remote-'));
+  try {
+    const run = spawnSync('bash', [inboxScript, 'tick'], {
+      env: { ...process.env, BTO_WORK: work, BTO_INBOX_REMOTE: join(work, 'fake.git') },
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 64);
+    assert.match(run.stderr, /for a dry run only/);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('inbox: non-ASCII and quoted names are read as they are, so the guard rails hold', () => {
+  const inbox = makeInbox();
+  try {
+    const head = inbox.push('accents', {
+      'apps/web/src/a.tsx': 'export const a = 11;\n',
+      'deploy/é.sh': 'echo\n',
+      'tools/brain/ü.sh': 'echo\n',
+    });
+    inbox.push('quote', { 'apps/web/src/q"x.tsx': 'export const q = 1;\n' });
+    inbox.run('tick');
+    const item = inbox.item('accents');
+    assert.equal(item.state, 'REFUSED');
+    assert.match(item.reason, /deploy\/é\.sh: the gate, the deploy and CI/);
+    assert.match(item.reason, /tools\/brain\/ü\.sh: the gate, the deploy and CI/);
+    assert.ok(!existsSync(join(inbox.books, 'lanes/in-accents')));
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['failure']);
+    assert.equal(inbox.item('quote').state, 'REFUSED');
+    assert.match(inbox.item('quote').reason, /a file name with a quote/);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a non-ASCII page is held and landed under its real name', () => {
+  const inbox = makeInbox();
+  try {
+    inbox.push('umlaut', { 'apps/web/src/ünï.tsx': 'export const u = 1;\n' });
+    inbox.run('tick');
+    assert.equal(inbox.item('umlaut').state, 'LANDED');
+    assert.equal(inbox.originGit('show', 'main:apps/web/src/ünï.tsx'), 'export const u = 1;');
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test("inbox: a tick killed after opening the task is recovered: the gate's task dropped, tried again", () => {
+  const inbox = makeInbox();
+  try {
+    inbox.push('crash-open', { 'apps/web/src/a.tsx': 'export const a = 12;\n' });
+    const killed = inbox.run('tick', { BTO_INBOX_DIE_AT: 'opened' });
+    assert.notEqual(killed.status, 0);
+    assert.equal(inbox.item('crash-open').phase, 'open');
+    assert.equal(inbox.item('crash-open').state, 'WAITING');
+    assert.ok(existsSync(join(inbox.books, 'lanes/in-crash-open')));
+    assert.match(inbox.run('status').stdout, /INTERRUPTED {2}in\/crash-open/);
+    assert.deepEqual(inbox.gh(), []);
+    const tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.match(tick.stdout, /recovering/);
+    assert.equal(inbox.item('crash-open').state, 'LANDED');
+    assert.equal(inbox.originGit('show', 'main:apps/web/src/a.tsx'), 'export const a = 12;');
+    assert.ok(!existsSync(join(inbox.books, 'lanes/in-crash-open')));
+    assert.ok(!existsSync(join(inbox.books, 'owners/in-crash-open')));
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: a tick killed after land.sh pushed finishes as LANDED: reported once, branch deleted', () => {
+  const inbox = makeInbox();
+  try {
+    const head = inbox.push('crash-land', { 'apps/web/src/b.tsx': 'export const b = 12;\n' });
+    const killed = inbox.run('tick', { BTO_INBOX_DIE_AT: 'landed' });
+    assert.notEqual(killed.status, 0);
+    const landed = inbox.originGit('rev-parse', 'main');
+    assert.match(
+      inbox.originGit('log', '-1', '--format=%B', 'main'),
+      new RegExp(`Inbox-Head: ${head}`),
+    );
+    assert.equal(inbox.item('crash-land').phase, 'land');
+    assert.equal(inbox.hasBranch('in/crash-land'), true);
+    assert.deepEqual(inbox.gh(), []);
+    const tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    assert.equal(inbox.item('crash-land').state, 'LANDED');
+    assert.equal(inbox.item('crash-land').landed, landed);
+    assert.equal(inbox.originGit('rev-parse', 'main'), landed);
+    assert.deepEqual(statusesOf(inbox.gh(), head), ['success']);
+    assert.equal(inbox.hasBranch('in/crash-land'), false);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: an in-* copy the gate did not open is never dropped, and task.sh keeps in-* for the gate', () => {
+  const inbox = makeInbox();
+  try {
+    const taskSh = join(inbox.main, 'tools/brain/task.sh');
+    const refused = spawnSync('bash', [taskSh, 'new', 'in-mine', 'apps/web/src/b.tsx'], {
+      cwd: inbox.main,
+      env: inbox.env,
+      encoding: 'utf8',
+    });
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, /in-\* are the inbox gate's/);
+    // Someone's own copy named in-page, with uncommitted work, made outside the gate.
+    const copy = join(inbox.dir, 'bto-work/in-page');
+    spawnSync('git', ['worktree', 'add', '-q', '-b', 'task/in-page', copy, 'origin/main'], {
+      cwd: inbox.main,
+      env: inbox.env,
+    });
+    writeFileSync(join(copy, 'apps/web/src/a.tsx'), 'my unsaved work\n');
+    const head = inbox.push('page', { 'apps/web/src/b.tsx': 'export const b = 13;\n' });
+    inbox.run('tick');
+    assert.equal(inbox.item('page').state, 'WAITING');
+    assert.match(inbox.item('page').reason, /could not open a task/);
+    inbox.push('page', { 'apps/web/src/b.tsx': 'export const b = 14;\n' }, 'again', {
+      onTop: true,
+    });
+    inbox.run('tick');
+    assert.equal(inbox.run('retry', 'in/page').status, 0);
+    inbox.run('tick');
+    assert.equal(readFileSync(join(copy, 'apps/web/src/a.tsx'), 'utf8'), 'my unsaved work\n');
+    const told = inbox.gh().filter((line) => line.includes(head));
+    for (const line of told) assert.doesNotMatch(line, /bto-work|\/tmp\//);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
 });

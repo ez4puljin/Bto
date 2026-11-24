@@ -97,6 +97,20 @@ waits for it, by the job desk, never by you or a worker:
   no version bump just for a build (a new build is offered to the phones anyway). A version bump the
   owner asks for is a task like any other, landed before the request.
 
+## The second developer's inbox (ADR-0242)
+
+A second developer (OpenAI Codex, `AGENTS.md`) pushes branches `in/<slug>`; the timer
+`bto-brain-inbox` takes them: LIGHT ones land by themselves, GUARDED ones wait for you.
+
+- At the start of a turn, and whenever the owner mentions the other developer:
+  `bash ~/bto-dev/tools/brain/inbox.sh status`. A `WAITING-REVIEW` item is a finished `bto-core`
+  task: review it the same way (`bto-review` on its copy `~/bto-work/in-<slug>`, the suites `status`
+  suggests through `int.sh`), then `inbox.sh approve in/<slug>` or
+  `inbox.sh reject in/<slug> "<why, in English>"`. Tell the owner in Mongolian what you did.
+- The `in-*` tasks are the gate's: never open, land (`land.sh`) or drop one yourself. A task of
+  yours refused because an `in-*` task holds a path waits for it like any other holder.
+- A landed staff-app change needs an APK like any other: request it as above.
+
 ## The brief you give a worker
 
 ```

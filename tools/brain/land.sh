@@ -66,7 +66,10 @@ for attempt in 1 2 3; do
       echo "$slug: already on main, nothing to add"
       continue
     fi
-    message_of "$fork" "task/$slug" | git -C "$GATE" commit -q -F -
+    # The author of the task's first commit stays (the inbox gate's commits keep the second
+    # developer's name, ADR-0242); a worker's commits are this PC's own.
+    author=$(git -C "$MAIN" log -1 --format='%an <%ae>' "$(git -C "$MAIN" rev-list --reverse "$fork..task/$slug" | head -n 1)")
+    message_of "$fork" "task/$slug" | git -C "$GATE" commit -q --author="$author" -F -
   done
   if [ "$(git -C "$GATE" rev-parse HEAD)" = "$base" ]; then
     echo "Nothing to land."
@@ -119,7 +122,7 @@ for attempt in 1 2 3; do
     for slug in "$@"; do
       git -C "$MAIN" worktree remove --force "$WORK/$slug"
       git -C "$MAIN" branch -q -D "task/$slug" 2>/dev/null || true
-      rm -f "$STATE/lanes/$slug"
+      rm -f "$STATE/lanes/$slug" "$STATE/owners/$slug"
       [ ! -f "$STATE/numbers" ] || sed -i "/ $slug\$/d" "$STATE/numbers"
     done
     # The job desk (ADR-0229): these tasks no longer hold a job, so one that waited for them may

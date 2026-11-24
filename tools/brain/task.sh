@@ -76,11 +76,20 @@ case "$cmd" in
     valid_slug "$slug"
     [ "$#" -gt 0 ] || die "Say what the task may change: task.sh new $slug <path>…"
     [ ! -e "$WORK/$slug" ] || die "A task named $slug is already running ($WORK/$slug)."
+    # The in-* names are the inbox gate's (ADR-0242): only it opens one, and the books say so
+    # (owners/<slug>), so that it never drops a copy it did not make.
+    case "$slug" in
+      in-*) [ "${BTO_TASK_OWNER:-}" = inbox ] || die "The task names in-* are the inbox gate's (inbox.sh); choose another name." ;;
+    esac
     claim "$slug" "$@"
+    if [ -n "${BTO_TASK_OWNER:-}" ]; then
+      mkdir -p "$STATE/owners"
+      printf '%s\n' "$BTO_TASK_OWNER" >"$STATE/owners/$slug"
+    fi
     fetch_main
     ensure_merge_driver
     if ! git -C "$MAIN" worktree add -q -b "task/$slug" "$WORK/$slug" "$BASE_REF"; then
-      rm -f "$STATE/lanes/$slug"
+      rm -f "$STATE/lanes/$slug" "$STATE/owners/$slug"
       die "Could not make the copy for $slug."
     fi
     link_modules "$WORK/$slug"
@@ -119,7 +128,7 @@ case "$cmd" in
     valid_slug "$slug"
     [ ! -d "$WORK/$slug" ] || git -C "$MAIN" worktree remove --force "$WORK/$slug"
     git -C "$MAIN" branch -q -D "task/$slug" 2>/dev/null || true
-    rm -f "$STATE/lanes/$slug"
+    rm -f "$STATE/lanes/$slug" "$STATE/owners/$slug"
     [ ! -f "$STATE/numbers" ] || sed -i "/ $slug\$/d" "$STATE/numbers"
     echo "dropped $slug"
     ;;

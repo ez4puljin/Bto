@@ -37,6 +37,7 @@ bash tools/brain/land.sh --no-push <slug>…         merge and check only
 bash tools/brain/int.sh <pattern>… | --integrity   the api's suites from a copy, one run at a time
 bash tools/brain/graph.sh explain|affected|path …  the code graph of origin/main (below)
 bash tools/brain/job.sh request|want|done|status|tick|run …   the job desk: an APK once for all (below)
+bash tools/brain/inbox.sh tick|status|approve|reject|retry …   the inbox gate: a second developer's in/* branches (below)
 node tools/brain/monitor/serve.mjs                  the monitor page on :3310 (a user service; below)
 ```
 
@@ -170,13 +171,93 @@ hand). A design-system artifact or a rebuild of the development database would b
 test goes into `brain.test.mjs` (the tests replace the command with `BTO_JOB_COMMAND`, the publish
 with `BTO_JOB_PUBLISH`, and run against a scratch repository and scratch books).
 
+## The inbox gate: a second developer's work (ADR-0242)
+
+Owner, 2026-11-24: two people with two different AIs, one brain; main and app.puljika.site as fast
+as is safe, without mistakes. The second developer works on another PC with OpenAI Codex, which reads
+`AGENTS.md` (the repository's root), not `CLAUDE.md`. They never push to `main` (GitHub protects it);
+they push a branch `in/<slug>`, and `inbox.sh` here puts it through the same one gate as the brain's
+tasks.
+
+```
+bash tools/brain/inbox.sh tick [--dry-run]        take every new head of an in/* branch (the timer)
+bash tools/brain/inbox.sh status                  what waits, what waits for review, the last results
+bash tools/brain/inbox.sh approve <branch>        the brain reviewed a GUARDED change: land it
+bash tools/brain/inbox.sh reject <branch> <why>   refuse it: the task is dropped, the reason sent back
+bash tools/brain/inbox.sh retry <branch>          forget the result for its head; the next tick tries again
+bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
+```
+
+- **`tick`** (the user timer `bto-brain-inbox.timer`, every 20 seconds, `nice 15`, installed by
+  `install.sh`) fetches the remote's `in/*` branches into `refs/inbox/*` (pruned) and takes each
+  head it has not handled, oldest first. A head is handled once; a new push to the same branch is a
+  new attempt and replaces one that waited (its task is dropped). A branch deleted on GitHub
+  withdraws its waiting attempt. One lock (`inbox/lock`): a second tick at once exits at once;
+  `approve`, `reject` and `retry` wait for it.
+- **Refused at once:** a bad name (`in/<slug>`: lower-case letters, digits, dashes, at most 37), a
+  head not on top of a commit of main's history, a head already on main, and any change of the guard
+  rails: `.github/`, `deploy/`, `tools/brain/`, `.claude/`, `CLAUDE.md`, `AGENTS.md` (anywhere); the
+  checks (`tools/fast-check/`, `tools/lint-guards/`, `tools/finance-core/`, `eslint.config.*`, `ci/`,
+  `scripts/`, `.husky/`, `.gitattributes`); dependencies (any `package.json`, `pnpm-lock.yaml`,
+  `pnpm-workspace.yaml`, `.npmrc`, `.nvmrc`); any `.env` file but `.env.example`. Renames count with
+  both names. Names are read as they are (`git diff -z`, `core.quotePath=false`), so `deploy/é.sh` is
+  `deploy/`; a name with a quote, a backslash or a control character (a tab, a newline) is refused.
+- **A task, through `task.sh`:** `task.sh new in-<slug> <every changed file>`; when a running task
+  holds one of them, the attempt is `WAITING` and the next ticks try again. The `in-` task names are
+  the gate's: `task.sh new in-…` refuses unless the gate calls it (`BTO_TASK_OWNER=inbox`, which
+  `task.sh` records in `owners/<slug>`), and the gate drops only a task the books say it opened, so a
+  copy named `in-…` that someone else made is never touched. The brain never lands or drops one by
+  hand.
+- **A killed tick** (a timeout, a restart): every attempt has a `phase` until it reaches a state.
+  The next tick, holding the lock, finds a phase left over and first waits for any `land.sh` still
+  running; if a commit with the head's `Inbox-Head:` trailer is on `origin/main`, the attempt
+  finishes as `LANDED` (report, branch deleted); otherwise the gate's task is dropped and the head
+  is tried again. `status` shows such an attempt as `INTERRUPTED` (or `IN PROGRESS` while a tick
+  runs).
+- **One commit:** the branch is squash-merged into the task's copy on top of `origin/main`; the
+  commit keeps the author (name, email, date) of the branch's head, its subject is the first commit's
+  subject, the body carries every commit's message, and two trailers name the branch and its head
+  (`Inbox-Branch:`, `Inbox-Head:`). A conflict drops the task and writes back «rebase onto main».
+  `land.sh` keeps the task's first commit's author on main (for a worker's task that is this PC's
+  own name, as before).
+- **LIGHT or GUARDED** (`classify`): LIGHT when every file is a page or text of the office's web
+  (`apps/web/src`, `apps/web/index.html`, `apps/web/public`; not the till: `apps/web/src/pos`,
+  `apps/web/pos.html`), a screen of the staff app (`apps/mobile/app`, `apps/mobile/src`, `assets`;
+  not `src/api`, `src/outbox`, `src/offline`, `src/server`, `src/config`), the translations
+  (`packages/shared/i18n/*.json`) or a document (`docs/`, `*.md`; not `docs/decisions/` or
+  `docs/STATUS.md`). Everything else is GUARDED: the api, `packages/`, migrations, the till, every
+  config. So LIGHT is a subset of what auto-deploy builds as «pages only» or «nothing» (ADR-0205,
+  ADR-0215), never a whole update.
+- **LIGHT lands at once:** `land.sh in-<slug>` (its `check:fast`, its push; the real system takes
+  it by itself). Landed: `LANDED <sha>`, and the remote branch is deleted (only while it still
+  points at that head). Red (exit 4), a conflict (3) or anything else: the task is dropped and the
+  check's last lines go back.
+- **GUARDED waits for the brain:** `check:fast` runs in the copy; green leaves the task open as
+  `WAITING-REVIEW` (in `status`, on the monitor and as a pending status on GitHub). The brain reviews
+  it like a `bto-core` task (`bto-review` on `git -C ~/bto-work/in-<slug> show`, the suites `status`
+  suggests through `int.sh`), then `inbox.sh approve in/<slug>` (land.sh; refused if the branch was
+  pushed again meanwhile) or `inbox.sh reject in/<slug> "<why>"`. Red: dropped and written back.
+- **Written back** with `gh` as the owner: a commit status `bto/inbox-gate` (success, pending,
+  failure) and a commit comment on the branch's head, in English with one Mongolian line, once per
+  result. If GitHub cannot be reached the next ticks try again (five times). The repository is
+  public: GitHub gets the failing step's name (`web types`) and «details in the gate's log on the
+  Bto PC», never a check's or `land.sh`'s output or a local path; the tail stays in `status` and the
+  logs.
+- **The books** are in `~/bto-work/.brain/inbox/`: `items/<slug>` (the attempt: branch, head, state,
+  class, files, task, reason, landed), `log` (one line a result), `logs/<slug>-<head>.log` (the
+  task, the merge, the check, the landing; the last 50), `gh.log`. `BTO_INBOX_REMOTE` (default
+  `origin`), `BTO_INBOX_GH` and `BTO_INBOX_REPO` exist for the tests and a dry run against a local
+  fake remote.
+- **Trust:** the second developer's tests run on this PC in `check:fast`, as a worker's do. The
+  gate keeps mistakes off main; it is not a defence against a hostile collaborator.
+
 ## The monitor: the brain's work on one page
 
 `http://192.168.1.250:3310` on any PC or phone of the store's LAN (owner 2026-11-20) shows, every
 five seconds, what the brain is doing: the workers running now, the open tasks with the paths they
 hold, their commits and uncommitted files, each brain session with its workers, the last landings
 and whether the real system runs them (`/health` and the auto-deploy log), and how fresh the code
-graph is. `monitor/serve.mjs` (Node, no dependency) serves the page and `GET /api/state`; the user
+graph is, and the inbox gate's branches. `monitor/serve.mjs` (Node, no dependency) serves the page and `GET /api/state`; the user
 service `bto-brain-monitor` (`monitor/bto-brain-monitor.service`, installed and restarted by
 `install.sh`) runs it from `~/bto-dev`. Another port: `BRAIN_MONITOR_PORT`.
 

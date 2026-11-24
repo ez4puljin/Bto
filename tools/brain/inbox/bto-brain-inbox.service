@@ -1,0 +1,16 @@
+[Unit]
+Description=Bto inbox gate: check and land the second developer's in/* branches (tools/brain/inbox.sh tick, ADR-0242)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/bto-dev
+Environment=PATH=%h/.local/opt/node/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env bash %h/bto-dev/tools/brain/inbox.sh tick
+Nice=15
+CPUWeight=20
+IOWeight=20
+# land.sh starts the code graph's update and the job desk's tick in the background after a push:
+# only tick itself is stopped when it ends.
+KillMode=process
+# A tick may wait for another landing (land.lock) and then check and land (a few minutes).
+TimeoutStartSec=1800

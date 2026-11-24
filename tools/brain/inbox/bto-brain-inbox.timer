@@ -1,0 +1,10 @@
+[Unit]
+Description=Bto inbox gate: take new in/* branches every 20 seconds (ADR-0242)
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=20s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

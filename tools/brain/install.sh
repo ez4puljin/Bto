@@ -2,8 +2,9 @@
 # Puts the brain where every Claude session on this PC finds it (ADR-0213): the workers' and the
 # reviewer's definitions in ~/.claude/agents, the brain's own rules as the skill `tarhi` in
 # ~/.claude/skills, the guard as a PreToolUse hook in ~/.claude/settings.json, git's merge of
-# mn.json by key, the monitor's page as the user service bto-brain-monitor, and the job desk's
-# one-minute timer bto-brain-jobs (ADR-0229). Run it again after changing anything under tools/brain/.
+# mn.json by key, the monitor's page as the user service bto-brain-monitor, the job desk's
+# one-minute timer bto-brain-jobs (ADR-0229) and the inbox gate's timer bto-brain-inbox (ADR-0242).
+# Run it again after changing anything under tools/brain/.
 #   bash tools/brain/install.sh
 set -euo pipefail
 # shellcheck source=tools/brain/lib.sh
@@ -66,6 +67,19 @@ else
   echo "warning: systemctl --user is not available; run «bash tools/brain/job.sh tick» after a push" >&2
 fi
 echo "jobs:    bash tools/brain/job.sh status (timer bto-brain-jobs, every minute)"
+# The inbox gate (inbox.sh, ADR-0242): a timer runs «inbox.sh tick» every 20 seconds, so a branch
+# in/<slug> the second developer pushes is checked and landed (or written back) by itself.
+for unit in bto-brain-inbox.service bto-brain-inbox.timer; do
+  cp "$BRAIN_DIR/inbox/$unit" "$HOME/.config/systemd/user/$unit"
+done
+if command -v systemctl >/dev/null && systemctl --user daemon-reload 2>/dev/null; then
+  systemctl --user enable -q --now bto-brain-inbox.timer 2>/dev/null ||
+    echo "warning: could not enable bto-brain-inbox.timer" >&2
+else
+  echo "warning: systemctl --user is not available; run «bash tools/brain/inbox.sh tick» by hand" >&2
+fi
+gh auth status >/dev/null 2>&1 || echo "warning: gh is not signed in; the inbox gate cannot write its results to GitHub" >&2
+echo "inbox:   bash tools/brain/inbox.sh status (timer bto-brain-inbox, every 20 seconds)"
 # The code graph (graph.sh): never installed or built from here; the build takes three minutes.
 if ! command -v graphify >/dev/null && [ ! -x "$HOME/.local/bin/graphify" ]; then
   echo "graph:   graphify is missing; install it once with «uv tool install graphifyy»"
