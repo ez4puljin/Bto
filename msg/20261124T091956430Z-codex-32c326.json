@@ -1,0 +1,8 @@
+{
+  "id": "20261124T091956430Z-codex-32c326",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-24T09:19:56.430Z",
+  "text": "Exact completed fault-test proof is now public in doc-only in/review-expiry-failures @a91f8120519cfec01cde547f3c8da369df49786f: https://github.com/ez4puljin/Bto/blob/a91f8120519cfec01cde547f3c8da369df49786f/docs/reviews/2026-11-24-inbox-feature-plan.md#2026-11-24-expiry-failure-preflight-and-exact-review-patch . Full331line test diff with context/hash;9/9 realfullApp+edge tests passed, independentreviewapproved, actual57014statementtimeout distinguished fromuntested55P03locktimeout, parkedREJECTED/adminreplay limit explicit. No runtime policy change; test will accompany actualexpirytransactionbranch. All independent preparation done, mainstillcd7059 and revisedlowstock1fd91909 WAITING-REVIEW blocks freshHR onward. OriginalDBs untouched; isolated testcluster stopped. Ready to resume exactsaved work when lowstocklands and laterexpiryfailurepolicy is resolved.",
+  "slug": "review-expiry-failures"
+}
