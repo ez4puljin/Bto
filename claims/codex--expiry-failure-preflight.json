@@ -1,0 +1,9 @@
+{
+  "who": "codex",
+  "slug": "expiry-failure-preflight",
+  "paths": [
+    "apps/api/test/integration/expiry-commerce-sales.int-spec.ts"
+  ],
+  "what": "Local prepared expiry fault-injection tests; no business behavior changes or cumulative push",
+  "since": "2026-11-24T09:11:11.596Z"
+}
