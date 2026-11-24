@@ -163,8 +163,10 @@ set_state() {
 
 repo_of() {
   [ -z "${BTO_INBOX_REPO:-}" ] || { echo "$BTO_INBOX_REPO"; return 0; }
+  # ERE has no lazy match: take the path after the host, then drop a trailing «/» and «.git».
   git -C "$MAIN" remote get-url "$REMOTE" 2>/dev/null |
-    sed -nE 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+?)(\.git)?/?$#\2#p'
+    sed -nE 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)/?$#\2#p' |
+    sed -E 's#\.git$##'
 }
 
 # The words of a result: GitHub's state, a short line (≤ 140), the English text and one Mongolian line.
@@ -215,6 +217,8 @@ report() {
     return 0
   fi
   repo=$(repo_of)
+  # GitHub refuses a short sha (422): always the full 40-hex one.
+  head=$(git -C "$MAIN" rev-parse -q --verify "${head}^{commit}" 2>/dev/null || echo "$head")
   if [ -z "$repo" ]; then
     echo "  not reported: $REMOTE is not a GitHub repository (BTO_INBOX_REPO)" >&2
     set_key "$item" reported "$state"

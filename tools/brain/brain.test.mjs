@@ -1273,6 +1273,52 @@ test('inbox: several commits become one, their messages in the body', () => {
   }
 });
 
+test('inbox: repo_of gives o/r for every GitHub URL form, without .git', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'bto-inbox-repo-'));
+  try {
+    const source = readFileSync(inboxScript, 'utf8');
+    const fn = /^repo_of\(\) \{\n[\s\S]*?\n\}\n/m.exec(source)?.[0];
+    assert.ok(fn, 'repo_of found');
+    spawnSync('git', ['init', '-q', dir]);
+    const urls = [
+      'https://github.com/o/r.git',
+      'https://github.com/o/r',
+      'https://github.com/o/r.git/',
+      'https://github.com/o/r/',
+      'git@github.com:o/r.git',
+      'git@github.com:o/r',
+      'ssh://git@github.com/o/r.git',
+      'ssh://git@github.com/o/r',
+    ];
+    for (const url of urls) {
+      spawnSync('git', ['-C', dir, 'remote', 'remove', 'origin']);
+      spawnSync('git', ['-C', dir, 'remote', 'add', 'origin', url]);
+      const run = spawnSync('bash', ['-c', `${fn}\nrepo_of`], {
+        env: { ...process.env, BTO_INBOX_REPO: '', MAIN: dir, REMOTE: 'origin' },
+        encoding: 'utf8',
+      });
+      assert.equal(run.stdout.trim(), 'o/r', url);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('inbox: GitHub calls carry the full 40-hex sha', () => {
+  const inbox = makeInbox();
+  try {
+    const head = inbox.push('sha-check', { 'apps/web/src/a.tsx': 'export const a = 5;\n' });
+    inbox.run('tick');
+    const calls = inbox.gh();
+    assert.match(head, /^[0-9a-f]{40}$/);
+    assert.ok(calls.some((l) => l.includes(`repos/owner/repo/statuses/${head}`)));
+    assert.ok(calls.some((l) => l.includes(`repos/owner/repo/commits/${head}/comments`)));
+    for (const line of calls) assert.ok(!line.includes('.git/'), line);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
 test('inbox: a GUARDED branch is checked, waits for review, and lands on approve', () => {
   const inbox = makeInbox();
   try {
