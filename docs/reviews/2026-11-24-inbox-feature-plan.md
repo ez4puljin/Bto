@@ -593,16 +593,16 @@ An asynchronous event cannot retain the caller transaction, capacity lock, rever
 
 The edge cashier's completed sale and outbox are committed independently before central acceptance. A central rollback does not erase that paid sale. The current prepared behavior has several distinct paths:
 
-| Failure                                                                                           | Current prepared central/edge behavior                                                                                                                                       | Evidence / limit                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recognized POS approval invalidity returned as `AppError` by the guarded `resolveInTx` call       | Record an unallocated exception (`EXPIRY_APPROVAL_INVALID`) rather than inventing a payroll allocation; central sale acceptance can finish.                                  | This is a narrow catch, not a blanket catch around all expiry operations.                                                                             |
-| POS price mismatch, exhausted budget or missing liability shares                                  | Return the corresponding unallocated exception path.                                                                                                                         | Existing integrations cover business-invalid offline evidence and actual POS/edge sales.                                                              |
-| Wholesale validation failure                                                                      | Propagate; caller transaction rolls back.                                                                                                                                    | Existing sale/return and payroll integration cover business rollback.                                                                                 |
-| `AppError` outside the recognized expiry exception path, including an early missing markdown/item | Central sale/expiry work rolls back. `PosAcceptService.applyEvent` normally records a `pos_sync_rejections` entry; edge item becomes REJECTED and needs manual admin replay. | Exceptions are `BIN_LOCKED_FOR_COUNT` and `STOCK_INSUFFICIENT`, the existing retryable set. Do not claim every secondary error automatically retries. |
-| Non-`AppError` programming error, missing provider binding or database/lock failure               | Error propagates as an HTTP failure. `SyncRunner` catches it and marks outbox failure while keeping the item PENDING for its existing exponential retry.                     | Unit tests cover required binding and rejection propagation, not every full-flow timeout/bug path.                                                    |
-| Payroll liability recording fails after expiry allocation                                         | Same central transaction rolls back; the outer error classification above determines rejection versus pending retry.                                                         | Same-transaction adapters retain atomicity; classification is not silently redesigned here.                                                           |
+| Failure                                                                                           | Current prepared central/edge behavior                                                                                                                                       | Evidence / limit                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recognized POS approval invalidity returned as `AppError` by the guarded `resolveInTx` call       | Record an unallocated exception (`EXPIRY_APPROVAL_INVALID`) rather than inventing a payroll allocation; central sale acceptance can finish.                                  | This is a narrow catch, not a blanket catch around all expiry operations.                                                                                |
+| POS price mismatch, exhausted budget or missing liability shares                                  | Return the corresponding unallocated exception path.                                                                                                                         | Existing integrations cover business-invalid offline evidence and actual POS/edge sales.                                                                 |
+| Wholesale validation failure                                                                      | Propagate; caller transaction rolls back.                                                                                                                                    | Existing sale/return and payroll integration cover business rollback.                                                                                    |
+| `AppError` outside the recognized expiry exception path, including an early missing markdown/item | Central sale/expiry work rolls back. `PosAcceptService.applyEvent` normally records a `pos_sync_rejections` entry; edge item becomes REJECTED and needs manual admin replay. | Exceptions are `BIN_LOCKED_FOR_COUNT` and `STOCK_INSUFFICIENT`, the existing retryable set. Do not claim every secondary error automatically retries.    |
+| Non-`AppError` programming error, missing provider binding or database/lock failure               | Error propagates as an HTTP failure. `SyncRunner` catches it and marks outbox failure while keeping the item PENDING for its existing exponential retry.                     | The dated appendix covers a full-flow injected bug and actual statement timeout; a missing binding and shared-lock-gate failure remain integration gaps. |
+| Payroll liability recording fails after expiry allocation                                         | Same central transaction rolls back; the outer error classification above determines rejection versus pending retry.                                                         | The dated appendix now verifies rollback after actual liability/reversal insertion followed by an injected throw. Classification is unchanged.           |
 
-A missing-markdown/item `AppError` can therefore park an already-paid edge sale before central completion. Whether that is acceptable is an explicit owner review condition **before the expiry transactions branch is pushed**. Add fault-injection coverage for ordinary unallocated evidence, missing markdown/item, payroll failure, lock timeout and programming error, checking both central rollback and final edge PENDING/REJECTED state. The existing 25 integration/integrity tests do not establish all these technical-failure outcomes. No queue behavior is silently changed by the port refactor or this document.
+A missing-markdown/item `AppError` can therefore park an already-paid edge sale before central completion. Whether that is acceptable remains an explicit owner review condition **before the expiry transactions branch is pushed**. The dated preflight appendix below now proves injected programming failure, actual PostgreSQL statement timeout, payroll failure after insertion, injected missing-provenance rejection, and sale/return recovery through the real edge and central HTTP flow. It does not prove actual lock timeout (`55P03`), a shared-lock-gate failure, or missing-provider behavior through the complete integration flow. The adapter unit test covers a missing binding, but that is not a full-flow substitute. No queue behavior is changed or policy decision inferred from passing tests.
 
 ADR-0245 is the already-reserved expiry decision and contains the synchronous-port amendment; it will explicitly cover all three removed edges and the approved failure policy. No sixth ADR number is requested.
 
@@ -2039,3 +2039,391 @@ ALTER TABLE "payroll_terms" ALTER COLUMN "position_legacy_salary" SET DEFAULT fa
 ```
 
 The redundant change of newly created `base_price_events.valid_from` was folded into that new table's initial definition. These are unapplied source adaptations only; applied local database migrations were left intact.
+
+## 2026-11-24: expiry failure preflight and exact review patch
+
+Status: **prepared and tested locally; not a production behavior change and not a submitted expiry feature**. This document exposes the test patch for review before any actual expiry transactions branch. The test path is already in that feature's manifest, so it adds no path or reserved number. The fresh-main feature must still incorporate and validate it after its predecessors land.
+
+The complete `expiry-commerce-sales.int-spec.ts` suite passed **9/9 tests in 49.297 seconds** in one invocation: the original three tests plus six new fault cases. Focused ESLint passed. An independent static review approved the exact test delta, subject to that passing integration run. All runtime checks used the isolated service on port 15435; no original database, accepted QA history, generator or launcher was touched.
+
+| New case                                                  | Observed outcome                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expiry programming error after an edge sale has committed | Central marked sale, stock movement, allocation and staff liability roll back. Its edge event stays PENDING. An earlier ordinary sale in the same batch remains committed; replay recognizes its duplicate and applies the marked sale once.                                                                                                                        |
+| Actual PostgreSQL `statement_timeout`                     | The transaction executes `SET LOCAL statement_timeout = '25ms'` and `SELECT pg_sleep(1)`. The test checks SQLSTATE **57014**, verifies rollback/PENDING, and proves successful replay after restoring the service. This is **not** a lock-timeout test for SQLSTATE **55P03**.                                                                                      |
+| Payroll throws after actually inserting liability         | Central sale/allocation/liability roll back together; restored retry produces one sale, one allocation and two employee charges totaling 100.00. Replaying the same wire event does not duplicate charges.                                                                                                                                                          |
+| Early missing-markdown `AppError`                         | `notFound` is injected at `recordSaleInTx`, outside the resolver's narrow unallocated-exception catch. No immutable provenance row is deleted. The paid edge sale becomes REJECTED, ordinary push stays idle, and explicit idempotent admin replay applies it once after restoring the service. The edge event **remains REJECTED after the central admin replay**. |
+| Completed return receives a domain `AppError`             | The edge return remains committed but parked REJECTED; no central return, stock reversal or liability reversal commits. Explicit admin replay later reverses the original charge once.                                                                                                                                                                              |
+| Payroll throws after actually inserting a return reversal | The central return/reversal rolls back and the edge event stays PENDING. Restored retry reverses 50.00 once, leaving net original liability 50.00. Duplicate wire replay does not change the result.                                                                                                                                                                |
+
+Every spy is restored in `finally`, with an `afterEach` fallback. Recovery assertions include central document count, stock quantity, expiry quantity sold, source-charge count/amount, edge persistence and duplicate behavior. These are observed outcomes of the current implementation, not new business rules.
+
+Still unresolved: the owner must accept or change the policy that a missing-provenance `AppError` can park an already-paid sale for manual admin replay. The tests establish current semantics; they do not authorize changing that classification. They also do not claim that a failure in the shared `lockInTx` gate leaves ordinary central sales unaffected, that missing provider bindings are covered by full integration, or that statement-timeout coverage proves lock-timeout behavior.
+
+### Test provenance
+
+- Parent port-preparation commit: `bc6b1e17b0c035baf2956727f08ddd03fd79197a`.
+- Local test-only commit: `58e45fe10e78f82ddc8657221478179ba892061c`.
+- Sole changed test source: `apps/api/test/integration/expiry-commerce-sales.int-spec.ts`; **331 added lines**, no production source edits.
+- SHA-256 of the complete committed test file (Git blob bytes): `6291ac7b84d448d4d9fcec5c308c443a46f7e71f2b400768288fbd55ec14adbb`.
+- SHA-256 of the exact parent-to-test diff below (UTF-8 Git diff bytes, including its final newline): `1fd76f6501c132d2c41891523040f7ef914e272cb8c08855c132025c15a156b8`.
+
+The local preparation commits need not be present on the public remote. The complete diff below is supplied so review does not depend on access to a private checkout or a local-only commit. It is documentation only; this branch does not install the test or change runtime behavior.
+
+### Complete test-only diff
+
+```diff
+diff --git a/apps/api/test/integration/expiry-commerce-sales.int-spec.ts b/apps/api/test/integration/expiry-commerce-sales.int-spec.ts
+index b61f41f6..a9254098 100644
+--- a/apps/api/test/integration/expiry-commerce-sales.int-spec.ts
++++ b/apps/api/test/integration/expiry-commerce-sales.int-spec.ts
+@@ -10,6 +10,12 @@ import type {
+   PosSnapshot,
+ } from '@tugeel/shared/pos';
+ import type { Client } from 'pg';
++import { eq, sql as sqlQuery } from 'drizzle-orm';
++import { notFound } from '../../src/common/errors/app-error';
++import { EDGE_DB, type EdgeDb } from '../../src/edge/db/edge-db';
++import { edgeOutbox, edgeSales } from '../../src/edge/db/schema';
++import { ExpiryCommerceService } from '../../src/modules/expiry';
++import { PayrollSourceDeductionsService } from '../../src/modules/payroll';
+ import request from 'supertest';
+ import { SyncRunner } from '../../src/edge/services/sync.runner';
+ import { OutboxService } from '../../src/edge/services/outbox.service';
+@@ -86,6 +92,107 @@ describe('expiry source sales', () => {
+     if (lines[0]) lines[0].expiryBarcode = barcode;
+     return { ...doc, ...extra };
+   };
++  /** Real edge checkout and transport; fault injection happens only after local commit. */
++  const faultTill = async () => {
++    await edge?.close();
++    edge = undefined;
++    const p = await product();
++    const till = (
++      await store.pos
++        .createTill({
++          edgeNodeId: store.node.id,
++          warehouseId: store.store.id,
++          code: `F${serial}`,
++          name: `Synthetic failure till ${serial}`,
++          printerHost: null,
++        })
++        .expect(201)
++    ).body as { id: number; code: string };
++    const approval = await approve(p, { contextId: till.id });
++    const offer = approval.commerce.markdowns[0];
++    if (!offer) throw new Error('missing failure-test approval');
++    const port = (app.getHttpServer().address() as AddressInfo).port;
++    edge = await createEdgeApp({
++      databaseUrl: await edgeDatabase(),
++      centralUrl: `http://127.0.0.1:${port}`,
++      nodeToken: store.edgeToken,
++    });
++    const kiosk = kioskApi(edge);
++    const sync = edge.get(SyncRunner);
++    const edgeDb = edge.get<EdgeDb>(EDGE_DB);
++    const pair = (await store.pos.pairingCode(till.id).expect(200)).body as { code: string };
++    expect(await sync.pullOnce()).toBe('changed');
++    const paired = (
++      await kiosk
++        .post('/pair', {
++          tillCode: till.code,
++          pairingCode: pair.code,
++        })
++        .expect(200)
++    ).body as EdgePairResponse;
++    kiosk.setDevice(paired.deviceToken);
++    const loggedIn = (
++      await kiosk
++        .post('/auth/pin', {
++          userId: store.cashierId,
++          pin: '123456',
++        })
++        .expect(200)
++    ).body as EdgeLoginResponse;
++    kiosk.setSession(loggedIn.token);
++    await kiosk.post('/shifts/open', { openingFloat: '0' }).expect(200);
++    expect(await sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 0 });
++    const complete = async (marked = true) => {
++      const body = {
++        clientId: randomUUID(),
++        lines: [
++          {
++            productUnitId: base(p),
++            qty: marked ? '2' : '1',
++            ...(marked ? { expiryBarcode: offer.barcode } : {}),
++          },
++        ],
++        tenders: [
++          { kind: 'CASH', amount: marked ? '110' : '1300', tendered: marked ? '110' : '1300' },
++        ],
++      };
++      const receipt = (await kiosk.post('/sales', body).expect(200)).body.receipt as EdgeReceipt;
++      const local = await edgeDb
++        .select()
++        .from(edgeSales)
++        .where(eq(edgeSales.clientId, receipt.clientId));
++      expect(local).toHaveLength(1);
++      return { receipt, body };
++    };
++    const event = async (clientId: string) => {
++      const rows = await edgeDb.select().from(edgeOutbox).where(eq(edgeOutbox.clientId, clientId));
++      const row = rows.find((entry) => entry.kind === 'SALE' || entry.kind === 'RETURN');
++      if (!row) throw new Error('completed edge document is missing its outbox event');
++      return row;
++    };
++    return { kiosk, sync, edgeDb, approval, offer, complete, event };
++  };
++  const centralDocument = async (clientId: string) =>
++    (
++      await sql.query<{ sales: number; stock_qty: string }>(
++        `SELECT (SELECT count(*)::int FROM pos_sales WHERE client_id=$1) AS sales,
++       coalesce((SELECT sum(l.qty_base) FROM stock_ledger l JOIN pos_sales s
++         ON l.doc_type='POS' AND l.doc_id=s.id WHERE s.client_id=$1),0)::numeric(14,3)::text AS stock_qty`,
++        [clientId],
++      )
++    ).rows[0];
++  const sourceCharges = async (itemId: number, markdownId: number) =>
++    (
++      await sql.query<{ rows: number; amount: string }>(
++        `SELECT count(*)::int AS rows,coalesce(sum(amount),0)::numeric(14,2)::text AS amount
++       FROM payroll_source_deductions WHERE source_reference=$1
++       OR reverses_id IN (SELECT id FROM payroll_source_deductions WHERE source_reference=$1)`,
++        [`expiry:${itemId}/markdown:${markdownId}`],
++      )
++    ).rows[0];
++  afterEach(() => {
++    jest.restoreAllMocks();
++  });
+   beforeAll(async () => {
+     app = await createHttpApp();
+     await app.listen(0, '127.0.0.1');
+@@ -443,4 +550,228 @@ describe('expiry source sales', () => {
+     expect(await edge.get(OutboxService).counts()).toEqual(before);
+     expect(await allocations(tiny.itemId)).toEqual([]);
+   });
++
++  it.each(['expiry bug', 'database timeout', 'payroll failure'] as const)(
++    'keeps paid edge sales pending on %s, rolls back expiry and retries without duplicate stock or charges',
++    async (failure) => {
++      const ctx = await faultTill();
++      // A separate ordinary sale precedes the faulty marked sale in the real outbox batch.
++      const ordinary = await ctx.complete(false);
++      const marked = await ctx.complete();
++      const expiry = app.get(ExpiryCommerceService);
++      const payroll = app.get(PayrollSourceDeductionsService);
++      const recordPayroll = payroll.recordInTx.bind(payroll);
++      let databaseCode: string | undefined;
++      const fault =
++        failure === 'payroll failure'
++          ? jest.spyOn(payroll, 'recordInTx').mockImplementation(async (...args) => {
++              await recordPayroll(...args);
++              throw new Error('synthetic failure after liability insert');
++            })
++          : jest.spyOn(expiry, 'recordSaleInTx').mockImplementation(async (tx) => {
++              if (failure === 'database timeout') {
++                await tx.execute(sqlQuery`SET LOCAL statement_timeout = '25ms'`);
++                try {
++                  await tx.execute(sqlQuery`SELECT pg_sleep(1)`);
++                } catch (error) {
++                  const databaseError = error as { code?: string; cause?: { code?: string } };
++                  databaseCode = databaseError.cause?.code ?? databaseError.code;
++                  throw error;
++                }
++                throw new Error('expected PostgreSQL statement timeout');
++              }
++              throw new Error('synthetic expiry programming failure');
++            });
++      try {
++        expect(await ctx.sync.pushOnce()).toMatchObject({ state: 'failed' });
++        expect(fault).toHaveBeenCalled();
++        if (failure === 'database timeout') expect(databaseCode).toBe('57014');
++        expect(await ctx.event(marked.receipt.clientId)).toMatchObject({
++          status: 'PENDING',
++          attempts: 1,
++        });
++        expect(await ctx.event(ordinary.receipt.clientId)).toMatchObject({ status: 'PENDING' });
++        expect(await centralDocument(ordinary.receipt.clientId)).toEqual({
++          sales: 1,
++          stock_qty: '-1.000',
++        });
++        expect(await centralDocument(marked.receipt.clientId)).toEqual({
++          sales: 0,
++          stock_qty: '0.000',
++        });
++        expect(await allocations(ctx.approval.itemId)).toEqual([]);
++        expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++          rows: 0,
++          amount: '0.00',
++        });
++        expect((await detail(ctx.approval.itemId)).markdowns[0]?.qtySold).toBe('0');
++        expect(
++          (await ctx.kiosk.post('/sales', marked.body).expect(200)).body.receipt.clientId,
++        ).toBe(marked.receipt.clientId);
++      } finally {
++        fault.mockRestore();
++      }
++      expect(await ctx.sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 0 });
++      expect(await ctx.event(marked.receipt.clientId)).toMatchObject({
++        status: 'SENT',
++        attempts: 2,
++      });
++      expect(await centralDocument(ordinary.receipt.clientId)).toEqual({
++        sales: 1,
++        stock_qty: '-1.000',
++      });
++      expect(await centralDocument(marked.receipt.clientId)).toEqual({
++        sales: 1,
++        stock_qty: '-2.000',
++      });
++      expect(await allocations(ctx.approval.itemId)).toHaveLength(1);
++      expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++        rows: 2,
++        amount: '100.00',
++      });
++      expect((await detail(ctx.approval.itemId)).markdowns[0]?.qtySold).toBe('2');
++      expect(await ctx.sync.pushOnce()).toEqual({ state: 'idle' });
++      // Resend the already applied wire event, not just an empty outbox.
++      expect(
++        (await store.replay([(await ctx.event(marked.receipt.clientId)).payload]))[0]?.status,
++      ).toBe('DUPLICATE');
++      expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++        rows: 2,
++        amount: '100.00',
++      });
++    },
++  );
++
++  it('parks a paid sale on an early missing-markdown AppError until explicit admin replay', async () => {
++    const ctx = await faultTill();
++    const marked = await ctx.complete();
++    // Simulate missing central provenance outside resolveInTx's narrow unallocated catch.
++    const fault = jest
++      .spyOn(app.get(ExpiryCommerceService), 'recordSaleInTx')
++      .mockRejectedValue(notFound('expiry markdown', ctx.offer.id));
++    try {
++      expect(await ctx.sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 1 });
++      expect(await ctx.event(marked.receipt.clientId)).toMatchObject({
++        status: 'REJECTED',
++        code: 'NOT_FOUND',
++      });
++      expect(await centralDocument(marked.receipt.clientId)).toEqual({
++        sales: 0,
++        stock_qty: '0.000',
++      });
++      expect(await allocations(ctx.approval.itemId)).toEqual([]);
++      expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++        rows: 0,
++        amount: '0.00',
++      });
++    } finally {
++      fault.mockRestore();
++    }
++    expect(await ctx.sync.pushOnce()).toEqual({ state: 'idle' });
++    const rejection = (
++      await sql.query<{ id: number }>('SELECT id FROM pos_sync_rejections WHERE client_id=$1', [
++        marked.receipt.clientId,
++      ])
++    ).rows;
++    expect(rejection).toHaveLength(1);
++    const key = idempotency();
++    const route = `/api/v1/pos/sync-rejections/${rejection[0]!.id}/replay`;
++    expect(
++      (await http().post(route).set(bearer(admin)).set(key).send({}).expect(200)).body.status,
++    ).toBe('APPLIED');
++    await http().post(route).set(bearer(admin)).set(key).send({}).expect(200);
++    expect(await centralDocument(marked.receipt.clientId)).toEqual({
++      sales: 1,
++      stock_qty: '-2.000',
++    });
++    expect(await allocations(ctx.approval.itemId)).toHaveLength(1);
++    expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++      rows: 2,
++      amount: '100.00',
++    });
++    // Central admin replay does not silently rewrite the edge's parked status.
++    expect(await ctx.event(marked.receipt.clientId)).toMatchObject({ status: 'REJECTED' });
++    expect((await ctx.kiosk.post('/sales', marked.body).expect(200)).body.receipt.clientId).toBe(
++      marked.receipt.clientId,
++    );
++  });
++
++  it.each(['domain rejection', 'payroll failure'] as const)(
++    'preserves a completed edge return through %s and reverses the original charge once after recovery',
++    async (failure) => {
++      const ctx = await faultTill();
++      const marked = await ctx.complete();
++      expect(await ctx.sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 0 });
++      const body = {
++        clientId: randomUUID(),
++        refundsSaleClientId: marked.receipt.clientId,
++        lines: [{ refundsLineNo: 1, qty: '1', damaged: false }],
++        approval: { supervisorUserId: store.supervisorId, pin: '654321' },
++      };
++      const returned = (await ctx.kiosk.post('/returns', body).expect(200)).body
++        .receipt as EdgeReceipt;
++      const payroll = app.get(PayrollSourceDeductionsService);
++      const recordPayroll = payroll.recordInTx.bind(payroll);
++      const fault =
++        failure === 'domain rejection'
++          ? jest
++              .spyOn(app.get(ExpiryCommerceService), 'recordReturnInTx')
++              .mockRejectedValue(notFound('expiry allocation', ctx.offer.id))
++          : jest.spyOn(payroll, 'recordInTx').mockImplementation(async (...args) => {
++              await recordPayroll(...args);
++              throw new Error('synthetic failure after reversal insert');
++            });
++      try {
++        expect(await ctx.sync.pushOnce()).toMatchObject(
++          failure === 'domain rejection' ? { state: 'sent', rejected: 1 } : { state: 'failed' },
++        );
++        expect(fault).toHaveBeenCalled();
++        expect(await ctx.event(returned.clientId)).toMatchObject({
++          status: failure === 'domain rejection' ? 'REJECTED' : 'PENDING',
++        });
++        expect(await centralDocument(returned.clientId)).toEqual({ sales: 0, stock_qty: '0.000' });
++        expect((await detail(ctx.approval.itemId)).markdowns[0]?.qtySold).toBe('2');
++        expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++          rows: 2,
++          amount: '100.00',
++        });
++        expect((await ctx.kiosk.post('/returns', body).expect(200)).body.receipt.clientId).toBe(
++          returned.clientId,
++        );
++      } finally {
++        fault.mockRestore();
++      }
++      if (failure === 'domain rejection') {
++        expect(await ctx.sync.pushOnce()).toEqual({ state: 'idle' });
++        const [rejection] = (
++          await sql.query<{ id: number }>('SELECT id FROM pos_sync_rejections WHERE client_id=$1', [
++            returned.clientId,
++          ])
++        ).rows;
++        if (!rejection) throw new Error('return rejection missing');
++        const key = idempotency();
++        const route = `/api/v1/pos/sync-rejections/${rejection.id}/replay`;
++        expect(
++          (await http().post(route).set(bearer(admin)).set(key).send({}).expect(200)).body.status,
++        ).toBe('APPLIED');
++        await http().post(route).set(bearer(admin)).set(key).send({}).expect(200);
++      } else {
++        expect(await ctx.sync.pushOnce()).toMatchObject({ state: 'sent', rejected: 0 });
++        expect(await ctx.event(returned.clientId)).toMatchObject({ status: 'SENT', attempts: 2 });
++      }
++      expect(await centralDocument(returned.clientId)).toEqual({ sales: 1, stock_qty: '1.000' });
++      expect((await detail(ctx.approval.itemId)).markdowns[0]?.qtySold).toBe('1');
++      expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++        rows: 4,
++        amount: '50.00',
++      });
++      expect((await store.replay([(await ctx.event(returned.clientId)).payload]))[0]?.status).toBe(
++        'DUPLICATE',
++      );
++      expect(await sourceCharges(ctx.approval.itemId, ctx.offer.id)).toEqual({
++        rows: 4,
++        amount: '50.00',
++      });
++    },
++  );
+ });
+```
