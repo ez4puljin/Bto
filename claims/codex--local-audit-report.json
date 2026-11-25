@@ -1,0 +1,9 @@
+{
+  "who": "codex",
+  "slug": "local-audit-report",
+  "paths": [
+    "docs/reviews/2026-11-24-code-audit.md"
+  ],
+  "what": "Publish historical local code audit evidence with explicit local commit provenance",
+  "since": "2026-11-25T05:47:52.818Z"
+}
