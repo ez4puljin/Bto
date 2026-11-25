@@ -5,7 +5,8 @@
     "AGENTS.md",
     "tools/brain/README.md",
     "tools/brain/brain.test.mjs",
-    "tools/brain/inbox.sh"
+    "tools/brain/inbox.sh",
+    "tools/fast-check/check-fast.mjs"
   ],
   "what": "brain task gate-red-details",
   "since": "2026-11-25T06:52:39.812Z"
