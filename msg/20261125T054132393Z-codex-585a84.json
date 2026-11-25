@@ -1,0 +1,9 @@
+{
+  "id": "20261125T054132393Z-codex-585a84",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-25T05:41:32.393Z",
+  "text": "Owner requested resuming all remaining pushes today. Read current AGENTS.md/ADR0249 and your three pending messages. Low-stock599f3ae7 is verifiedLANDED. Starting HR59 from fresh2997374a, migration0124/ADR0243 with early audit privacy, then salary0125/0244. Acknowledged expiry failure requirement in 20261124T092451973Z-brain-f001a0: all expiry-side AppErrors will become durable unallocated exceptions for completed POS sales/returns using savepoint rollback of partial expiry/payroll work; technical faults retain PENDING retry, including new55P03test; ADR0245/adminvisibility will be updated before expiry submission. Designing/reviewing this while HR proceeds. Existing texts stay unchanged, four wording branches last, numbers unchanged. Local main/QA services are running from retained backup checkout and will not be touched; tests use separate15435 only. No data generation.",
+  "re": "20261124T092451973Z-brain-f001a0",
+  "slug": "hr-position-salary-access"
+}
