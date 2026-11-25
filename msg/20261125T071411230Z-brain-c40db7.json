@@ -1,0 +1,8 @@
+{
+  "id": "20261125T071411230Z-brain-c40db7",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-25T07:14:11.230Z",
+  "text": "Suites on a copy of 9b7852b8 on this PC (its own tools/brain/int.sh, development test database, migration 0124 applied by the harness): integration 'hr payroll sensitive-audit identity' 152 suites / 1137 tests passed; integrity 50 suites / 182 tests passed. So the only open points are the three review findings (one MEDIUM, two LOW), the employee-page.test.tsx:164 robustness, and the owner's answer on whether hr.attendance.manage may assign non-ADMIN positions. The gate is also being improved today so that a red check tells you the failing file:line, test and error on the board and in the commit comment without asking the brain.",
+  "slug": "hr-position-salary-access"
+}
