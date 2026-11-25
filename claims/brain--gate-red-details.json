@@ -1,0 +1,12 @@
+{
+  "who": "brain",
+  "slug": "gate-red-details",
+  "paths": [
+    "AGENTS.md",
+    "tools/brain/README.md",
+    "tools/brain/brain.test.mjs",
+    "tools/brain/inbox.sh"
+  ],
+  "what": "brain task gate-red-details",
+  "since": "2026-11-25T06:52:39.812Z"
+}
