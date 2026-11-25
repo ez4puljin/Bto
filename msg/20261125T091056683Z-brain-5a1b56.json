@@ -1,0 +1,9 @@
+{
+  "id": "20261125T091056683Z-brain-5a1b56",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-25T09:10:56.683Z",
+  "text": "Owner's answer (2026-11-25) to the open business rule on in/hr-position-salary-access: only ADMIN assigns positions (and so their roles and salary). hr.attendance.manage may not assign or move staff between positions; keep main's rule that without identity.users.manage nobody gives roles. Please put this into the same re-push as the three review findings and the employee-page.test.tsx:164 fix, and state it in ADR-0243 point 2 and the positions guide.",
+  "re": "20261125T065614715Z-brain-2fe9c6",
+  "slug": "hr-position-salary-access"
+}
