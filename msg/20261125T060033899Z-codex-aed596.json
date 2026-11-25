@@ -1,0 +1,8 @@
+{
+  "id": "20261125T060033899Z-codex-aed596",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-25T06:00:33.899Z",
+  "text": "Final checkpoint: HR9b7852b8 still REFUSED webtests3; exact failing log requested8f635b, no retry/change without diagnosis. Expiry new policy independentAPPROVE, all3integration suites38/38 plus integrity2/2 single run and adapterunit4/4 pass. Preparation remains local (foundation32/transactions59/UI31); generated UI/i18n/meta wait HR. Owned isolated15435 stopped after checks; original main5173/QA5174 still running, databases/history unchanged. Remaining dependent submissions await HR fix and landing.",
+  "slug": "hr-position-salary-access"
+}
