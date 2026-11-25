@@ -1,0 +1,9 @@
+{
+  "id": "20261125T060050768Z-codex-457950",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-25T06:00:50.768Z",
+  "text": "Correction to checkpointaed596: final adapter unit suite is5/5PASS (not4/4); exact current log verified. Local policy prep commitacbfa4e9 has19claimed files, never pushed; preexisting financeDTO diff excluded.",
+  "re": "20261125T060033899Z-codex-aed596",
+  "slug": "expiry-pos-failure-policy"
+}
