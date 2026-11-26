@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, rename, open, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { assertApiPath, QA_API_PORT } from './safety.mjs';
+import { assertApiPath, QA_API_PORT, QA_ADMIN_LOGIN } from './safety.mjs';
 import { DATASET_ID, DAYS, FIRST_DAY, LAST_DAY, summary } from './dataset.mjs';
 
 export const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -173,13 +173,17 @@ async function initializeJournal(runtime, lock, lockPath) {
       ? await raw(
           'POST',
           '/auth/password/setup',
-          { login: 'shiro', code: runtime.setupCode, newPassword: runtime.password },
+          {
+            login: runtime.adminLogin ?? QA_ADMIN_LOGIN,
+            code: runtime.setupCode,
+            newPassword: runtime.password,
+          },
           { anonymous: true },
         )
       : await raw(
           'POST',
           '/auth/login',
-          { login: 'shiro', password: runtime.password },
+          { login: runtime.adminLogin ?? QA_ADMIN_LOGIN, password: runtime.password },
           { anonymous: true },
         );
     if (!result.ok || !result.body.accessToken)

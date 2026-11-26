@@ -29,10 +29,14 @@ test('cleanup failures preserve the original business failure and every cleanup 
 
 test('runner defaults to a read-only preview and refuses accidental target/window changes', () => {
   assert.equal(optionsOf([]).apply, false);
-  assert.equal(optionsOf(['--apply', '--database', QA_DATABASE]).through, '2026-11-23');
+  assert.equal(
+    optionsOf(['--apply', '--repo', '/explicit-checkout', '--database', QA_DATABASE]).through,
+    '2026-11-23',
+  );
   for (const args of [
     ['--apply'],
-    ['--apply', '--database', 'bto_local_shiro'],
+    ['--apply', '--database', QA_DATABASE],
+    ['--apply', '--database', 'ordinary_database'],
     ['--through', '2026-11-24'],
     ['--through'],
     ['--unsafe'],
@@ -40,7 +44,15 @@ test('runner defaults to a read-only preview and refuses accidental target/windo
   ])
     assert.throws(() => optionsOf(args));
   assert.equal(
-    optionsOf(['--apply', '--database', QA_DATABASE, '--through', '2026-06-01']).through,
+    optionsOf([
+      '--apply',
+      '--repo',
+      '/explicit-checkout',
+      '--database',
+      QA_DATABASE,
+      '--through',
+      '2026-06-01',
+    ]).through,
     '2026-06-01',
   );
 });

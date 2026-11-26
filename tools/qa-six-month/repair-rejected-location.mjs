@@ -7,13 +7,19 @@ import { QA_DATABASE, DATASET_ID } from './dataset.mjs';
 import { hash } from './journal.mjs';
 
 /** One reviewed correction of a proven validation rejection. Never changes business data. */
-export async function repairRejectedLocation({ repo, explicitlyEnabled, database }) {
+export async function repairRejectedLocation(
+  { repo, explicitlyEnabled, database },
+  { read = readFile, openLock = open } = {},
+) {
   if (explicitlyEnabled !== true || database !== QA_DATABASE)
     throw new Error('Explicit exact-QA repair required');
+  if (typeof repo !== 'string' || !repo.trim()) throw new Error('Explicit --repo is required');
   const checkout = resolve(repo),
     directory = assertRunDirectory(checkout);
+  const env = parseEnvironment(await read(join(directory, 'qa.env'), 'utf8'));
+  assertQaUrl(env.DATABASE_URL);
   const lockPath = join(directory, 'run.lock'),
-    lock = await open(lockPath, 'wx');
+    lock = await openLock(lockPath, 'wx');
   let reader;
   try {
     await lock.writeFile(
@@ -23,8 +29,6 @@ export async function repairRejectedLocation({ repo, explicitlyEnabled, database
         at: new Date().toISOString(),
       }),
     );
-    const env = parseEnvironment(await readFile(join(directory, 'qa.env'), 'utf8'));
-    assertQaUrl(env.DATABASE_URL);
     const require = createRequire(join(checkout, 'apps/api/package.json'));
     const { Client } = require('pg');
     reader = new Client({ connectionString: env.DATABASE_URL });
@@ -101,7 +105,7 @@ export async function repairRejectedLocation({ repo, explicitlyEnabled, database
       throw new Error('Repair bin provenance mismatch');
     const proofPath = join(
       checkout,
-      '.data/local-dev/checks/overnight-qa-catalogue-execution-20261124.log',
+      '.data/local-dev/qa-six-month/rejected-catalogue-execution.log',
     );
     const proof = await readFile(proofPath, 'utf8');
     if (
