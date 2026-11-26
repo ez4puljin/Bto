@@ -47,6 +47,7 @@ import {
 } from '../dto/workforce.dto';
 import { HrExportsService } from '../services/hr-exports.service';
 import { HrReportsService } from '../services/reports.service';
+import { PositionsService } from '../services/positions.service';
 import { RequestsService, type TimeRequest } from '../services/requests.service';
 import { ATTENDANCE_MANAGE, ATTENDANCE_VIEW } from '../services/work-sites.service';
 import {
@@ -75,6 +76,7 @@ const staffInput = (body: HrStaffRequestDto): EmployeeInput => ({
   firstName: body.firstName,
   lastName: body.lastName,
   phone: body.phone,
+  positionId: body.positionId,
   position: body.position ?? null,
   divisionId: body.divisionId ?? null,
   employmentType: body.employmentType,
@@ -97,6 +99,7 @@ export class WorkforceController {
     private readonly requests: RequestsService,
     private readonly reports: HrReportsService,
     private readonly exports: HrExportsService,
+    private readonly positions: PositionsService,
   ) {}
 
   // divisions
@@ -143,8 +146,15 @@ export class WorkforceController {
   @Get('staff')
   @RequirePermission(ATTENDANCE_VIEW)
   @ApiOkResponse({ type: [HrStaffDto] })
-  staff(): Promise<HrStaffDto[]> {
-    return this.workforce.employees();
+  async staff(@CurrentUser() ctx: AuthContext): Promise<HrStaffDto[]> {
+    const rows = await this.workforce.employees();
+    if (await this.positions.canViewSalary(ctx)) return rows;
+    return rows.map((row) => ({
+      ...row,
+      positionBaseSalary: null,
+      positionNextBaseSalary: null,
+      positionNextEffectiveMonth: null,
+    }));
   }
 
   @Get('staff.xlsx')
@@ -159,22 +169,22 @@ export class WorkforceController {
   @RequirePermission(ATTENDANCE_MANAGE)
   @Idempotent()
   @ApiCreatedResponse({ type: HrStaffDto })
-  createStaff(
+  async createStaff(
     @CurrentUser() ctx: AuthContext,
     @Body() body: HrStaffRequestDto,
   ): Promise<HrStaffDto> {
-    return this.workforce.create(ctx, staffInput(body));
+    return this.positions.staffResponse(ctx, this.workforce.create(ctx, staffInput(body)));
   }
 
   @Put('staff/:userId')
   @RequirePermission(ATTENDANCE_MANAGE)
   @ApiOkResponse({ type: HrStaffDto })
-  updateStaff(
+  async updateStaff(
     @CurrentUser() ctx: AuthContext,
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body: HrStaffRequestDto,
   ): Promise<HrStaffDto> {
-    return this.workforce.update(ctx, userId, staffInput(body));
+    return this.positions.staffResponse(ctx, this.workforce.update(ctx, userId, staffInput(body)));
   }
 
   @Put('staff/:userId/left')
@@ -185,11 +195,14 @@ export class WorkforceController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body: HrStaffLeftRequestDto,
   ): Promise<HrStaffDto> {
-    return this.workforce.setLeft(ctx, userId, {
-      leftOn: body.leftOn ?? null,
-      reason: body.reason ?? null,
-      reasonKind: body.reasonKind ?? null,
-    });
+    return this.positions.staffResponse(
+      ctx,
+      this.workforce.setLeft(ctx, userId, {
+        leftOn: body.leftOn ?? null,
+        reason: body.reason ?? null,
+        reasonKind: body.reasonKind ?? null,
+      }),
+    );
   }
 
   @Put('staff/:userId/password')
@@ -200,7 +213,10 @@ export class WorkforceController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body: HrStaffPasswordRequestDto,
   ): Promise<HrStaffDto> {
-    return this.workforce.resetPassword(ctx, userId, body.password);
+    return this.positions.staffResponse(
+      ctx,
+      this.workforce.resetPassword(ctx, userId, body.password),
+    );
   }
 
   @Put('staff/:userId/photo')
@@ -211,7 +227,10 @@ export class WorkforceController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body: HrStaffPhotoRequestDto,
   ): Promise<HrStaffDto> {
-    return this.workforce.setPhoto(ctx, userId, body.fileId ?? null);
+    return this.positions.staffResponse(
+      ctx,
+      this.workforce.setPhoto(ctx, userId, body.fileId ?? null),
+    );
   }
 
   // schedules

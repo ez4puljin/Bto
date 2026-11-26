@@ -100,6 +100,11 @@ export class HrStaffDto {
   @ApiProperty({ enum: ['ACTIVE', 'DISABLED'] }) status: 'ACTIVE' | 'DISABLED';
   @ApiProperty({ type: [String] }) roles: string[];
   @ApiProperty({ type: String, nullable: true }) position: string | null;
+  @ApiProperty({ type: Number, nullable: true }) positionId: number | null;
+  @ApiProperty({ type: String, nullable: true }) positionSalaryEffectiveMonth: string | null;
+  @ApiProperty({ type: String, nullable: true }) positionBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) positionNextBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) positionNextEffectiveMonth: string | null;
   @ApiProperty({ type: Number, nullable: true }) divisionId: number | null;
   @ApiProperty({ type: String, nullable: true }) divisionName: string | null;
   @ApiProperty({ enum: EMPLOYMENT_TYPES, enumName: 'EmploymentType' })
@@ -131,6 +136,15 @@ export class HrStaffDto {
 
 @ApiSchema({ name: 'HrStaffRequest' })
 export class HrStaffRequestDto {
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Required for new staff; legacy unassigned staff may remain unassigned',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  positionId?: number | null;
   @ApiProperty()
   @Transform(trimmed)
   @IsString()

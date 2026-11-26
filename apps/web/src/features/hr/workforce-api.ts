@@ -11,6 +11,8 @@ import { HR_KEYS } from './api';
 
 type Schemas = components['schemas'];
 export type HrDivision = Schemas['HrDivision'];
+export type HrPosition = Schemas['HrPosition'];
+export type HrPositionRequest = Schemas['HrPositionRequest'];
 export type HrStaff = Schemas['HrStaff'];
 export type HrStaffRequest = Schemas['HrStaffRequest'];
 export type HrWorkSchedule = Schemas['HrWorkSchedule'];
@@ -25,6 +27,7 @@ export type HrReportRow = Schemas['HrReportRow'];
 
 export const WORKFORCE_KEYS = {
   divisions: ['hr', 'divisions'] as const,
+  positions: ['hr', 'positions'] as const,
   staff: ['hr', 'staff'] as const,
   schedules: ['hr', 'schedules'] as const,
   requestTypes: ['hr', 'request-types'] as const,
@@ -32,6 +35,17 @@ export const WORKFORCE_KEYS = {
   pending: ['hr', 'requests', 'pending'] as const,
   report: ['hr', 'report'] as const,
 };
+
+export function usePositions(includeArchived = false) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...WORKFORCE_KEYS.positions, includeArchived],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/hr/positions', { params: { query: { includeArchived } }, signal }),
+      ),
+  });
+}
 
 export function useDivisions(includeArchived = false) {
   const api = useApiClient();
@@ -140,6 +154,24 @@ export function useWorkforceMutations() {
   const path = (id: number) => ({ params: { path: { id } } });
   const user = (userId: number) => ({ params: { path: { userId } } });
   return {
+    savePosition: useMutation({
+      mutationFn: async ({ id, ...body }: HrPositionRequest & { id: number | null }) =>
+        id === null
+          ? unwrap(await api.POST('/api/v1/hr/positions', { body }))
+          : unwrap(await api.PUT('/api/v1/hr/positions/{id}', { ...path(id), body })),
+      onSuccess: async () => {
+        await refresh();
+        await queryClient.invalidateQueries({ queryKey: ['identity'] });
+        await queryClient.invalidateQueries({ queryKey: ['payroll'] });
+      },
+    }),
+    archivePosition: useMutation({
+      mutationFn: async ({ id, archived }: { id: number; archived: boolean }) =>
+        unwrap(
+          await api.PUT('/api/v1/hr/positions/{id}/archived', { ...path(id), body: { archived } }),
+        ),
+      onSuccess: refresh,
+    }),
     saveDivision: useMutation({
       mutationFn: async ({ id, ...body }: { id: number | null; name: string; sort: number }) =>
         id === null

@@ -394,6 +394,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         permission: 'hr.attendance.view',
       },
       {
+        to: '/hr/positions',
+        label: 'nav.hrPositions',
+        icon: IdCard,
+        permission: ['hr.attendance.view', 'hr.attendance.manage'],
+      },
+      {
         to: '/hr/divisions',
         label: 'nav.hrDivisions',
         icon: Building2,

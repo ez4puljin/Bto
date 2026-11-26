@@ -188,8 +188,11 @@ export class AuditController {
   @Get()
   @RequirePermission('identity.audit.read')
   @ApiOkResponse({ type: AuditPageDto })
-  async list(@Query() query: AuditQueryDto): Promise<AuditPageDto> {
-    const page = await this.audit.list(query);
+  async list(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: AuditQueryDto,
+  ): Promise<AuditPageDto> {
+    const page = await this.audit.list(ctx, query);
     return {
       data: page.data.map((row) => ({ ...row, occurredAt: row.occurredAt.toISOString() })),
       nextCursor: page.nextCursor,

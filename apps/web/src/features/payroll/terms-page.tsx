@@ -1,10 +1,11 @@
 import { PAYROLL_AMOUNT_PATTERN } from '@tugeel/shared/payroll';
+import { businessDate } from '@tugeel/shared/time';
 import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import { Wallet } from 'lucide-react';
 import { type FormEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
-import { useHasPermission } from '@/app/auth-context';
+import { Link, useSearchParams } from 'react-router';
+import { useHasAnyPermission, useHasPermission } from '@/app/auth-context';
 import { DialogFormFooter, FormField } from '@/components/form';
 import {
   ChevronHead,
@@ -54,10 +55,12 @@ const COLUMNS: readonly ColumnSpec[] = [
 function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
   const { t } = useTranslation();
   const canManage = useHasPermission('hr.payroll.manage');
+  const canReadPositions = useHasAnyPermission(['hr.attendance.view', 'hr.attendance.manage']);
   const templates = useTemplates();
   const mutations = usePayrollMutations();
   const action = useAction();
   const { terms } = props;
+  const positionDerived = terms.positionId !== null;
   const [salary, setSalary] = useState(terms.hasTerms ? terms.baseSalary.replace(/\.00$/, '') : '');
   const [insured, setInsured] = useState(terms.paysSocialInsurance);
   const [active, setActive] = useState(terms.hasTerms ? terms.active : true);
@@ -77,7 +80,7 @@ function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!PAYROLL_AMOUNT_PATTERN.test(salary)) {
+    if (!positionDerived && !PAYROLL_AMOUNT_PATTERN.test(salary)) {
       setError('validation.money');
       return;
     }
@@ -89,7 +92,7 @@ function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
     const ok = await action.run(() =>
       mutations.saveTerms.mutateAsync({
         userId: terms.userId,
-        baseSalary: salary,
+        ...(positionDerived ? {} : { baseSalary: salary }),
         paysSocialInsurance: insured,
         templateId,
         items: requestOf(items),
@@ -114,19 +117,54 @@ function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
           <ProblemAlert problem={action.problem} />
           <div className="@container">
             <div className="grid gap-4 @lg:grid-cols-3">
-              <FormField label={t('payroll.web.terms.salary')} htmlFor="terms-salary" error={error}>
-                <MoneyInput
-                  id="terms-salary"
-                  autoFocus={canManage}
-                  suffix="₮"
-                  disabled={!canManage}
-                  value={salary}
-                  onValueChange={(raw) => {
-                    setError(undefined);
-                    setSalary(raw);
-                  }}
-                />
-              </FormField>
+              {positionDerived ? (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium">{t('payroll.web.terms.salary')}</p>
+                  <p className="font-mono text-lg">{money(terms.baseSalary)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('hr.positions.derivedSalary', { name: terms.position })}
+                  </p>
+                  {terms.positionSalaryEffectiveMonth &&
+                  terms.positionSalaryEffectiveMonth > businessDate().slice(0, 7) ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t('hr.positions.assignmentHint', {
+                        month: terms.positionSalaryEffectiveMonth,
+                      })}
+                    </p>
+                  ) : null}
+                  {terms.nextBaseSalary && terms.nextEffectiveMonth ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t('hr.positions.scheduledAmount', {
+                        amount: money(terms.nextBaseSalary),
+                        month: terms.nextEffectiveMonth,
+                      })}
+                    </p>
+                  ) : null}
+                  {canReadPositions ? (
+                    <Link className="text-xs text-link" to="/hr/positions">
+                      {t('hr.positions.title')}
+                    </Link>
+                  ) : null}
+                </div>
+              ) : (
+                <FormField
+                  label={t('payroll.web.terms.salary')}
+                  htmlFor="terms-salary"
+                  error={error}
+                >
+                  <MoneyInput
+                    id="terms-salary"
+                    autoFocus={canManage}
+                    suffix="₮"
+                    disabled={!canManage}
+                    value={salary}
+                    onValueChange={(raw) => {
+                      setError(undefined);
+                      setSalary(raw);
+                    }}
+                  />
+                </FormField>
+              )}
               <FormField
                 label={t('payroll.web.terms.insured')}
                 htmlFor="terms-insured"

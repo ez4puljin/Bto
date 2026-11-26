@@ -39,6 +39,7 @@ export function UserAccessForm(props: {
   submitLabel: string;
   onSubmit: (values: UserAccessValues) => Promise<void>;
   onCancel: () => void;
+  rolesReadOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const roles = useRoles();
@@ -71,27 +72,31 @@ export function UserAccessForm(props: {
 
   return (
     <form className="flex flex-col gap-5" noValidate onSubmit={(event) => void submit(event)}>
-      <FormSection title={t('users.form.roles')} description={roleHint}>
-        <div className="px-3.5 py-3">
-          <div className={ROLE_COLUMNS}>
-            <Controller
-              control={form.control}
-              name="roleIds"
-              render={({ field }) => (
-                <CheckboxGroup
-                  name="role"
-                  value={field.value}
-                  onChange={field.onChange}
-                  options={(roles.data ?? []).map((role) => ({
-                    value: role.id,
-                    label: <RoleName role={role} />,
-                  }))}
-                />
-              )}
-            />
+      {props.rolesReadOnly ? (
+        <p className="text-sm text-muted-foreground">{t('hr.positions.rolesLocked')}</p>
+      ) : (
+        <FormSection title={t('users.form.roles')} description={roleHint}>
+          <div className="px-3.5 py-3">
+            <div className={ROLE_COLUMNS}>
+              <Controller
+                control={form.control}
+                name="roleIds"
+                render={({ field }) => (
+                  <CheckboxGroup
+                    name="role"
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={(roles.data ?? []).map((role) => ({
+                      value: role.id,
+                      label: <RoleName role={role} />,
+                    }))}
+                  />
+                )}
+              />
+            </div>
           </div>
-        </div>
-      </FormSection>
+        </FormSection>
+      )}
       <FormSection title={t('users.form.scopes')} description={t('users.form.scopesHint')}>
         <FormRow label={t('users.form.scopeWarehouses')}>
           <div className={SCOPE_OFFSET}>

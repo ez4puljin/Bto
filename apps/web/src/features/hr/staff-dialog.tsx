@@ -12,6 +12,7 @@ import { Camera, Trash2 } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '@/app/api-client-context';
+import { useAuthState } from '@/app/auth-context';
 import { DateInput } from '@/components/date-input';
 import { DialogFormFooter, FormField, FormFooter } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
@@ -27,14 +28,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { randomUuid } from '@/lib/uuid';
+import { problemFromError } from '@/lib/problem';
 import { cropToJpeg } from '@/lib/image-resize';
 import { toast } from '@/lib/toast';
 import { uploadFile } from '@/lib/upload';
 import { useAction } from '@/lib/use-action';
 import { Avatar } from './hr-kit';
+import { nextPositionMonth } from './position-helpers';
+import { PositionPreview } from './position-kit';
 import {
   type HrStaff,
   useDivisions,
+  usePositions,
   useWorkforceMutations,
   useWorkSchedules,
 } from './workforce-api';
@@ -47,7 +52,7 @@ interface Draft {
   lastName: string;
   firstName: string;
   phone: string;
-  position: string;
+  positionId: string;
   divisionId: string;
   employmentType: EmploymentType;
   gender: EmployeeGender | '';
@@ -70,7 +75,7 @@ function namesOf(staff: HrStaff): { lastName: string; firstName: string } {
 const draftOf = (staff: HrStaff | null): Draft => ({
   ...(staff ? namesOf(staff) : { lastName: '', firstName: '' }),
   phone: staff?.phone?.replace(/^\+976/, '') ?? '',
-  position: staff?.position ?? '',
+  positionId: staff?.positionId ? String(staff.positionId) : '',
   divisionId: staff?.divisionId === null || !staff ? '' : String(staff.divisionId),
   employmentType: staff?.employmentType ?? 'PERMANENT',
   gender: staff?.gender ?? '',
@@ -79,7 +84,9 @@ const draftOf = (staff: HrStaff | null): Draft => ({
   password: '',
 });
 
-type Errors = Partial<Record<'lastName' | 'firstName' | 'phone' | 'password', string>>;
+type Errors = Partial<
+  Record<'lastName' | 'firstName' | 'phone' | 'password' | 'positionId', string>
+>;
 
 /**
  * The employee's card as a form (ADR-0144, ADR-0145): the names, the phone they sign in with, the
@@ -93,14 +100,23 @@ export function StaffForm(props: {
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const { t } = useTranslation();
+  const auth = useAuthState();
+  const admin =
+    auth.status === 'authenticated' && auth.me.roles.some((role) => role.code === 'ADMIN');
   const mutations = useWorkforceMutations();
   const divisions = useDivisions();
   const schedules = useWorkSchedules();
+  const positions = usePositions(props.staff !== null);
   const action = useAction();
   const [draft, setDraft] = useState<Draft>(() => draftOf(props.staff));
   const [errors, setErrors] = useState<Errors>({});
   const [key, setKey] = useState(randomUuid);
   const staff = props.staff;
+  const canAssignPosition =
+    admin && (!staff || (auth.status === 'authenticated' && auth.me.id !== staff.userId));
+  const selectedPosition = positions.data?.find(
+    (position) => String(position.id) === draft.positionId,
+  );
 
   const set = <K extends keyof Draft>(field: K, value: Draft[K]) => {
     setDraft((prev) => ({ ...prev, [field]: value }));
@@ -117,6 +133,7 @@ export function StaffForm(props: {
     if (draft.lastName.trim() === '') next.lastName = 'validation.required';
     if (draft.firstName.trim() === '') next.firstName = 'validation.required';
     if (!/^\d{8}$/.test(draft.phone.trim())) next.phone = 'validation.phone';
+    if (!staff && !selectedPosition?.canAssign) next.positionId = 'validation.required';
     if (!staff && draft.password.length < MIN_PASSWORD) {
       next.password = draft.password === '' ? 'validation.required' : 'validation.passwordTooShort';
     }
@@ -126,7 +143,10 @@ export function StaffForm(props: {
       lastName: draft.lastName.trim(),
       firstName: draft.firstName.trim(),
       phone: draft.phone.trim(),
-      position: draft.position.trim() || null,
+      position: staff?.position ?? null,
+      ...(canAssignPosition
+        ? { positionId: draft.positionId === '' ? null : Number(draft.positionId) }
+        : {}),
       divisionId: draft.divisionId === '' ? null : Number(draft.divisionId),
       employmentType: draft.employmentType,
       gender: draft.gender === '' ? null : draft.gender,
@@ -155,6 +175,7 @@ export function StaffForm(props: {
         setDraft((prev) => ({
           ...draftOf(null),
           divisionId: prev.divisionId,
+          positionId: prev.positionId,
           scheduleId: prev.scheduleId,
           employmentType: prev.employmentType,
           employedOn: prev.employedOn,
@@ -168,9 +189,10 @@ export function StaffForm(props: {
 
   const pending = mutations.createStaff.isPending || mutations.updateStaff.isPending;
   return (
-    <form ref={formRef} className="flex flex-col gap-4" noValidate onSubmit={submit}>
+    <form ref={formRef} className="@container flex flex-col gap-4" noValidate onSubmit={submit}>
       <ProblemAlert problem={action.problem} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <ProblemAlert problem={problemFromError(positions.error)} onRetry={positions.refetch} />
+      <div className="grid gap-4 @xl:grid-cols-2">
         <FormField
           label={t('hr.staff.dialog.lastName')}
           htmlFor="staff-last"
@@ -225,13 +247,33 @@ export function StaffForm(props: {
             />
           </FormField>
         )}
-        <FormField label={t('hr.staff.dialog.position')} htmlFor="staff-position">
-          <Input
+        <FormField
+          label={t('hr.staff.dialog.position')}
+          htmlFor="staff-position"
+          error={errors.positionId}
+          hint={
+            staff && !staff.positionId
+              ? t('hr.positions.legacyHint', { name: staff.position ?? t('common.none') })
+              : undefined
+          }
+        >
+          <NativeSelect
             id="staff-position"
-            maxLength={WORKFORCE_LIMITS.maxPosition}
-            value={draft.position}
-            onChange={(event) => set('position', event.target.value)}
-          />
+            disabled={!canAssignPosition || positions.isPending}
+            value={draft.positionId}
+            onChange={(event) => set('positionId', event.target.value)}
+          >
+            <option value="" disabled={!!staff?.positionId}>
+              {t('hr.positions.choose')}
+            </option>
+            {(positions.data ?? [])
+              .filter((position) => position.canAssign || position.id === staff?.positionId)
+              .map((position) => (
+                <option key={position.id} value={position.id} disabled={!position.canAssign}>
+                  {position.name}
+                </option>
+              ))}
+          </NativeSelect>
         </FormField>
         <FormField label={t('hr.staff.dialog.division')} htmlFor="staff-division">
           <NativeSelect
@@ -297,6 +339,21 @@ export function StaffForm(props: {
           />
         </FormField>
       </div>
+      {selectedPosition ? (
+        <PositionPreview
+          position={selectedPosition}
+          startMonth={
+            staff &&
+            (selectedPosition.id !== staff.positionId ||
+              (staff.positionSalaryEffectiveMonth !== null &&
+                staff.positionSalaryEffectiveMonth > businessDate().slice(0, 7)))
+              ? nextPositionMonth()
+              : undefined
+          }
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">{t('hr.positions.selectionHint')}</p>
+      )}
       {staff ? (
         <FormFooter>
           <Button type="button" variant="ghost" onClick={props.onCancel}>

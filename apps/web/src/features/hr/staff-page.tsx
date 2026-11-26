@@ -4,7 +4,7 @@ import { Check, Download, Plus, Users, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { useHasPermission } from '@/app/auth-context';
+import { useAuthState, useHasPermission } from '@/app/auth-context';
 import {
   ChevronHead,
   EmptyState,
@@ -196,6 +196,11 @@ export function StaffPage() {
   const setParam = useSetParam();
   const roleLabel = useRoleLabel();
   const canManage = useHasPermission('hr.attendance.manage');
+  const auth = useAuthState();
+  const canCreate =
+    canManage &&
+    auth.status === 'authenticated' &&
+    auth.me.roles.some((role) => role.code === 'ADMIN');
   const staff = useStaff();
   const divisions = useDivisions();
   const pending = usePendingRequests(canManage);
@@ -276,7 +281,7 @@ export function StaffPage() {
               <Download />
               {t('hr.staff.export')}
             </Button>
-            {canManage ? (
+            {canCreate ? (
               <Button size="sm" onClick={() => creating.setOpen(true)}>
                 <Plus />
                 {t('hr.staff.create')}
@@ -439,7 +444,7 @@ export function StaffPage() {
           onClose={() => setPendingOpen(false)}
         />
       ) : null}
-      {creating.open && canManage ? (
+      {creating.open && canCreate ? (
         <StaffCreateDialog
           onClose={() => creating.setOpen(false)}
           onCreated={(userId) => void navigate(`/hr/staff/${userId}`)}

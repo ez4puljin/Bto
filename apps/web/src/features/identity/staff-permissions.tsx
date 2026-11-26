@@ -2,7 +2,7 @@ import { type Permission, PERMISSIONS } from '@tugeel/shared/auth';
 import { Check, X } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { SegmentedControl } from '@/components/list';
 import { RoleName } from '@/components/role-name';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,48 @@ import { groupPermissions } from './permission-groups';
 
 const VIEWS = ['ALL', 'HELD', 'MISSING'] as const;
 type View = (typeof VIEWS)[number];
+
+export function PositionAccessNotice({ position }: { position: string | null }) {
+  const { t } = useTranslation();
+  return (
+    <p className="text-sm text-muted-foreground">
+      {t('hr.positions.derivedRights', { name: position ?? t('common.none') })}{' '}
+      <Link className="text-link" to="/hr/positions">
+        {t('hr.positions.title')}
+      </Link>
+    </p>
+  );
+}
+
+/** Assigned employees inherit this access from their position; no per-user override. */
+export function PositionAccessCard({
+  position,
+  roleCodes,
+}: {
+  position: string | null;
+  roleCodes: readonly string[];
+}) {
+  const { t } = useTranslation();
+  return (
+    <Card role="region" aria-label={t('users.detail.access')}>
+      <CardHeader>
+        <CardTitle>{t('users.detail.access')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <PositionAccessNotice position={position} />
+        <div className="flex flex-wrap gap-2 text-sm">
+          {roleCodes.length
+            ? roleCodes.map((code) => (
+                <span key={code}>
+                  <RoleName role={{ code, name: code }} />
+                </span>
+              ))
+            : t('roles.staff.noRole')}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 /**
  * What one staff member may and may not do (owner 2026-11-06, ADR-0165 #5): every right of the

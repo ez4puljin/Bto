@@ -1,4 +1,5 @@
 import { isEmployeeLeft } from '@tugeel/shared/hr';
+import { businessDate } from '@tugeel/shared/time';
 import { KeyRound, LogOut, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,8 +13,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useIdentityMutations, useUser } from '@/features/identity/api';
 import { UserAccessCard, UserSessionsCard } from '@/features/identity/user-access';
+import { PositionAccessCard } from '@/features/identity/staff-permissions';
 import { localPhone } from '@/features/partners/phone';
 import { formatUbDateTime } from '@/lib/dayjs';
+import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
@@ -150,7 +153,10 @@ export function EmployeePage() {
               canManage={canManageUsers}
               isSelf={isSelf}
               onChanged={refresh}
+              position={staff.positionId !== null ? { name: staff.position } : undefined}
             />
+          ) : staff.positionId !== null ? (
+            <PositionAccessCard roleCodes={staff.roles} position={staff.position} />
           ) : (
             <RolesCard roles={staff.roles} />
           )}
@@ -186,12 +192,32 @@ function CardFacts({ staff, canManage }: { staff: HrStaff; canManage: boolean })
   return (
     <div className="flex flex-col gap-4">
       <PhotoPicker staff={staff} canManage={canManage} />
+      {staff.positionSalaryEffectiveMonth &&
+      staff.positionSalaryEffectiveMonth > businessDate().slice(0, 7) ? (
+        <p className="text-sm text-muted-foreground">
+          {t('hr.positions.assignmentHint', { month: staff.positionSalaryEffectiveMonth })}
+        </p>
+      ) : null}
       <FieldList
         columns={2}
         items={[
           { label: t('hr.staff.dialog.lastName'), value: staff.lastName },
           { label: t('hr.staff.dialog.firstName'), value: staff.firstName ?? staff.fullName },
           { label: t('hr.staff.dialog.position'), value: staff.position },
+          ...(staff.positionBaseSalary !== null
+            ? [{ label: t('hr.positions.salary'), value: formatMnt(staff.positionBaseSalary) }]
+            : []),
+          ...(staff.positionNextBaseSalary && staff.positionNextEffectiveMonth
+            ? [
+                {
+                  label: t('hr.positions.scheduled'),
+                  value: t('hr.positions.scheduledAmount', {
+                    amount: formatMnt(staff.positionNextBaseSalary),
+                    month: staff.positionNextEffectiveMonth,
+                  }),
+                },
+              ]
+            : []),
           { label: t('hr.staff.dialog.division'), value: staff.divisionName },
           {
             label: t('hr.staff.dialog.schedule'),

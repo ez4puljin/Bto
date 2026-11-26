@@ -64,6 +64,7 @@ import { EngagementService } from '../services/engagement.service';
 import { HrInsightsService } from '../services/insights.service';
 import { ATTENDANCE_MANAGE, ATTENDANCE_VIEW } from '../services/work-sites.service';
 import { WorkforceService } from '../services/workforce.service';
+import { PositionsService } from '../services/positions.service';
 
 /**
  * The staff's own side (ADR-0146): what every signed-in staff member reads and answers, and what
@@ -74,6 +75,7 @@ import { WorkforceService } from '../services/workforce.service';
 export class EngagementController {
   constructor(
     private readonly engagement: EngagementService,
+    private readonly positions: PositionsService,
     private readonly insights: HrInsightsService,
     private readonly workforce: WorkforceService,
   ) {}
@@ -406,7 +408,7 @@ export class EngagementController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body: HrStaffDetailsRequestDto,
   ): Promise<HrStaffDto> {
-    return this.workforce.saveDetails(ctx, userId, body);
+    return this.positions.staffResponse(ctx, this.workforce.saveDetails(ctx, userId, body));
   }
 
   @Get('insights/workforce')

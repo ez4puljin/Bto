@@ -764,7 +764,7 @@ export class PayrollRunsService {
     facts: MonthFacts,
   ): Promise<{ added: number[]; removed: number[] }> {
     const range = payrollMonthRange(run.month);
-    const terms = await this.terms.activeByUser(tx);
+    const terms = await this.terms.activeByUser(tx, run.month);
     const lines = await tx.select().from(payrollLines).where(eq(payrollLines.runId, run.id));
     const byUser = new Map(lines.map((line) => [line.userId, line]));
     const added: number[] = [];
@@ -785,7 +785,7 @@ export class PayrollRunsService {
       if (!person || !own || !employedIn(person, range.from, range.to)) continue;
       const snapshot = {
         fullName: person.fullName,
-        position: person.position,
+        position: own.position,
         divisionName: person.divisionName,
         baseSalary: new Decimal(own.baseSalary),
         paysSocialInsurance: own.paysSocialInsurance,

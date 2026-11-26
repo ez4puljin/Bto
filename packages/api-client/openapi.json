@@ -19819,6 +19819,251 @@
         ]
       }
     },
+    "/api/v1/hr/positions": {
+      "get": {
+        "operationId": "Positions_list",
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HrPosition"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      },
+      "post": {
+        "operationId": "Positions_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrPositionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrPosition"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/positions/{id}": {
+      "get": {
+        "operationId": "Positions_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrPosition"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      },
+      "put": {
+        "operationId": "Positions_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrPositionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrPosition"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
+    "/api/v1/hr/positions/{id}/archived": {
+      "put": {
+        "operationId": "Positions_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HrArchiveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HrPosition"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hr"
+        ]
+      }
+    },
     "/api/v1/hr/me/feed": {
       "get": {
         "operationId": "Engagement_feed",
@@ -71393,6 +71638,26 @@
             "type": "string",
             "nullable": true
           },
+          "positionId": {
+            "type": "number",
+            "nullable": true
+          },
+          "positionSalaryEffectiveMonth": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionNextBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionNextEffectiveMonth": {
+            "type": "string",
+            "nullable": true
+          },
           "divisionId": {
             "type": "number",
             "nullable": true
@@ -71512,6 +71777,11 @@
           "status",
           "roles",
           "position",
+          "positionId",
+          "positionSalaryEffectiveMonth",
+          "positionBaseSalary",
+          "positionNextBaseSalary",
+          "positionNextEffectiveMonth",
           "divisionId",
           "divisionName",
           "employmentType",
@@ -71538,6 +71808,12 @@
       "HrStaffRequest": {
         "type": "object",
         "properties": {
+          "positionId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "description": "Required for new staff; legacy unassigned staff may remain unassigned"
+          },
           "firstName": {
             "type": "string",
             "maxLength": 60
@@ -72308,6 +72584,146 @@
         "required": [
           "rows",
           "totals"
+        ]
+      },
+      "HrPositionRole": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "permissions"
+        ]
+      },
+      "HrPositionSalary": {
+        "type": "object",
+        "properties": {
+          "effectiveMonth": {
+            "type": "string"
+          },
+          "baseSalary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "effectiveMonth",
+          "baseSalary"
+        ]
+      },
+      "HrPosition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roleIds": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HrPositionRole"
+            }
+          },
+          "baseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextEffectiveMonth": {
+            "type": "string",
+            "nullable": true
+          },
+          "salaryHistory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HrPositionSalary"
+            }
+          },
+          "archivedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "employeeCount": {
+            "type": "number"
+          },
+          "grantsAdmin": {
+            "type": "boolean"
+          },
+          "canAssign": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "roleIds",
+          "roles",
+          "baseSalary",
+          "nextBaseSalary",
+          "nextEffectiveMonth",
+          "salaryHistory",
+          "archivedAt",
+          "employeeCount",
+          "grantsAdmin",
+          "canAssign"
+        ]
+      },
+      "HrPositionRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "baseSalary": {
+            "type": "string",
+            "pattern": "^\\d{1,12}(\\.\\d{1,2})?$",
+            "example": "1500000.00"
+          },
+          "roleIds": {
+            "uniqueItems": true,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "name",
+          "baseSalary",
+          "roleIds"
         ]
       },
       "HrMessageKind": {
@@ -74621,10 +75037,30 @@
             "type": "boolean",
             "description": "False: no pay terms are set for the caller"
           },
+          "positionId": {
+            "type": "number",
+            "nullable": true
+          },
+          "positionSalaryEffectiveMonth": {
+            "type": "string",
+            "nullable": true
+          },
+          "position": {
+            "type": "string",
+            "nullable": true
+          },
           "baseSalary": {
             "type": "string",
             "description": "Money as text, «300000» or «300000.50»",
             "example": "300000.00"
+          },
+          "nextBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextEffectiveMonth": {
+            "type": "string",
+            "nullable": true
           },
           "paysSocialInsurance": {
             "type": "boolean"
@@ -74643,7 +75079,12 @@
         },
         "required": [
           "hasTerms",
+          "positionId",
+          "positionSalaryEffectiveMonth",
+          "position",
           "baseSalary",
+          "nextBaseSalary",
+          "nextEffectiveMonth",
           "paysSocialInsurance",
           "items",
           "kpiTotal"
@@ -74850,6 +75291,14 @@
           "fullName": {
             "type": "string"
           },
+          "positionId": {
+            "type": "number",
+            "nullable": true
+          },
+          "positionSalaryEffectiveMonth": {
+            "type": "string",
+            "nullable": true
+          },
           "position": {
             "type": "string",
             "nullable": true
@@ -74868,7 +75317,7 @@
           },
           "hasTerms": {
             "type": "boolean",
-            "description": "False: HR has not set terms yet (zero salary, no items)"
+            "description": "True when personal terms or a current position salary exist"
           },
           "active": {
             "type": "boolean",
@@ -74878,6 +75327,14 @@
             "type": "string",
             "description": "Money as text, «300000» or «300000.50»",
             "example": "300000.00"
+          },
+          "nextBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextEffectiveMonth": {
+            "type": "string",
+            "nullable": true
           },
           "paysSocialInsurance": {
             "type": "boolean"
@@ -74910,6 +75367,8 @@
         "required": [
           "userId",
           "fullName",
+          "positionId",
+          "positionSalaryEffectiveMonth",
           "position",
           "divisionId",
           "divisionName",
@@ -74917,6 +75376,8 @@
           "hasTerms",
           "active",
           "baseSalary",
+          "nextBaseSalary",
+          "nextEffectiveMonth",
           "paysSocialInsurance",
           "templateId",
           "templateName",
@@ -74930,7 +75391,7 @@
         "properties": {
           "baseSalary": {
             "type": "string",
-            "description": "Money as text, «300000» or «300000.50»",
+            "description": "Omit for employees assigned to a position",
             "example": "300000.00"
           },
           "paysSocialInsurance": {
@@ -74953,7 +75414,6 @@
           }
         },
         "required": [
-          "baseSalary",
           "paysSocialInsurance",
           "items",
           "active"

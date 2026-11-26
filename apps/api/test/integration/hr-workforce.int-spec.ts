@@ -54,12 +54,19 @@ describe('hr workforce', () => {
   let employee: StaffJson;
   let employeeToken: string;
   let scheduleId: number;
+  let positionId: number;
 
   beforeAll(async () => {
     app = await createHttpApp();
     hr = (await login(app, await seedUser(app, { roles: ['HR'] }))).accessToken;
     office = (await login(app, await seedUser(app, { roles: ['OFFICE'] }))).accessToken;
     admin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
+    const position = await http()
+      .post('/api/v1/hr/positions')
+      .set(bearer(admin))
+      .send({ name: 'Workforce test position', baseSalary: '1000000', roleIds: [] })
+      .expect(201);
+    positionId = (position.body as { id: number }).id;
   });
   afterAll(async () => {
     await app.close();
@@ -79,12 +86,13 @@ describe('hr workforce', () => {
       .expect(409);
     const created = await http()
       .post('/api/v1/hr/staff')
-      .set(bearer(hr))
+      .set(bearer(admin))
       .set(idempotency())
       .send({
         firstName: 'Бат',
         lastName: 'Дорж',
         phone: PHONE,
+        positionId,
         position: 'Нярав',
         divisionId,
         employmentType: 'PERMANENT',
@@ -110,12 +118,13 @@ describe('hr workforce', () => {
     await http().get('/api/v1/hr/staff').set(bearer(employeeToken)).expect(403);
     await http()
       .post('/api/v1/hr/staff')
-      .set(bearer(hr))
+      .set(bearer(admin))
       .set(idempotency())
       .send({
         firstName: 'Сул',
         lastName: 'Нууц',
         phone: '88001133',
+        positionId,
         position: null,
         divisionId: null,
         employmentType: 'PERMANENT',
@@ -283,6 +292,7 @@ describe('hr workforce', () => {
 
   it('keeps one record per phone and resets a password directly (ADR-0145)', async () => {
     const card = {
+      positionId,
       firstName: 'Дахин',
       lastName: 'Бүртгэл',
       position: null,
@@ -295,13 +305,13 @@ describe('hr workforce', () => {
     // The phone is in the list already; a new employee needs a first password.
     await http()
       .post('/api/v1/hr/staff')
-      .set(bearer(hr))
+      .set(bearer(admin))
       .set(idempotency())
       .send({ ...card, phone: PHONE, password: PASSWORD })
       .expect(422);
     await http()
       .post('/api/v1/hr/staff')
-      .set(bearer(hr))
+      .set(bearer(admin))
       .set(idempotency())
       .send({ ...card, phone: '88001144' })
       .expect(422);

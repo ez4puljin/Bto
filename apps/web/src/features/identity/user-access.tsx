@@ -31,6 +31,7 @@ import {
   useWarehouses,
 } from './api';
 import { UserAccessForm } from './user-form';
+import { PositionAccessNotice } from './staff-permissions';
 
 const when = (iso: string) => formatUbDateTime(Date.parse(iso));
 
@@ -56,6 +57,7 @@ export function UserAccessCard(props: {
   canManage: boolean;
   isSelf: boolean;
   onChanged: () => void;
+  position?: { name: string | null };
 }) {
   const { t } = useTranslation();
   const mutations = useIdentityMutations();
@@ -72,10 +74,12 @@ export function UserAccessCard(props: {
             </Alert>
           ) : null}
           <AccessFacts user={user} />
+          {props.position ? <PositionAccessNotice position={props.position.name} /> : null}
         </div>
       }
       edit={(close) => (
         <UserAccessForm
+          rolesReadOnly={props.position !== undefined}
           submitLabel={t('common.save')}
           onCancel={close}
           defaultValues={{
@@ -88,7 +92,7 @@ export function UserAccessCard(props: {
               mutations.updateUser.mutateAsync({
                 id: user.id,
                 body: {
-                  roleIds: values.roleIds,
+                  ...(props.position ? {} : { roleIds: values.roleIds }),
                   scopes: { warehouseIds: values.warehouseIds, branchIds: values.branchIds },
                 },
               }),

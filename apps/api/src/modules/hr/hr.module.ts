@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity';
 import { DirectoryController } from './controllers/directory.controller';
+import { PositionsController } from './controllers/positions.controller';
 import { EngagementController } from './controllers/engagement.controller';
 import { AttendanceController, HrSetupController } from './controllers/hr.controller';
 import { WorkforceController } from './controllers/workforce.controller';
@@ -12,6 +13,7 @@ import { HrSettingsService } from './services/hr-settings.service';
 import { HrInsightsService } from './services/insights.service';
 import { HrReportsService } from './services/reports.service';
 import { RequestsService } from './services/requests.service';
+import { PositionsService } from './services/positions.service';
 import { WorkforceService } from './services/workforce.service';
 import { WorkSitesService } from './services/work-sites.service';
 
@@ -27,6 +29,7 @@ import { WorkSitesService } from './services/work-sites.service';
     HrSettingsService,
     AttendanceService,
     WorkforceService,
+    PositionsService,
     RequestsService,
     HrReportsService,
   ],
@@ -35,6 +38,7 @@ import { WorkSitesService } from './services/work-sites.service';
     HrSettingsService,
     AttendanceService,
     WorkforceService,
+    PositionsService,
     RequestsService,
     HrReportsService,
   ],
@@ -48,6 +52,7 @@ export class HrModule {}
     HrSetupController,
     AttendanceController,
     WorkforceController,
+    PositionsController,
     EngagementController,
     DirectoryController,
   ],

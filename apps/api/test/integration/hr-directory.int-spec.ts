@@ -40,12 +40,22 @@ describe('hr directory', () => {
     position: string | null;
     divisionId: number | null;
   }): Promise<number> => {
+    const position = await http()
+      .post('/api/v1/hr/positions')
+      .set(bearer(admin))
+      .send({
+        name: body.position ?? `Directory staff ${body.phone}`,
+        baseSalary: '1000000',
+        roleIds: [],
+      })
+      .expect(201);
     const created = await http()
       .post('/api/v1/hr/staff')
-      .set(bearer(hr))
+      .set(bearer(admin))
       .set(idempotency())
       .send({
         ...body,
+        positionId: (position.body as { id: number }).id,
         employmentType: 'PERMANENT',
         gender: 'FEMALE',
         employedOn: null,

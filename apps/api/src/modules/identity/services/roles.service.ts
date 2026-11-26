@@ -159,10 +159,20 @@ export class RolesService {
       try {
         await tx.delete(roles).where(eq(roles.id, id));
       } catch (error) {
+        const databaseError = databaseErrorOf(error);
+        if (
+          databaseError?.code === '23503' &&
+          databaseError.constraint === 'hr_position_roles_role_id_roles_id_fk'
+        ) {
+          throw new AppError('ROLE_NAMED_ON_RECORDS', `role ${id} is configured on a position`, {
+            id,
+            entity: 'hr_position',
+          });
+        }
         // Holders are counted above and every other reference cascades, so what is left is an expiry
         // record naming the role as liable (ADR-0172). Identity cannot read that table, and it must
         // not cascade: that would erase who was held liable.
-        if (databaseErrorOf(error)?.code === '23503') {
+        if (databaseError?.code === '23503') {
           throw new AppError('ROLE_NAMED_ON_RECORDS', `role ${id} is named on records`, { id });
         }
         throw error;

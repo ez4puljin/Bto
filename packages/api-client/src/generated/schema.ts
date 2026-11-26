@@ -4948,6 +4948,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hr/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Positions_list"];
+        put?: never;
+        post: operations["Positions_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/positions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Positions_get"];
+        put: operations["Positions_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hr/positions/{id}/archived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Positions_archive"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hr/me/feed": {
         parameters: {
             query?: never;
@@ -18759,6 +18807,11 @@ export interface components {
             status: "ACTIVE" | "DISABLED";
             roles: string[];
             position: string | null;
+            positionId: number | null;
+            positionSalaryEffectiveMonth: string | null;
+            positionBaseSalary: string | null;
+            positionNextBaseSalary: string | null;
+            positionNextEffectiveMonth: string | null;
             divisionId: number | null;
             divisionName: string | null;
             employmentType: components["schemas"]["EmploymentType"];
@@ -18784,6 +18837,8 @@ export interface components {
             children: components["schemas"]["HrStaffChild"][];
         };
         HrStaffRequest: {
+            /** @description Required for new staff; legacy unassigned staff may remain unassigned */
+            positionId?: number | null;
             firstName: string;
             lastName: string;
             /** @example 99112233 */
@@ -18961,6 +19016,37 @@ export interface components {
         HrReport: {
             rows: components["schemas"]["HrReportRow"][];
             totals: components["schemas"]["HrReportTotals"];
+        };
+        HrPositionRole: {
+            id: number;
+            code: string | null;
+            name: string | null;
+            permissions: string[];
+        };
+        HrPositionSalary: {
+            effectiveMonth: string;
+            baseSalary: string;
+        };
+        HrPosition: {
+            id: number;
+            name: string;
+            roleIds: number[];
+            roles: components["schemas"]["HrPositionRole"][];
+            baseSalary: string | null;
+            nextBaseSalary: string | null;
+            nextEffectiveMonth: string | null;
+            salaryHistory: components["schemas"]["HrPositionSalary"][];
+            /** Format: date-time */
+            archivedAt: string | null;
+            employeeCount: number;
+            grantsAdmin: boolean;
+            canAssign: boolean;
+        };
+        HrPositionRequest: {
+            name: string;
+            /** @example 1500000.00 */
+            baseSalary: string;
+            roleIds: number[];
         };
         /** @enum {string} */
         HrMessageKind: "NOTICE" | "NEWS";
@@ -19562,11 +19648,16 @@ export interface components {
         PayrollMyTerms: {
             /** @description False: no pay terms are set for the caller */
             hasTerms: boolean;
+            positionId: number | null;
+            positionSalaryEffectiveMonth: string | null;
+            position: string | null;
             /**
              * @description Money as text, «300000» or «300000.50»
              * @example 300000.00
              */
             baseSalary: string;
+            nextBaseSalary: string | null;
+            nextEffectiveMonth: string | null;
             paysSocialInsurance: boolean;
             items: components["schemas"]["PayrollKpiItem"][];
             /**
@@ -19653,12 +19744,14 @@ export interface components {
         PayrollTerms: {
             userId: number;
             fullName: string;
+            positionId: number | null;
+            positionSalaryEffectiveMonth: string | null;
             position: string | null;
             divisionId: number | null;
             divisionName: string | null;
             /** @description The employee has left (a closed account or a leaving date) */
             left: boolean;
-            /** @description False: HR has not set terms yet (zero salary, no items) */
+            /** @description True when personal terms or a current position salary exist */
             hasTerms: boolean;
             /** @description Only active terms put the person on a payroll run */
             active: boolean;
@@ -19667,6 +19760,8 @@ export interface components {
              * @example 300000.00
              */
             baseSalary: string;
+            nextBaseSalary: string | null;
+            nextEffectiveMonth: string | null;
             paysSocialInsurance: boolean;
             templateId: number | null;
             templateName: string | null;
@@ -19681,10 +19776,10 @@ export interface components {
         };
         PayrollTermsRequest: {
             /**
-             * @description Money as text, «300000» or «300000.50»
+             * @description Omit for employees assigned to a position
              * @example 300000.00
              */
-            baseSalary: string;
+            baseSalary?: string;
             paysSocialInsurance: boolean;
             /** @description The template the sheet came from */
             templateId?: number | null;
@@ -41778,6 +41873,166 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Positions_list: {
+        parameters: {
+            query?: {
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPosition"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Positions_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrPositionRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPosition"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Positions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPosition"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Positions_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrPositionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPosition"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Positions_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrArchiveRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrPosition"];
                 };
             };
             /** @description RFC 9457 problem details */

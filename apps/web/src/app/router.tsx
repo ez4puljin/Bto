@@ -139,6 +139,7 @@ import { HrReportPage } from '@/features/hr/report-page';
 import { RequestsPage } from '@/features/hr/requests-page';
 import { SchedulesPage } from '@/features/hr/schedules-page';
 import { StaffPage } from '@/features/hr/staff-page';
+import { PositionsPage } from '@/features/hr/positions-page';
 import { CalendarPage } from '@/features/hr/community/calendar-page';
 import { FeedbackPage } from '@/features/hr/community/feedback-page';
 import { MessagesPage } from '@/features/hr/community/messages-page';
@@ -1150,6 +1151,15 @@ function hrRoutes(): RouteObject[] {
     { path: 'hr/shares', handle: { width: 'wide' }, element: view(<SharesPage />) },
     { path: 'hr/sites', handle: { width: 'wide' }, element: view(<SitesPage />) },
     { path: 'hr/staff', handle: { width: 'wide' }, element: view(<StaffPage />) },
+    {
+      path: 'hr/positions',
+      handle: { width: 'wide' },
+      element: (
+        <RequirePermission permission={['hr.attendance.view', 'hr.attendance.manage']}>
+          <PositionsPage />
+        </RequirePermission>
+      ),
+    },
     { path: 'hr/staff/:id', handle: { width: 'wide' }, element: view(<EmployeePage />) },
     { path: 'hr/divisions', handle: { width: 'reading' }, element: view(<DivisionsPage />) },
     { path: 'hr/schedules', handle: { width: 'wide' }, element: view(<SchedulesPage />) },

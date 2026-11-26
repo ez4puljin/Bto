@@ -31,7 +31,14 @@ import {
   StorageService,
   UserNamesService,
 } from '../../identity';
-import { hrEmployees, hrEmployeeSites, hrSchedules, hrSettings, hrWorkSites } from '../schema';
+import {
+  hrEmployees,
+  hrEmployeeSites,
+  hrPositions,
+  hrSchedules,
+  hrSettings,
+  hrWorkSites,
+} from '../schema';
 import { ATTENDANCE_MANAGE } from './work-sites.service';
 
 export interface CompanySchedule extends Schedule {
@@ -53,6 +60,7 @@ export interface EmployeeCard {
   firstName: string | null;
   lastName: string | null;
   position: string | null;
+  positionId: number | null;
   divisionId: number | null;
   employmentType: EmploymentType;
   gender: EmployeeGender | null;
@@ -165,7 +173,7 @@ export class HrSettingsService {
 
   /** Every staff record with its terms; the dashboard and the app keep only ACTIVE tracked ones. */
   async employees(executor: Db | Tx = this.db): Promise<Employee[]> {
-    const [staff, company, terms, sites, schedules] = await Promise.all([
+    const [staff, company, terms, sites, schedules, positions] = await Promise.all([
       this.names.allStaff(),
       this.schedule(executor),
       executor.select().from(hrEmployees),
@@ -177,9 +185,11 @@ export class HrSettingsService {
       executor
         .select({ id: hrSchedules.id, kind: hrSchedules.kind, days: hrSchedules.days })
         .from(hrSchedules),
+      executor.select({ id: hrPositions.id, name: hrPositions.name }).from(hrPositions),
     ]);
     const own = new Map(terms.map((row) => [row.userId, row]));
     const scheduleById = new Map(schedules.map((row) => [row.id, row]));
+    const positionById = new Map(positions.map((row) => [row.id, row.name]));
     const today = businessDate();
     const siteIds = new Map<number, number[]>();
     for (const row of sites)
@@ -214,7 +224,11 @@ export class HrSettingsService {
         ...employee,
         firstName: mine?.firstName ?? null,
         lastName: mine?.lastName ?? null,
-        position: mine?.position ?? null,
+        position:
+          mine?.positionId == null
+            ? (mine?.position ?? null)
+            : (positionById.get(mine.positionId) ?? mine.position),
+        positionId: mine?.positionId ?? null,
         divisionId: mine?.divisionId ?? null,
         employmentType: mine?.employmentType ?? 'PERMANENT',
         gender: mine?.gender ?? null,

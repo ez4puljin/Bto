@@ -157,16 +157,20 @@ export class PayrollIncludeArchivedQueryDto {
 export class PayrollTermsDto {
   @ApiProperty() userId: number;
   @ApiProperty() fullName: string;
+  @ApiProperty({ type: Number, nullable: true }) positionId: number | null;
+  @ApiProperty({ type: String, nullable: true }) positionSalaryEffectiveMonth: string | null;
   @ApiProperty({ type: String, nullable: true }) position: string | null;
   @ApiProperty({ type: Number, nullable: true }) divisionId: number | null;
   @ApiProperty({ type: String, nullable: true }) divisionName: string | null;
   @ApiProperty({ description: 'The employee has left (a closed account or a leaving date)' })
   left: boolean;
-  @ApiProperty({ description: 'False: HR has not set terms yet (zero salary, no items)' })
+  @ApiProperty({ description: 'True when personal terms or a current position salary exist' })
   hasTerms: boolean;
   @ApiProperty({ description: 'Only active terms put the person on a payroll run' })
   active: boolean;
   @ApiProperty(AMOUNT) baseSalary: string;
+  @ApiProperty({ type: String, nullable: true }) nextBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) nextEffectiveMonth: string | null;
   @ApiProperty() paysSocialInsurance: boolean;
   @ApiProperty({ type: Number, nullable: true }) templateId: number | null;
   @ApiProperty({ type: String, nullable: true }) templateName: string | null;
@@ -177,7 +181,11 @@ export class PayrollTermsDto {
 
 @ApiSchema({ name: 'PayrollTermsRequest' })
 export class PayrollTermsRequestDto {
-  @ApiProperty(AMOUNT) @IsString() @Matches(PAYROLL_AMOUNT_PATTERN) baseSalary: string;
+  @ApiPropertyOptional({ ...AMOUNT, description: 'Omit for employees assigned to a position' })
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsString()
+  @Matches(PAYROLL_AMOUNT_PATTERN)
+  baseSalary?: string;
   @ApiProperty() @IsBoolean() paysSocialInsurance: boolean;
   @ApiPropertyOptional({
     type: Number,
@@ -201,7 +209,12 @@ export class PayrollTermsRequestDto {
 @ApiSchema({ name: 'PayrollMyTerms' })
 export class PayrollMyTermsDto {
   @ApiProperty({ description: 'False: no pay terms are set for the caller' }) hasTerms: boolean;
+  @ApiProperty({ type: Number, nullable: true }) positionId: number | null;
+  @ApiProperty({ type: String, nullable: true }) positionSalaryEffectiveMonth: string | null;
+  @ApiProperty({ type: String, nullable: true }) position: string | null;
   @ApiProperty(AMOUNT) baseSalary: string;
+  @ApiProperty({ type: String, nullable: true }) nextBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) nextEffectiveMonth: string | null;
   @ApiProperty() paysSocialInsurance: boolean;
   @ApiProperty({ type: [PayrollKpiItemDto] }) items: PayrollKpiItemDto[];
   @ApiProperty(AMOUNT) kpiTotal: string;

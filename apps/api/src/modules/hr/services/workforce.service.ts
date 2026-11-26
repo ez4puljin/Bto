@@ -40,6 +40,7 @@ import {
   hrSchedules,
 } from '../schema';
 import { HrSettingsService } from './hr-settings.service';
+import { PositionsService } from './positions.service';
 import { ATTENDANCE_MANAGE } from './work-sites.service';
 
 const MANAGE_ACCOUNTS = 'identity.users.manage';
@@ -72,6 +73,11 @@ export interface EmployeeRow {
   status: 'ACTIVE' | 'DISABLED';
   roles: string[];
   position: string | null;
+  positionId: number | null;
+  positionSalaryEffectiveMonth: string | null;
+  positionBaseSalary: string | null;
+  positionNextBaseSalary: string | null;
+  positionNextEffectiveMonth: string | null;
   divisionId: number | null;
   divisionName: string | null;
   employmentType: EmploymentType;
@@ -123,6 +129,7 @@ export interface EmployeeProfileInput {
 }
 
 export interface EmployeeInput {
+  positionId?: number | null;
   firstName: string;
   lastName: string;
   phone: string;
@@ -170,6 +177,7 @@ export class WorkforceService implements OnApplicationBootstrap {
     private readonly accounts: StaffAccountsService,
     private readonly storage: StorageService,
     private readonly settings: HrSettingsService,
+    private readonly positions: PositionsService,
   ) {}
 
   /** A new database gets timely's request types. */
@@ -305,6 +313,11 @@ export class WorkforceService implements OnApplicationBootstrap {
     const photos = await this.storage.publicUrls(photoIds);
     const divisionName = new Map(divisions.map((row) => [row.id, row.name]));
     const scheduleName = new Map(schedules.map((row) => [row.id, row.name]));
+    const userIds = people.map((person) => person.userId);
+    const [positionSalaries, effectiveMonths] = await Promise.all([
+      this.positions.salarySchedulesForUsers(this.db, userIds, businessDate().slice(0, 7)),
+      this.positions.assignmentEffectiveMonths(this.db, userIds),
+    ]);
     return people
       .map((person): EmployeeRow => ({
         userId: person.userId,
@@ -315,6 +328,12 @@ export class WorkforceService implements OnApplicationBootstrap {
         status: person.status,
         roles: person.roles,
         position: person.position,
+        positionId: person.positionId,
+        positionSalaryEffectiveMonth: effectiveMonths.get(person.userId) ?? null,
+        positionBaseSalary: positionSalaries.get(person.userId)?.current?.baseSalary ?? null,
+        positionNextBaseSalary: positionSalaries.get(person.userId)?.next?.baseSalary ?? null,
+        positionNextEffectiveMonth:
+          positionSalaries.get(person.userId)?.next?.effectiveMonth ?? null,
         divisionId: person.divisionId,
         divisionName:
           person.divisionId === null ? null : (divisionName.get(person.divisionId) ?? null),
@@ -358,10 +377,19 @@ export class WorkforceService implements OnApplicationBootstrap {
    */
   async create(ctx: AuthContext, input: EmployeeInput): Promise<EmployeeRow> {
     this.assertManage(ctx);
+    if (!(await this.accounts.isAdmin(this.db, ctx))) {
+      throw new AppError('FORBIDDEN', 'only ADMIN may register staff with a position', {
+        permission: 'ADMIN',
+      });
+    }
+    if (!Number.isInteger(input.positionId) || (input.positionId ?? 0) < 1) {
+      throw invalid('positionId', 'required', 'select a position for the new employee');
+    }
     const card = this.checkedCard(input);
     if (input.password === null)
       throw invalid('password', 'required', 'a first password is needed');
     const userId = await inTransaction(this.db, async (tx) => {
+      await this.accounts.lockAccess(tx);
       await this.assertRefs(tx, card.divisionId, card.scheduleId);
       await this.accounts.assertPhoneFree(tx, input.phone);
       const { userId: id } = await this.accounts.ensure(tx, ctx, {
@@ -369,7 +397,14 @@ export class WorkforceService implements OnApplicationBootstrap {
         phone: input.phone,
         password: input.password,
       });
-      await this.writeCard(tx, ctx, id, card, null);
+      const position = await this.positions.assign(tx, ctx, id, input.positionId, true);
+      await this.writeCard(
+        tx,
+        ctx,
+        id,
+        { ...card, positionId: position?.id, position: position?.name ?? card.position },
+        null,
+      );
       return id;
     });
     return this.employee(userId);
@@ -382,6 +417,7 @@ export class WorkforceService implements OnApplicationBootstrap {
     }
     const card = this.checkedCard(input);
     await inTransaction(this.db, async (tx) => {
+      const position = await this.positions.assign(tx, ctx, userId, input.positionId);
       await this.assertRefs(tx, card.divisionId, card.scheduleId);
       await this.accounts.rename(
         tx,
@@ -390,7 +426,13 @@ export class WorkforceService implements OnApplicationBootstrap {
         { fullName: employeeFullName(card.firstName, card.lastName), phone: input.phone },
         ctx.permissions.has(MANAGE_ACCOUNTS),
       );
-      await this.writeCard(tx, ctx, userId, card, null);
+      await this.writeCard(
+        tx,
+        ctx,
+        userId,
+        { ...card, positionId: position?.id, position: position?.name ?? card.position },
+        null,
+      );
     });
     return this.employee(userId);
   }
@@ -433,6 +475,7 @@ export class WorkforceService implements OnApplicationBootstrap {
       throw invalid('reasonKind', 'enum', LEFT_REASON_KINDS.join(', '));
     }
     await inTransaction(this.db, async (tx) => {
+      await this.accounts.lockAccess(tx);
       if (!ctx.permissions.has(MANAGE_ACCOUNTS)) {
         const held = await this.accounts.heldRoles(tx, userId);
         if (held.admin) this.refuseAccount();
@@ -905,6 +948,7 @@ export class WorkforceService implements OnApplicationBootstrap {
       firstName,
       lastName,
       position,
+      positionId: input.positionId,
       divisionId: input.divisionId,
       employmentType: input.employmentType,
       gender: input.gender,
@@ -924,6 +968,7 @@ export class WorkforceService implements OnApplicationBootstrap {
       firstName: card.firstName,
       lastName: card.lastName,
       position: card.position,
+      ...(card.positionId === undefined ? {} : { positionId: card.positionId }),
       divisionId: card.divisionId,
       employmentType: card.employmentType,
       gender: card.gender,

@@ -6,6 +6,8 @@ import { HrSettingsService, WorkforceService } from '../../hr';
 export interface PayrollPerson {
   userId: number;
   fullName: string;
+  positionId: number | null;
+  positionSalaryEffectiveMonth: string | null;
   position: string | null;
   divisionId: number | null;
   divisionName: string | null;
@@ -32,6 +34,8 @@ export class PayrollPeopleService {
     return cards.map((card) => ({
       userId: card.userId,
       fullName: card.fullName,
+      positionId: card.positionId,
+      positionSalaryEffectiveMonth: card.positionSalaryEffectiveMonth,
       position: card.position,
       divisionId: card.divisionId,
       divisionName: card.divisionName,

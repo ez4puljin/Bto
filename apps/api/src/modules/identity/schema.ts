@@ -34,6 +34,8 @@ export const users = pgTable(
     username: text('username').notNull(),
     fullName: text('full_name').notNull(),
     phone: text('phone'),
+    /** ADR-0243: a position owns this account's roles; manual role edits must not drift. */
+    rolesManagedBy: text('roles_managed_by', { enum: ['HR_POSITION'] }),
     /** argon2id; NULL until the user redeems a one-time code. */
     passwordHash: text('password_hash'),
     status: text('status', { enum: ['ACTIVE', 'DISABLED'] })
@@ -57,6 +59,10 @@ export const users = pgTable(
     check('users_phone_e164', sql`${t.phone} IS NULL OR ${t.phone} ~ '^[+]976[0-9]{8}$'`),
     check('users_status', sql`${t.status} IN ('ACTIVE', 'DISABLED')`),
     check('users_failed_login_count', sql`${t.failedLoginCount} >= 0`),
+    check(
+      'users_roles_managed_by',
+      sql`${t.rolesManagedBy} IS NULL OR ${t.rolesManagedBy} = 'HR_POSITION'`,
+    ),
   ],
 );
 

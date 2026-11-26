@@ -93,6 +93,8 @@ export const payrollTerms = pgTable(
       .primaryKey()
       .references(() => users.id),
     baseSalary: money('base_salary').notNull(),
+    /** A genuine personal salary kept for months before a position salary assignment began. */
+    positionLegacySalary: boolean('position_legacy_salary').default(false),
     paysSocialInsurance: boolean('pays_social_insurance').notNull().default(true),
     /** The template the sheet was last copied from; a note of origin, nothing follows it. */
     templateId: ref('template_id').references(() => payrollKpiTemplates.id),

@@ -33,8 +33,8 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { coordinate, jsonValue } from '../../common/db/types';
-import { branches, files, users } from '../identity/schema';
+import { coordinate, jsonValue, money } from '../../common/db/types';
+import { branches, files, roles, users } from '../identity/schema';
 
 // The tables owned by the hr module (docs/modules/hr.md, ADR-0131): attendance from the staff
 // app. Migration 0064_hr_attendance adds by hand the REVOKEs that keep the events from being
@@ -46,6 +46,82 @@ const ref = (name: string) => bigint(name, { mode: 'number' });
 const userRef = (name: string) => ref(name).references(() => users.id);
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp('updated_at', { withTimezone: true }).notNull().defaultNow();
+
+/** ADR-0243: positions share existing identity roles and a dated monthly base salary. */
+export const hrPositions = pgTable(
+  'hr_positions',
+  {
+    id: id(),
+    name: text('name').notNull(),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('hr_positions_name_key')
+      .on(sql`lower(${t.name})`)
+      .where(sql`${t.archivedAt} IS NULL`),
+    check('hr_positions_name_present', sql`length(btrim(${t.name})) BETWEEN 1 AND 80`),
+  ],
+);
+
+export const hrPositionRoles = pgTable(
+  'hr_position_roles',
+  {
+    positionId: ref('position_id')
+      .notNull()
+      .references(() => hrPositions.id),
+    roleId: ref('role_id')
+      .notNull()
+      .references(() => roles.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.positionId, t.roleId] }),
+    index('hr_position_roles_role_idx').on(t.roleId),
+  ],
+);
+
+export const hrPositionSalaries = pgTable(
+  'hr_position_salaries',
+  {
+    positionId: ref('position_id')
+      .notNull()
+      .references(() => hrPositions.id),
+    effectiveMonth: text('effective_month').notNull(),
+    baseSalary: money('base_salary').notNull(),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.positionId, t.effectiveMonth] }),
+    check('hr_position_salaries_month', sql`${t.effectiveMonth} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check('hr_position_salaries_nonnegative', sql`${t.baseSalary} >= 0`),
+  ],
+);
+
+/** The salary assignment is dated; the card's position changes access immediately. */
+export const hrEmployeePositionAssignments = pgTable(
+  'hr_employee_position_assignments',
+  {
+    userId: userRef('user_id').notNull(),
+    positionId: ref('position_id')
+      .notNull()
+      .references(() => hrPositions.id),
+    effectiveMonth: text('effective_month').notNull(),
+    assignedBy: userRef('assigned_by'),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.effectiveMonth] }),
+    index('hr_employee_position_assignments_position_idx').on(t.positionId),
+    check(
+      'hr_employee_position_assignments_month',
+      sql`${t.effectiveMonth} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`,
+    ),
+  ],
+);
 
 /**
  * A work site (ADR-0131 #1): a named point with a radius; a punch counts only inside one. Kept
@@ -119,6 +195,7 @@ export const hrEmployees = pgTable(
     firstName: text('first_name'),
     lastName: text('last_name'),
     position: text('position'),
+    positionId: ref('position_id').references(() => hrPositions.id),
     divisionId: ref('division_id').references(() => hrDivisions.id),
     employmentType: text('employment_type', { enum: EMPLOYMENT_TYPES })
       .notNull()
@@ -148,6 +225,7 @@ export const hrEmployees = pgTable(
       .on(t.externalRef)
       .where(sql`${t.externalRef} IS NOT NULL`),
     index('hr_employees_division_idx').on(t.divisionId),
+    index('hr_employees_position_idx').on(t.positionId),
     check(
       'hr_employees_employment_type',
       sql`${t.employmentType} IN ('PERMANENT', 'PROBATION', 'CONTRACT', 'PART_TIME', 'INTERN')`,

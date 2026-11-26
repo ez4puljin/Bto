@@ -8,13 +8,15 @@ For one month HR computes every employee's pay from a KPI sheet — fixed salary
 
 Money in every request and response is **text** with at most two decimals (`"300000"`, `"173800.00"`); a percent is text 0–100 with at most two decimals (`"86.9"`); a month is `YYYY-MM`.
 
+Since ADR-0243, an assigned employee's fixed salary comes from HR's effective-month salary assignments and position rates. The initial position rate starts in its creation month; a later rate change starts next month. A newly registered employee's salary assignment starts this month; binding an existing employee or moving them to another position starts next month, while the position's permissions change immediately. Personal terms still own the KPI sheet, insurance flag and active flag. An employee with an applicable position salary and no `payroll_terms` row participates automatically with insurance enabled and no KPI items. An explicitly inactive row excludes them. Legacy employees without a position continue using their stored personal salary. Before the first salary assignment/rate, only a personal row marked as holding a genuine legacy salary supplies a fallback; otherwise the employee is excluded, rather than assigning a current rate retroactively. Saving or applying KPI items for assigned staff never creates a legacy fallback.
+
 ## 2. Owned tables
 
 | Table | What |
 |---|---|
 | `payroll_settings` | one row (`id = 1`): `late_penalty_percent`, `employee_si_percent`, `employer_si_percent`, `minimum_wage`, `si_cap_multiplier`, `pit_percent`, `pit_credits` jsonb (`{ upTo, credit }[]`, lowest first, the last may be open). No row = `DEFAULT_PAYROLL_SETTINGS`. `REVOKE DELETE, TRUNCATE` |
 | `payroll_kpi_templates` | name (unique among live ones, case-insensitive), `items` jsonb (`{ key, name, source, amount, sort }[]`), `archived_at`. `REVOKE DELETE, TRUNCATE` |
-| `payroll_terms` | per user: `base_salary`, `pays_social_insurance`, `template_id` (origin only), `items` jsonb (the person's own sheet), `active`. `REVOKE DELETE, TRUNCATE` |
+| `payroll_terms` | per user: `base_salary` (legacy salary, preserved when a position is assigned), `position_legacy_salary` (true only for a genuine personal salary; migration preserves existing rows, newly assigned rows default false), `pays_social_insurance`, `template_id` (origin only), `items` jsonb (the person's own sheet), `active`. Salary assignments and position rates belong to HR. `REVOKE DELETE, TRUNCATE` |
 | `payroll_advances` | user, `month`, `amount` > 0, `paid_on`, `note`, `created_by`, `voided_at` / `voided_by` / `void_reason`. `REVOKE DELETE, TRUNCATE` |
 | `payroll_runs` | `month` (unique), `status` DRAFT / APPROVED, `note`, `settings` jsonb (the rates last computed with), `attendance_to`, `computed_at`, `created_by`, `approved_by` / `approved_at`, `reopened_by` / `reopened_at` / `reopen_reason`. `REVOKE DELETE, TRUNCATE` |
 | `payroll_lines` | (run, user) unique: the snapshot (`full_name`, `position`, `division_name`, `base_salary` = the terms' monthly salary, `pays_social_insurance`), the fixed salary's split (`salary_days`, `salary_month_days`, `salary_paid`; NULL on a line computed before 2026-11-21 = `base_salary` paid whole, migration `0121_payroll_prorate`), attendance (`attendance_measured`, `workdays`, `attended_days`, `late_days`) and the totals (`kpi_total`, `taxable_additions`, `gross`, `si_base`, `employee_si`, `employer_si`, `pit_credit`, `pit`, `advance`, `other_additions`, `deductions`, `net`) |
@@ -26,12 +28,12 @@ The last three are a draft's working paper (`REVOKE TRUNCATE` only); the trigger
 ## 3. Services (`modules/payroll`)
 
 - `PayrollSettingsService.get() / update(ctx, settings)`.
-- `PayrollTermsService`: `templates(includeArchived)`, `saveTemplate(ctx, id | null, input)`, `archiveTemplate`, `applyTemplate(ctx, id, userIds)`; `list()`, `one(userId)`, `save(ctx, userId, input)`, `mine(userId)`, `activeByUser(tx)`.
+- `PayrollTermsService`: `templates(includeArchived)`, `saveTemplate(ctx, id | null, input)`, `archiveTemplate`, `applyTemplate(ctx, id, userIds)`; `list()`, `one(userId)`, `save(ctx, userId, input)`, `mine(userId)`, `activeByUser(tx, month)`.
 - `PayrollAdvancesService.list(filter) / create(ctx, input) / void(ctx, id, reason)`.
 - `PayrollRunsService`: `list()`, `get(id)`, `line(runId, lineId)`, `create(ctx, { month, note })`, `recompute(ctx, id, refreshTerms)`, `score(ctx, id, scores)`, `addAdjustment` / `removeAdjustment`, `approve(ctx, id)`, `reopen(ctx, id, reason)`, `scoringRuns(ctx)`, `scoring(ctx, id)`, `myPayslips(ctx)`, `myPayslip(ctx, month)`, `advanceChangedInTx(tx, month, userId)`.
 - `PayrollExportsService.runWorkbook(id)` (api only). `PayrollPeopleService` reads hr's staff list and each person's week plan (`HrSettingsService.employees`).
 
-`modules/payroll/index.ts` exports the two Nest modules and the three right codes. Nobody imports payroll; it imports `identity` and `hr` (`WorkforceService`, `HrReportsService`, `HrSettingsService`).
+`modules/payroll/index.ts` exports the two Nest modules and the three right codes. Nobody imports payroll; it imports `identity` and `hr` (`WorkforceService`, `HrReportsService`, `HrSettingsService`, `PositionsService`). Salary assignments and rates are resolved through `PositionsService.baseSalariesForUsers(tx, userIds, month)`, never through HR tables. Current pay terms also read `salarySchedulesForUsers` to show an upcoming assignment or rate even when the employee has no current salary assignment yet.
 
 ## 4. REST (`/api/v1/payroll/…`)
 
@@ -43,7 +45,7 @@ Rights: **view** = `hr.payroll.view`, **manage** = `hr.payroll.manage`, **score*
 |---|---|
 | `GET /me/payslips` | `Payslip[]`: the caller's payslips of APPROVED runs, newest month first |
 | `GET /me/payslips/:month` | `Payslip`; 404 when the month has no approved payslip for the caller (no run, a draft, or not on it); 422 for a bad month |
-| `GET /me/terms` | `{ hasTerms, baseSalary, paysSocialInsurance, items: KpiItem[], kpiTotal }`: the caller's own active sheet (`hasTerms: false` with zeros when none) |
+| `GET /me/terms` | `{ hasTerms, positionId, position, positionSalaryEffectiveMonth, baseSalary, nextBaseSalary, nextEffectiveMonth, paysSocialInsurance, items: KpiItem[], kpiTotal }`: the caller's own active sheet and current salary (`hasTerms: false` with zeros when none or explicitly inactive) |
 
 ### Settings
 
@@ -72,9 +74,9 @@ Rights: **view** = `hr.payroll.view`, **manage** = `hr.payroll.manage`, **score*
 |---|---|---|
 | `GET /terms` | view | → `Terms[]`: every employed person (and anyone who left but still holds terms), with or without terms |
 | `GET /terms/:userId` | view | → `Terms` |
-| `PUT /terms/:userId` | manage | `{ baseSalary, paysSocialInsurance, templateId?, items: KpiItemRequest[], active }` → `Terms` |
+| `PUT /terms/:userId` | manage | `{ baseSalary?, paysSocialInsurance, templateId?, items: KpiItemRequest[], active }` → `Terms`; omit salary for an assigned employee (a supplied matching current amount remains accepted; a different amount is 422), required for a legacy unassigned employee |
 
-`Terms` = `{ userId, fullName, position, divisionId, divisionName, left, hasTerms, active, baseSalary, paysSocialInsurance, templateId, templateName, items: KpiItem[], kpiTotal, updatedAt }`. Changing terms changes no existing run.
+`Terms` = `{ userId, fullName, positionId, position, positionSalaryEffectiveMonth, divisionId, divisionName, left, hasTerms, active, baseSalary, nextBaseSalary, nextEffectiveMonth, paysSocialInsurance, templateId, templateName, items: KpiItem[], kpiTotal, updatedAt }`. `positionId` and `position` identify the employee's current card binding; the nullable `positionSalaryEffectiveMonth` says when that binding supplies salary. `baseSalary` is the current month's effective assignment/rate, or preserved legacy fallback, so a pending card change does not change current pay. The nullable next fields identify the nearest scheduled salary. `hasTerms` includes an applicable position's automatic defaults. Changing terms changes no existing run.
 
 ### Advances
 
@@ -130,8 +132,8 @@ These three routes are `@Authenticated()` and check `hr.payroll.score` or `hr.pa
 2. A KPI item earns `amount × score %`, the score within 0–100; an unscored MANUAL item earns 0 and blocks approval.
 3. The attendance score comes only from the time report's days (`HrReportsService.days`): attended ÷ planned workdays − late days × the penalty, never below 0; an untracked person gets 100 %, a month without planned days 100 %. The report holds only the days inside the employed span, so a newcomer's score counts from the day they joined; the KPI items' amounts are never prorated.
    - The fixed salary paid (ADR-0235, 2026-11-21) = the monthly salary × planned workdays inside the employed span (max(month start, `employed_on`) … min(month end, `left_on`)) ÷ planned workdays of the month, from the person's own week plan, money HALF_UP; whole when the span holds every workday or the month has none. Both counts and the amount are a snapshot on the line, read again on create and recompute of a DRAFT only.
-4. A sheet holds at most one ATTENDANCE item; a person is on a run only with active terms and employed at some point of the month.
-5. A run holds a snapshot: later changes of terms, templates, cards or rates reach a DRAFT only through `recompute`, and never an APPROVED run.
+4. A sheet holds at most one ATTENDANCE item; a person is on a run only with active terms (including an assigned position's defaults) and employed at some point of the month.
+5. A run holds a snapshot: later changes of terms, templates, cards or rates reach a DRAFT only through `recompute`, and never an APPROVED run. Creation and `recompute(refreshTerms: true)` resolve the salary assignment and position rate using the run's month, so a scheduled increase or reassignment cannot change earlier months. The payslip's position label follows that month's salary assignment. Without `refreshTerms`, the salary, position and KPI snapshot stays; manual scores survive a refresh by item key.
 6. An APPROVED run's lines, items and free lines never change (services and database triggers); its month takes no new or voided advance. Reopening needs `hr.payroll.manage` and a reason and is audited.
 7. One run per month; never for a future month. Every write of a month holds that month's advisory lock.
 8. An employee reads only their own payslips, only of APPROVED runs, without the employer's cost; a scorer without `hr.payroll.view` sees names and scores, never an amount.
@@ -142,6 +144,10 @@ These three routes are `@Authenticated()` and check `hr.payroll.score` or `hr.pa
 
 `packages/shared/src/payroll/payroll.test.ts` (the KPI percent and its clamp; the counts from report days; the owner's 200,000 example; the fixed salary split by workdays — the owner's 1,000,000 → 500,000 example, a leaver mid-month, a whole month; the floor; an insured employee's НДШ and ХХОАТ with the credit; a non-insured employee; the capped base; a negative net; the credit table; the settings check; the month). `apps/api/test/integration/payroll.int-spec.ts` (the rates and the rights; templates, a duplicate name, two attendance items; a template applied and the sheet edited; a run built from 22 planned days with 20 attended and 2 late; an advance deducted; a manager scoring without seeing pay; an uninsured employee; free lines; recompute with and without `refreshTerms`; approval refused while unscored, then freezing — services and the `app` role's SQL; an employee reading only their own approved payslip; the Excel; reopen with a reason, a voided advance, the audit rows; a newcomer joined on 16 September: salary 11 / 22 = 500,000, attendance 11 of 11, a corrected card read on recompute, the approved line frozen and the payslip showing the split).
 
+`apps/api/test/integration/payroll-positions.int-spec.ts` covers assigned new staff without personal rows, preserved legacy fallback and exclusion before the first salary assignment (also after KPI terms are saved), pending legacy bindings and reassignments taking salary next month, rejection of personal salary overrides, current versus next-month rates, stable manual scores on refresh, unchanged approved salary and position snapshots, and explicit inactive terms excluding an assigned employee.
+
 ## 7. Screens
 
 Web «Хүний нөөц → Цалин» (`apps/web/src/features/payroll`: runs, a run's sheet with scoring, pay terms and templates, advances, settings) and the staff app's «Миний цалин» (`apps/mobile/app/(staff)/payroll`: the payslips, the own sheet, a scorer's screen). Under «Тогтмол цалин» the run's table, the line window (with the monthly salary) and the payslip show «11 / 22 ажлын өдөр» when the salary was split.
+
+Migration 0124 adds a nullable legacy marker without a default, preserving existing terms as NULL. The new column then defaults to false for future inserts. Existing NULL terms retain legacy salary; a normal save records true. Missing terms are never legacy. No existing business row is rewritten.

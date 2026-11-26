@@ -4,6 +4,8 @@ Status: **built** in delivery 1 (weeks 1–2), session of 2026-10-10; accepted l
 
 identity is the root of the module graph: it depends on no other module, and every other module may import its `index.ts`.
 
+ADR-0243 adds position-managed staff access. Public `StaffAccountsService.assignPositionRoles(tx, actor, userId, roleIds)` validates exact existing role IDs, preserves scopes/passwords, mirrors company roles and applies ADMIN/self-access/last-admin guards. HR calls it in the card's transaction under the shared ADMIN role lock. `users.roles_managed_by = HR_POSITION` blocks manual `/users/:id` role edits; position role references restrict role deletion. HR salary amounts stay behind payroll-view/ADMIN access. See [hr-positions.md](hr-positions.md).
+
 ## 1. Owned tables (migration `0001_identity`)
 
 | Table | Purpose | Key rules (DB-enforced unless noted) |
@@ -126,6 +128,9 @@ Adding a key: extend `SETTINGS` and add `settings.keys.<key>` to `mn.json`; noth
 `INVALID_CREDENTIALS` 401, `ACCOUNT_LOCKED` 423, `ACCOUNT_DISABLED` 403, `SESSION_EXPIRED` 401, `PASSWORD_CODE_INVALID` 400, `PASSWORD_TOO_WEAK` 422, `CURRENT_PASSWORD_INCORRECT` 400, `LAST_ADMIN` 409, `SELF_EDIT_FORBIDDEN` 409, `ROLE_SYSTEM_READONLY` 409, `ROLE_IN_USE` 409, `ROLE_NAMED_ON_RECORDS` 409, `WAREHOUSE_KIND_NOT_ALLOWED` 422, `SETTING_NOT_EDITABLE` 409, `SETTING_MISSING` 409, `DUPLICATE_VALUE` 409 (any unique violation, `params.constraint`), `IDEMPOTENCY_KEY_IN_PROGRESS` 409, `FILE_NOT_UPLOADED` 409, `FILE_KIND_MISMATCH` 422. `FORBIDDEN` carries `params.reason`: `NO_ACCESS_RULE` (no rule, or both a staff and a customer rule), `PERMISSION`, `WAREHOUSE_SCOPE`, `SIGNATURE` (file URLs), `ORIGIN` (a browser on `/auth/mobile/*` or `/auth/customer/*`), `CUSTOMER_TOKEN` (a customer token on a staff route) or `STAFF_TOKEN` (a staff token on a customer route; ADR-0082 #2 — 403, never 401, so no client refreshes in a loop); `UNAUTHORIZED` carries `TOKEN`, `SESSION` or `REFRESH`.
 
 ## 8. Audit actions
+
+Audit reads preserve historical rows but mask their sensitive payloads: without `hr.payroll.view` or actual ADMIN, every historical `payroll_*` before/after payload is null, and position salary fields are removed. New position audit writes omit salary amounts. Pagination and other audit metadata remain available; stored append-only records are not rewritten.
+
 
 `CREATE`, `UPDATE`, `DELETE`, `LOGIN`, `LOGIN_FAILED`, `LOGOUT`, `LOGOUT_ALL`, `PASSWORD_SET`, `PASSWORD_CHANGED`, `PASSWORD_CODE_ISSUED`, `UNLOCK`, `SESSIONS_REVOKED`, `TOKEN_REUSE`, `ADMIN_RECOVERED`. Entities: `users`, `roles`, `branches`, `warehouses`, `settings`, `auth_sessions`, `customer_users` (CREATE, PHONE_CHANGE, PASSWORD_CODE_ISSUED, DISABLE, ENABLE, SESSIONS_REVOKED by staff; PASSWORD_SET, PASSWORD_CHANGED, LOGIN_FAILED; LOGIN / LOGOUT / TOKEN_REUSE on `auth_sessions` by the CUSTOMER actor, whose `actor_id` is the account). The audit screen's `actorId` filter reads staff rows only. A new action or entity needs its label under `audit.actions` / `audit.entities` in `mn.json` (the audit screen falls back to the raw code).
 

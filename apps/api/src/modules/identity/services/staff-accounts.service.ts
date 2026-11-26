@@ -1,15 +1,23 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { checkPassword, PASSWORD_MIN_LENGTH, usernameFromPhone } from '@tugeel/shared/auth';
 import { normalizeMnPhone } from '@tugeel/shared/phone';
-import { and, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError, invalid } from '../../../common/errors/app-error';
-import type { AuditActor } from '../auth-context';
-import { authSessions, roles, userRoles, users } from '../schema';
+import type { AuditActor, AuthContext } from '../auth-context';
+import { authSessions, rolePermissions, roles, userRoles, users } from '../schema';
 import { AuditService } from './audit.service';
+import { mirrorCompanyRoles } from './company-roles';
 import { LoginLimiter } from './login-limiter.service';
 import { PasswordHasher } from './password-hasher.service';
+
+export interface PositionRole {
+  id: number;
+  code: string | null;
+  name: string | null;
+  permissions: string[];
+}
 
 /**
  * Staff accounts as HR keeps them (ADR-0144): an employee registered in «Ажилтан» is a staff user
@@ -25,6 +33,112 @@ export class StaffAccountsService {
     private readonly hasher: PasswordHasher,
     private readonly limiter: LoginLimiter,
   ) {}
+
+  /** The shared access lock is always taken before a position and its users. */
+  async lockAccess(tx: Tx): Promise<number> {
+    const [admin] = await tx
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.code, 'ADMIN'))
+      .for('update');
+    if (!admin) throw new Error('the ADMIN role is missing (synced at api boot)');
+    return admin.id;
+  }
+
+  async isAdmin(executor: Db | Tx, actor: AuthContext): Promise<boolean> {
+    const [admin] = await executor
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.code, 'ADMIN'));
+    return admin !== undefined && actor.roleIds.includes(admin.id);
+  }
+
+  /** Curated identity role data for HR's position picker; keeps existing role IDs and grants. */
+  async positionRoles(executor: Db | Tx, roleIds: readonly number[]): Promise<PositionRole[]> {
+    if (roleIds.length === 0) return [];
+    const rows = await executor
+      .select({ id: roles.id, code: roles.code, name: roles.name })
+      .from(roles)
+      .where(inArray(roles.id, [...roleIds]))
+      .orderBy(asc(roles.id));
+    if (rows.length !== new Set(roleIds).size)
+      throw invalid('roleIds', 'exists', 'unknown role id');
+    const grants = await executor
+      .select()
+      .from(rolePermissions)
+      .where(inArray(rolePermissions.roleId, [...roleIds]));
+    return rows.map((row) => ({
+      ...row,
+      permissions: grants
+        .filter((grant) => grant.roleId === row.id)
+        .map((grant) => grant.permissionCode)
+        .sort(),
+    }));
+  }
+
+  /**
+   * HR owns only the choice of position. Identity replaces the account's roles atomically,
+   * preserving scopes, credentials and company-role mirroring, with the existing access guards.
+   */
+  async assignPositionRoles(
+    tx: Tx,
+    actor: AuthContext,
+    userId: number,
+    roleIds: readonly number[],
+  ): Promise<void> {
+    const adminRoleId = await this.lockAccess(tx);
+    const catalog = await this.positionRoles(tx, roleIds);
+    const [user] = await tx
+      .select({ id: users.id, status: users.status })
+      .from(users)
+      .where(eq(users.id, userId))
+      .for('update');
+    if (!user) throw new AppError('NOT_FOUND', `user ${userId} not found`, { id: userId });
+    const held = await tx
+      .select({ roleId: userRoles.roleId })
+      .from(userRoles)
+      .where(eq(userRoles.userId, userId))
+      .orderBy(asc(userRoles.roleId));
+    const before = held.map((row) => row.roleId);
+    const after = catalog.map((row) => row.id);
+    const changed = before.join(',') !== after.join(',');
+    const isAdmin = actor.roleIds.includes(adminRoleId);
+    if (!isAdmin && (before.includes(adminRoleId) || after.includes(adminRoleId))) {
+      throw new AppError('FORBIDDEN', 'only ADMIN may assign or change an ADMIN position', {
+        permission: 'ADMIN',
+      });
+    }
+    if (changed && userId === actor.userId) {
+      throw new AppError('SELF_EDIT_FORBIDDEN', 'users cannot change their own access', {
+        id: userId,
+      });
+    }
+    if (
+      changed &&
+      before.includes(adminRoleId) &&
+      !after.includes(adminRoleId) &&
+      user.status === 'ACTIVE'
+    ) {
+      await this.assertAdminRemains(tx, userId);
+    }
+    if (changed) {
+      await tx.delete(userRoles).where(eq(userRoles.userId, userId));
+      if (after.length)
+        await tx.insert(userRoles).values(after.map((roleId) => ({ userId, roleId })));
+    }
+    await mirrorCompanyRoles(tx, userId);
+    await tx
+      .update(users)
+      .set({ rolesManagedBy: 'HR_POSITION', updatedAt: sql`now()` })
+      .where(eq(users.id, userId));
+    await this.audit.record(tx, actor, {
+      action: 'UPDATE',
+      entity: 'users',
+      entityId: userId,
+      before: { roleIds: before },
+      after: { roleIds: after, rolesManagedBy: 'HR_POSITION' },
+    });
+  }
 
   /** One phone, one account: a readable refusal before a second registration. */
   async assertPhoneFree(tx: Tx, input: string): Promise<void> {

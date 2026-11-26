@@ -1,5 +1,7 @@
 # hr — attendance and workforce (ADR-0131, ADR-0144)
 
+Positions, shared access and dated base salaries: [hr-positions.md](hr-positions.md), ADR-0243. New staff select a catalog position; legacy cards remain unassigned until an administrator maps them.
+
 Status: attendance built 2026-10-31 (branch `claude/hr-attendance`, migration `0064_hr_attendance`). The employee cards, divisions, named schedules, time requests and the time report built 2026-11-04 (ADR-0144, migration `0069_hr_workforce`). Contracts and payroll stay planned (architecture §4 row 11).
 
 ## 1. Purpose

@@ -6,6 +6,9 @@ import type { Db, Tx } from '../../../common/db/db.types';
 import { AppError } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, toPage } from '../../../common/pagination/page';
 import { auditLog, users } from '../schema';
+import type { AuthContext } from '../auth-context';
+import { auditForReader } from './audit-privacy';
+import { StaffAccountsService } from './staff-accounts.service';
 
 export interface AuditQuery {
   entity?: string;
@@ -50,7 +53,10 @@ export interface AuditTargets {
 /** Reads audit_log newest first (SPEC §5.1: who changed which record and when). */
 @Injectable()
 export class AuditQueryService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly accounts: StaffAccountsService,
+  ) {}
 
   /**
    * The rows of the given records, newest first, keyset by id: a document's history across the
@@ -137,7 +143,7 @@ export class AuditQueryService {
       .orderBy(sql`count(*) DESC`, auditLog.action);
   }
 
-  async list(query: AuditQuery) {
+  async list(ctx: AuthContext, query: AuditQuery) {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const conditions: SQL[] = [];
     const after = decodeCursor(query.cursor);
@@ -190,6 +196,12 @@ export class AuditQueryService {
       .where(and(...conditions))
       .orderBy(desc(auditLog.id))
       .limit(limit + 1);
-    return toPage(rows, limit, (row) => ({ id: row.id }));
+    const canReadPayroll =
+      ctx.permissions.has('hr.payroll.view') || (await this.accounts.isAdmin(this.db, ctx));
+    return toPage(
+      rows.map((row) => auditForReader(row, canReadPayroll)),
+      limit,
+      (row) => ({ id: row.id }),
+    );
   }
 }

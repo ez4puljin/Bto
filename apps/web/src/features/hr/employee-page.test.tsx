@@ -25,6 +25,11 @@ const person = (fields: Partial<Schemas['HrStaff']>): Schemas['HrStaff'] => ({
   phone: '+97699112233',
   status: 'ACTIVE',
   roles: ['WAREHOUSE'],
+  positionId: null,
+  positionSalaryEffectiveMonth: null,
+  positionBaseSalary: null,
+  positionNextBaseSalary: null,
+  positionNextEffectiveMonth: null,
   position: 'Нярав',
   divisionId: null,
   divisionName: null,
@@ -91,6 +96,23 @@ const list = <T,>(data: T[]) => json({ data, nextCursor: null });
 const ROUTES = {
   'GET /api/v1/hr/staff': () => json([WORKING, CLOSED, NO_ROLES]),
   'GET /api/v1/hr/divisions': () => json([]),
+  'GET /api/v1/hr/positions': () =>
+    json([
+      {
+        id: 1,
+        name: 'Warehouse',
+        roleIds: [4],
+        roles: ROLES,
+        baseSalary: '1000000.00',
+        nextBaseSalary: null,
+        nextEffectiveMonth: null,
+        salaryHistory: [],
+        archivedAt: null,
+        employeeCount: 1,
+        grantsAdmin: false,
+        canAssign: true,
+      },
+    ]),
   'GET /api/v1/hr/schedules': () => json([]),
   'GET /api/v1/hr/requests': () => json([]),
   'GET /api/v1/roles': () => list(ROLES),
@@ -101,6 +123,31 @@ const ROUTES = {
 };
 
 describe('«Ажилтны бүртгэл», the one staff list (ADR-0145)', () => {
+  it('keeps assigned roles derived while allowing per-user scopes to be saved', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...ROUTES,
+      'GET /api/v1/hr/staff': () => json([person({ positionId: 1, position: 'Warehouse' })]),
+      'PATCH /api/v1/users/7': () => json(ACCOUNT),
+    });
+    renderApp('/hr/staff/7', fetchMock);
+    const user = userEvent.setup();
+    const editLabel = mn.common.editRecord.replace('{{name}}', mn.users.detail.access);
+    await screen.findByRole('button', { name: editLabel });
+    const access = within(screen.getByRole('region', { name: mn.users.detail.access }));
+    expect(access.getByRole('link', { name: mn.hr.positions.title })).toHaveAttribute(
+      'href',
+      '/hr/positions',
+    );
+    await user.click(access.getByRole('button', { name: editLabel }));
+    expect(access.getByText(mn.hr.positions.rolesLocked)).toBeInTheDocument();
+    expect(access.queryByRole('checkbox', { name: mn.roles.system.WAREHOUSE })).toBeNull();
+    await user.click(access.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PATCH', '/api/v1/users/7')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'PATCH', '/api/v1/users/7')[0])).toEqual({
+      scopes: { warehouseIds: [], branchIds: [] },
+    });
+  });
+
   it('moves a closed account to those who left, whatever closed it', async () => {
     const user = userEvent.setup();
     renderApp('/hr/staff', signedIn(ADMIN_ME, ROUTES));
@@ -114,7 +161,12 @@ describe('«Ажилтны бүртгэл», the one staff list (ADR-0145)', () 
   it('leads the old addresses to the list and the employee', async () => {
     const { router } = renderApp('/users/7', signedIn(ADMIN_ME, ROUTES));
     await waitFor(() => expect(router.state.location.pathname).toBe('/hr/staff/7'));
-    expect(await screen.findByRole('heading', { name: 'Дорж Бат' })).toBeInTheDocument();
+    // Poll the heading text directly: computing accessible names across the full sidebar
+    // on every retry can starve the redirected page's fetch/render on a busy runner.
+    const heading = await screen.findByText('Дорж Бат', { selector: 'h1' });
+    expect(heading).toHaveRole('heading');
+    expect(heading).toBeVisible();
+    expect(heading).toHaveAccessibleName('Дорж Бат');
   });
 
   it('asks a first password when registering, then opens the employee', async () => {
@@ -128,13 +180,18 @@ describe('«Ажилтны бүртгэл», the one staff list (ADR-0145)', () 
     await user.type(dialog.getByLabelText(mn.hr.staff.dialog.lastName), 'Дорж');
     await user.type(dialog.getByLabelText(mn.hr.staff.dialog.firstName), 'Бат');
     await user.type(dialog.getByLabelText(mn.hr.staff.dialog.phone), '99112233');
+    await user.selectOptions(dialog.getByLabelText(mn.hr.staff.dialog.position), '1');
     await user.click(dialog.getByRole('button', { name: mn.common.create }));
     expect(calls(fetchMock, 'POST', '/api/v1/hr/staff')).toHaveLength(0);
     await user.type(dialog.getByLabelText(mn.hr.staff.dialog.passwordNew), 'Tsagaan-2026');
     await user.click(dialog.getByRole('button', { name: mn.common.create }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/hr/staff/7'));
     const [post] = calls(fetchMock, 'POST', '/api/v1/hr/staff');
-    expect(await bodyOf(post)).toMatchObject({ phone: '99112233', password: 'Tsagaan-2026' });
+    expect(await bodyOf(post)).toMatchObject({
+      phone: '99112233',
+      password: 'Tsagaan-2026',
+      positionId: 1,
+    });
   });
 
   it('resets a password directly and keeps the rights on one page', async () => {
@@ -162,6 +219,29 @@ describe('«Ажилтны бүртгэл», the one staff list (ADR-0145)', () 
     const [put] = calls(fetchMock, 'PUT', '/api/v1/hr/staff/7/password');
     expect(await bodyOf(put)).toEqual({ password: 'Shine-nuuts-2026' });
   });
+
+  it.each([HR_ONLY, { ...ADMIN_ME, id: 7 }])(
+    'keeps position disabled for HR and ADMIN self edits',
+    async (actor) => {
+      const staff = person({ positionId: 1, position: 'Warehouse' });
+      const fetchMock = signedIn(actor, {
+        ...ROUTES,
+        'GET /api/v1/hr/staff': () => json([staff]),
+        'PUT /api/v1/hr/staff/7': () => json(staff),
+      });
+      renderApp('/hr/staff/7', fetchMock);
+      const user = userEvent.setup();
+      const editLabel = mn.common.editRecord.replace('{{name}}', mn.hr.staff.dialog.editTitle);
+      await user.click(await screen.findByRole('button', { name: editLabel }));
+      const card = within(screen.getByRole('region', { name: mn.hr.staff.dialog.editTitle }));
+      expect(card.getByLabelText(mn.hr.staff.dialog.position)).toBeDisabled();
+      await user.click(card.getByRole('button', { name: mn.common.save }));
+      await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/hr/staff/7')).toHaveLength(1));
+      expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/hr/staff/7')[0])).not.toHaveProperty(
+        'positionId',
+      );
+    },
+  );
 
   it('lets HR reset only an account without roles and read the roles without the users API', async () => {
     const fetchMock = signedIn(HR_ONLY, ROUTES);

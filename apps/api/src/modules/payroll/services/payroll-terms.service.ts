@@ -1,10 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PAYROLL_LIMITS } from '@tugeel/shared/payroll';
+import { businessDate } from '@tugeel/shared/time';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
+import { type PositionSalarySchedule, PositionsService } from '../../hr';
 import { type AuthContext, AuditService } from '../../identity';
 import {
   amountOf,
@@ -33,10 +35,12 @@ export interface KpiTemplateInput {
   items: KpiSheetItemInput[];
 }
 
-/** One employee's pay terms; `hasTerms` false = HR has not set them (zero salary, no items). */
+/** The position supplies salary; personal terms keep KPI, insurance and participation settings. */
 export interface PayTerms {
   userId: number;
   fullName: string;
+  positionId: number | null;
+  positionSalaryEffectiveMonth: string | null;
   position: string | null;
   divisionId: number | null;
   divisionName: string | null;
@@ -44,6 +48,8 @@ export interface PayTerms {
   hasTerms: boolean;
   active: boolean;
   baseSalary: string;
+  nextBaseSalary: string | null;
+  nextEffectiveMonth: string | null;
   paysSocialInsurance: boolean;
   templateId: number | null;
   templateName: string | null;
@@ -54,11 +60,18 @@ export interface PayTerms {
 }
 
 export interface PayTermsInput {
-  baseSalary: string;
+  baseSalary?: string;
   paysSocialInsurance: boolean;
   templateId: number | null;
   items: KpiSheetItemInput[];
   active: boolean;
+}
+
+interface ActivePayTerms {
+  baseSalary: string;
+  position: string | null;
+  paysSocialInsurance: boolean;
+  items: KpiSheetItem[];
 }
 
 const totalOf = (items: readonly KpiSheetItem[]): string =>
@@ -75,6 +88,7 @@ export class PayrollTermsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly people: PayrollPeopleService,
+    private readonly positions: PositionsService,
   ) {}
 
   // ── templates ─────────────────────────────────────────────────────────────
@@ -228,6 +242,7 @@ export class PayrollTermsService {
           await tx.insert(payrollTerms).values({
             userId,
             baseSalary: amountOf('baseSalary', '0'),
+            positionLegacySalary: known.get(userId)?.positionId === null,
             paysSocialInsurance: true,
             templateId: id,
             items,
@@ -265,22 +280,36 @@ export class PayrollTermsService {
     ]);
     const terms = new Map(rows.map((row) => [row.userId, row]));
     const templateName = new Map(templates.map((row) => [row.id, row.name]));
+    const salaries = await this.positions.salarySchedulesForUsers(
+      executor,
+      people.map((person) => person.userId),
+      businessDate().slice(0, 7),
+    );
     return people
       .filter((person) => !person.left || terms.has(person.userId))
-      .map((person) => this.view(person, terms.get(person.userId) ?? null, templateName));
+      .map((person) =>
+        this.view(
+          person,
+          terms.get(person.userId) ?? null,
+          templateName,
+          salaries.get(person.userId),
+        ),
+      );
   }
 
   async one(userId: number, executor: Db | Tx = this.db): Promise<PayTerms> {
     const person = (await this.people.byId()).get(userId);
     if (!person) throw notFound('employee', userId);
-    const [[row], templates] = await Promise.all([
+    const [[row], templates, salaries] = await Promise.all([
       executor.select().from(payrollTerms).where(eq(payrollTerms.userId, userId)),
       this.templates(true, executor),
+      this.positions.salarySchedulesForUsers(executor, [userId], businessDate().slice(0, 7)),
     ]);
     return this.view(
       person,
       row ?? null,
       new Map(templates.map((entry) => [entry.id, entry.name])),
+      salaries.get(userId),
     );
   }
 
@@ -288,7 +317,8 @@ export class PayrollTermsService {
     assertPayroll(ctx, PAYROLL_MANAGE);
     const person = (await this.people.byId()).get(userId);
     if (!person) throw notFound('employee', userId);
-    const baseSalary = amountOf('baseSalary', input.baseSalary);
+    const requestedSalary =
+      input.baseSalary === undefined ? undefined : amountOf('baseSalary', input.baseSalary);
     const items = checkedItems(input.items);
     await inTransaction(this.db, async (tx) => {
       if (input.templateId !== null) await this.template(tx, input.templateId);
@@ -297,8 +327,29 @@ export class PayrollTermsService {
         .from(payrollTerms)
         .where(eq(payrollTerms.userId, userId))
         .for('update');
+      const salary = (
+        await this.positions.baseSalariesForUsers(tx, [userId], businessDate().slice(0, 7))
+      ).get(userId);
+      if (person.positionId !== null) {
+        const currentSalary =
+          salary?.baseSalary ??
+          (before && before.positionLegacySalary !== false ? before.baseSalary.toFixed(2) : '0.00');
+        if (requestedSalary && !requestedSalary.eq(currentSalary)) {
+          throw invalid('baseSalary', 'positionSalary', 'change the base salary on the position');
+        }
+      } else if (requestedSalary === undefined) {
+        throw invalid('baseSalary', 'isDefined', 'a legacy employee needs a base salary');
+      }
+      // Keep the old personal amount solely as a fallback for months before position rates began.
+      const baseSalary =
+        person.positionId !== null
+          ? (before?.baseSalary ?? amountOf('baseSalary', '0'))
+          : requestedSalary;
+      if (baseSalary === undefined) throw new Error('base salary missing');
       const values = {
         baseSalary,
+        positionLegacySalary:
+          person.positionId === null || (before ? before.positionLegacySalary !== false : false),
         paysSocialInsurance: input.paysSocialInsurance,
         templateId: input.templateId,
         items,
@@ -315,6 +366,7 @@ export class PayrollTermsService {
         before: before
           ? {
               baseSalary: before.baseSalary,
+              positionLegacySalary: before.positionLegacySalary,
               paysSocialInsurance: before.paysSocialInsurance,
               templateId: before.templateId,
               items: before.items,
@@ -323,6 +375,7 @@ export class PayrollTermsService {
           : undefined,
         after: {
           baseSalary,
+          positionLegacySalary: values.positionLegacySalary,
           paysSocialInsurance: input.paysSocialInsurance,
           templateId: input.templateId,
           items,
@@ -337,19 +390,34 @@ export class PayrollTermsService {
   /** The caller's own active terms (ADR-0235 #10): the sheet a full score pays, nothing else. */
   async mine(userId: number): Promise<{
     hasTerms: boolean;
+    positionId: number | null;
+    positionSalaryEffectiveMonth: string | null;
+    position: string | null;
     baseSalary: string;
+    nextBaseSalary: string | null;
+    nextEffectiveMonth: string | null;
     paysSocialInsurance: boolean;
     items: KpiSheetItem[];
     kpiTotal: string;
   }> {
-    const [row] = await this.db
-      .select()
-      .from(payrollTerms)
-      .where(and(eq(payrollTerms.userId, userId), eq(payrollTerms.active, true)));
-    const items = row ? storedItems(row.items) : [];
+    const [[row], salaries, people] = await Promise.all([
+      this.db.select().from(payrollTerms).where(eq(payrollTerms.userId, userId)),
+      this.positions.salarySchedulesForUsers(this.db, [userId], businessDate().slice(0, 7)),
+      this.people.byId(),
+    ]);
+    const schedule = salaries.get(userId);
+    const salary = schedule?.current;
+    const person = people.get(userId);
+    const active = row?.active ?? salary != null;
+    const items = active && row ? storedItems(row.items) : [];
     return {
-      hasTerms: row !== undefined,
-      baseSalary: row ? row.baseSalary.toFixed(2) : '0.00',
+      hasTerms: active,
+      positionId: person?.positionId ?? null,
+      positionSalaryEffectiveMonth: person?.positionSalaryEffectiveMonth ?? null,
+      position: person?.position ?? null,
+      baseSalary: active ? (salary?.baseSalary ?? row?.baseSalary.toFixed(2) ?? '0.00') : '0.00',
+      nextBaseSalary: schedule?.next?.baseSalary ?? null,
+      nextEffectiveMonth: schedule?.next?.effectiveMonth ?? null,
       paysSocialInsurance: row?.paysSocialInsurance ?? true,
       items,
       kpiTotal: totalOf(items),
@@ -357,40 +425,56 @@ export class PayrollTermsService {
   }
 
   /** The active terms by user, for building a run. */
-  async activeByUser(
-    executor: Db | Tx,
-  ): Promise<
-    Map<number, { baseSalary: string; paysSocialInsurance: boolean; items: KpiSheetItem[] }>
-  > {
-    const rows = await executor.select().from(payrollTerms).where(eq(payrollTerms.active, true));
-    return new Map(
-      rows.map((row) => [
-        row.userId,
-        {
-          baseSalary: row.baseSalary.toFixed(2),
-          paysSocialInsurance: row.paysSocialInsurance,
-          items: storedItems(row.items),
-        },
-      ]),
+  async activeByUser(executor: Db | Tx, month: string): Promise<Map<number, ActivePayTerms>> {
+    const [people, rows] = await Promise.all([
+      this.people.all(),
+      executor.select().from(payrollTerms),
+    ]);
+    const salaries = await this.positions.baseSalariesForUsers(
+      executor,
+      people.map((person) => person.userId),
+      month,
     );
+    const terms = new Map(rows.map((row) => [row.userId, row]));
+    const result = new Map<number, ActivePayTerms>();
+    for (const person of people) {
+      const row = terms.get(person.userId);
+      const salary = salaries.get(person.userId);
+      if (row?.active === false || (!row && !salary)) continue;
+      if (!salary && person.positionId !== null && (!row || row.positionLegacySalary === false))
+        continue;
+      result.set(person.userId, {
+        baseSalary: salary?.baseSalary ?? row?.baseSalary.toFixed(2) ?? '0.00',
+        position: salary?.position ?? person.position,
+        paysSocialInsurance: row?.paysSocialInsurance ?? true,
+        items: row ? storedItems(row.items) : [],
+      });
+    }
+    return result;
   }
 
   private view(
     person: PayrollPerson,
     row: typeof payrollTerms.$inferSelect | null,
     templateName: ReadonlyMap<number, string>,
+    schedule: PositionSalarySchedule | undefined,
   ): PayTerms {
     const items = row ? storedItems(row.items) : [];
+    const salary = schedule?.current;
     return {
       userId: person.userId,
       fullName: person.fullName,
+      positionId: person.positionId,
+      positionSalaryEffectiveMonth: person.positionSalaryEffectiveMonth,
       position: person.position,
       divisionId: person.divisionId,
       divisionName: person.divisionName,
       left: person.left,
-      hasTerms: row !== null,
-      active: row?.active ?? false,
-      baseSalary: row ? row.baseSalary.toFixed(2) : '0.00',
+      hasTerms: row !== null || salary != null,
+      active: row?.active ?? salary != null,
+      baseSalary: salary?.baseSalary ?? row?.baseSalary.toFixed(2) ?? '0.00',
+      nextBaseSalary: schedule?.next?.baseSalary ?? null,
+      nextEffectiveMonth: schedule?.next?.effectiveMonth ?? null,
       paysSocialInsurance: row?.paysSocialInsurance ?? true,
       templateId: row?.templateId ?? null,
       templateName: row?.templateId ? (templateName.get(row.templateId) ?? null) : null,

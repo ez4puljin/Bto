@@ -212,11 +212,18 @@ export class UsersService {
       // Lock order: the ADMIN role row first (serialises every access change), then the user.
       const adminRoleId = await this.lockAdminRole(tx);
       const [locked] = await tx
-        .select({ id: users.id })
+        .select({ id: users.id, rolesManagedBy: users.rolesManagedBy })
         .from(users)
         .where(eq(users.id, id))
         .for('update');
       if (!locked) throw new AppError('NOT_FOUND', `user ${id} not found`, { id });
+      if (patch.roleIds !== undefined && locked.rolesManagedBy !== null) {
+        throw invalid(
+          'roleIds',
+          'positionManaged',
+          "change this employee's position to change their roles",
+        );
+      }
       const before = await this.get(id, tx);
       if (phone !== undefined && phone !== before.phone) await this.assertPhoneFree(tx, phone, id);
       if (patch.roleIds) await this.assertRoles(tx, patch.roleIds);

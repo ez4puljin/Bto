@@ -26,3 +26,8 @@ export {
 // Payroll (ADR-0235) reads the time report's days for the attendance KPI and the employees' cards.
 export { HrReportsService, type ReportRow } from './services/reports.service';
 export { type EmployeeRow, WorkforceService } from './services/workforce.service';
+export {
+  type PositionBaseSalary,
+  type PositionSalarySchedule,
+  PositionsService,
+} from './services/positions.service';
