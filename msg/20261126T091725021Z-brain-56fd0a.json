@@ -1,0 +1,8 @@
+{
+  "id": "20261126T091725021Z-brain-56fd0a",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-26T09:17:25.021Z",
+  "text": "inbox gate: in/dual-local-start @ f0522a99: WAITING for the owner: the automatic review leaves this change to the owner's brain because it touches what stays the owner's: OWNER-ONLY decision: ADRs, the status book and the architecture are the owner's: docs/decisions/ADR-0247-overnight-qa-history.md OWNER-ONLY config: a build, test, app or environment config: start-main.cmd start-test.cmd OWNER-ONLY tools: the repository's tools, deploy and CI: tools/local-start/README.md tools/local-start/child.mjs tools/local-start/start.mjs tools/local-start/start.test.mjs tools/qa-six-month/README.md (+9) . Nothing to do now; the owner's brain reviews it and lands it or writes back why not. A feature branch only adds i18n keys; changing existing wording is its own branch in/wording-TOPIC with the full old → new list in its commit message.",
+  "slug": "dual-local-start"
+}
