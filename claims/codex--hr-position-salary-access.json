@@ -48,6 +48,7 @@
     "apps/web/src/features/hr/positions-page.test.tsx",
     "apps/web/src/features/hr/positions-page.tsx",
     "apps/web/src/features/hr/staff-dialog.tsx",
+    "apps/web/src/features/hr/staff-page.tsx",
     "apps/web/src/features/hr/workforce-api.ts",
     "apps/web/src/features/identity/staff-permissions.tsx",
     "apps/web/src/features/identity/user-access.tsx",
@@ -61,6 +62,6 @@
     "packages/api-client/openapi.json",
     "packages/api-client/src/generated/schema.ts"
   ],
-  "what": "Position-based salary/access with additive0124, ADR0243 and early audit privacy",
+  "what": "Keep position assignment and staff registration ADMIN-only in UI and API; owner review corrections",
   "since": "2026-11-25T05:41:28.725Z"
 }
