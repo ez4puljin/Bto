@@ -105,7 +105,7 @@ test('a durable logical floor only advances within the currently selected QA bus
 test('every client connection/query fails closed outside exact QA database, before executing', () => {
   const f = fixture(),
     c = install(f),
-    wrong = new f.Client('bto_local_shiro');
+    wrong = new f.Client('ordinary_database');
   try {
     assert.throws(() => wrong.connect(), /outside/);
     assert.throws(() => wrong.query('INSERT any business data'), /outside/);
@@ -138,7 +138,7 @@ test('partial installation failure restores prior patches; production and wrong 
     () =>
       installLogicalClock({
         ...fixture(),
-        databaseUrl: URL.replace(QA_DATABASE, 'bto_local_shiro'),
+        databaseUrl: URL.replace(QA_DATABASE, 'ordinary_database'),
         nodeEnv: 'test',
         explicitlyEnabled: true,
       }),

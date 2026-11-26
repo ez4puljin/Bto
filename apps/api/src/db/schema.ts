@@ -233,6 +233,7 @@ export {
   payrollLineItems,
   payrollLines,
   payrollRuns,
+  payrollSalaryOverrides,
   payrollSettings,
   payrollTerms,
 } from '../modules/payroll/schema';

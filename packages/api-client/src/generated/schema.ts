@@ -19656,6 +19656,13 @@ export interface components {
              * @example 300000.00
              */
             baseSalary: string;
+            /** @enum {string} */
+            salarySource: "POSITION" | "PERSONAL" | "LEGACY";
+            /** @enum {string|null} */
+            nextSalarySource: "POSITION" | "PERSONAL" | "LEGACY" | null;
+            positionBaseSalary: string | null;
+            positionNextBaseSalary: string | null;
+            positionNextEffectiveMonth: string | null;
             nextBaseSalary: string | null;
             nextEffectiveMonth: string | null;
             paysSocialInsurance: boolean;
@@ -19760,6 +19767,13 @@ export interface components {
              * @example 300000.00
              */
             baseSalary: string;
+            /** @enum {string} */
+            salarySource: "POSITION" | "PERSONAL" | "LEGACY";
+            /** @enum {string|null} */
+            nextSalarySource: "POSITION" | "PERSONAL" | "LEGACY" | null;
+            positionBaseSalary: string | null;
+            positionNextBaseSalary: string | null;
+            positionNextEffectiveMonth: string | null;
             nextBaseSalary: string | null;
             nextEffectiveMonth: string | null;
             paysSocialInsurance: boolean;
@@ -19776,10 +19790,12 @@ export interface components {
         };
         PayrollTermsRequest: {
             /**
-             * @description Omit for employees assigned to a position
+             * @description For assigned staff, schedules an employee-only override next month; omit to preserve inheritance
              * @example 300000.00
              */
             baseSalary?: string;
+            /** @description Resume the position salary next month; cannot accompany baseSalary */
+            usePositionSalary?: boolean;
             paysSocialInsurance: boolean;
             /** @description The template the sheet came from */
             templateId?: number | null;

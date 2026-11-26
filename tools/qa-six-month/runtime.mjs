@@ -7,7 +7,7 @@ import {
   assertQaUrl,
   assertRunDirectory,
   parseEnvironment,
-  withQaDatabase,
+  qaAdminLogin,
   QA_API_PORT,
 } from './safety.mjs';
 import { installLogicalClock } from './clock.mjs';
@@ -50,30 +50,39 @@ export function installLoopbackFence() {
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-/** No database creation, migration, reset, role/constraint alterations or production launch occurs here. */
-export async function startRuntime({ repo, directory, explicitlyEnabled, database, password }) {
+/** Read only the explicitly selected QA environment; never inspect an application's .env. */
+export async function loadQaEnvironment(
+  { repo, directory, explicitlyEnabled, database, password },
+  { read = readFile, explicitUrl = process.env.BTO_QA_DATABASE_URL } = {},
+) {
   if (explicitlyEnabled !== true || database !== QA_DATABASE || !password)
     throw new Error('Use explicit --apply, exact --database and BTO_QA_PASSWORD');
+  if (typeof repo !== 'string' || !repo.trim()) throw new Error('Explicit --repo is required');
   const checkout = resolve(repo);
   const runDirectory = assertRunDirectory(checkout, directory);
-  await stat(join(checkout, 'node_modules', '@nestjs', 'core', 'package.json'));
-  const require = createRequire(join(checkout, 'apps/api/package.json'));
-  const pg = require('pg');
-  const time = require('@tugeel/shared/time');
-  await mkdir(runDirectory, { recursive: true });
+  // A supplied target is refused before even reading the tool-owned environment.
+  if (explicitUrl !== undefined) assertQaUrl(explicitUrl);
   const envFile = join(runDirectory, 'qa.env');
-  let env;
+  let env,
+    provision = false;
   try {
-    env = parseEnvironment(await readFile(envFile, 'utf8'));
+    env = parseEnvironment(await read(envFile, 'utf8'));
+    assertQaUrl(env.DATABASE_URL);
+    if (explicitUrl !== undefined && env.DATABASE_URL !== explicitUrl)
+      throw new Error('Explicit QA URL differs from the provisioned QA environment');
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
-    const local = parseEnvironment(await readFile(join(checkout, 'apps/api/.env'), 'utf8'));
+    if (explicitUrl === undefined)
+      throw new Error('Pre-provision tool-owned qa.env or supply a validated BTO_QA_DATABASE_URL', {
+        cause: error,
+      });
+    provision = true;
     env = {
       NODE_ENV: 'test',
       ROLE: 'api',
       API_PORT: String(QA_API_PORT),
       LOG_LEVEL: 'silent',
-      DATABASE_URL: withQaDatabase(local.DATABASE_URL),
+      DATABASE_URL: explicitUrl,
       DB_POOL_MAX: '4',
       PGBOSS_POOL_MAX: '2',
       JWT_SECRET: randomBytes(48).toString('hex'),
@@ -85,7 +94,33 @@ export async function startRuntime({ repo, directory, explicitlyEnabled, databas
       APP_VERSION: 'isolated-six-month-qa',
       REPORTS_MAX_RUNNING: '1',
       REPORTS_MAX_PER_USER: '1',
+      BTO_QA_ADMIN_LOGIN: process.env.BTO_QA_ADMIN_LOGIN ?? 'qa-admin',
     };
+  }
+  assertQaUrl(env.DATABASE_URL);
+  if (env.NODE_ENV !== 'test' || env.ROLE !== 'api' || env.API_PORT !== String(QA_API_PORT))
+    throw new Error('QA environment does not match isolated API configuration');
+  qaAdminLogin(env);
+  return { checkout, runDirectory, envFile, env, provision };
+}
+
+/** No database creation, migration, reset, role/constraint alterations or production launch occurs here. */
+export async function startRuntime(options) {
+  const { explicitlyEnabled, password, browseOnly = false } = options;
+  const { checkout, runDirectory, envFile, env, provision } = await loadQaEnvironment(options);
+  if (browseOnly && provision)
+    throw new Error('Browsing requires a pre-provisioned QA environment');
+  const prohibited =
+    /^(?:AI_|LLM_|ELEVENLABS_|ERKHET_|MIGRATOR_DATABASE_URL|ADMIN_DATABASE_URL|TEST_ADMIN_DATABASE_URL)/;
+  if (Object.keys(env).some((key) => prohibited.test(key)))
+    throw new Error('QA environment must contain no provider or admin credentials');
+  // Validation precedes dependency loads and every filesystem mutation.
+  await stat(join(checkout, 'node_modules', '@nestjs', 'core', 'package.json'));
+  const require = createRequire(join(checkout, 'apps/api/package.json'));
+  const pg = require('pg');
+  const time = require('@tugeel/shared/time');
+  if (provision) {
+    await mkdir(runDirectory, { recursive: true });
     await writeFile(
       envFile,
       Object.entries(env)
@@ -94,13 +129,7 @@ export async function startRuntime({ repo, directory, explicitlyEnabled, databas
       { flag: 'wx', mode: 0o600 },
     );
   }
-  assertQaUrl(env.DATABASE_URL);
-  if (env.NODE_ENV !== 'test' || env.ROLE !== 'api' || env.API_PORT !== String(QA_API_PORT))
-    throw new Error('QA environment does not match isolated API configuration');
-  const prohibited =
-    /^(?:AI_|LLM_|ELEVENLABS_|ERKHET_|MIGRATOR_DATABASE_URL|ADMIN_DATABASE_URL|TEST_ADMIN_DATABASE_URL)/;
-  if (Object.keys(env).some((key) => prohibited.test(key)))
-    throw new Error('QA environment must contain no provider or admin credentials');
+  const adminLogin = qaAdminLogin(env);
   const affectedKeys = new Set([
     ...Object.keys(env),
     ...Object.keys(process.env).filter((key) => prohibited.test(key)),
@@ -133,13 +162,15 @@ export async function startRuntime({ repo, directory, explicitlyEnabled, databas
     if (errors.length) throw new AggregateError(errors, 'QA runtime shutdown failed');
   };
   try {
-    clock = installLogicalClock({
-      Client: pg.Client,
-      time,
-      databaseUrl: env.DATABASE_URL,
-      nodeEnv: process.env.NODE_ENV,
-      explicitlyEnabled,
-    });
+    clock = browseOnly
+      ? { restore() {} }
+      : installLogicalClock({
+          Client: pg.Client,
+          time,
+          databaseUrl: env.DATABASE_URL,
+          nodeEnv: process.env.NODE_ENV,
+          explicitlyEnabled,
+        });
     reader = new pg.Client({ connectionString: env.DATABASE_URL });
     await reader.connect();
     const target = await reader.query(
@@ -206,14 +237,17 @@ export async function startRuntime({ repo, directory, explicitlyEnabled, databas
       join(checkout, 'apps/api/dist/modules/identity/cli/create-admin.js'),
     );
     const users = await reader.query(
-      "SELECT id, password_hash IS NOT NULL AS password_ready FROM users WHERE username='shiro'",
+      'SELECT id, password_hash IS NOT NULL AS password_ready FROM users WHERE username=$1',
+      [adminLogin],
     );
+    if (browseOnly && (users.rows.length !== 1 || !users.rows[0].password_ready))
+      throw new Error('Browsing requires the existing password-ready QA administrator');
     let setupCode;
     if (!users.rows.length || !users.rows[0].password_ready)
       setupCode = (
         await createAdmin(app.get(DB), {
-          username: 'shiro',
-          fullName: 'Shiro · туршилтын админ',
+          username: adminLogin,
+          fullName: 'QA administrator',
           pepper: env.AUTH_PEPPER,
         })
       ).code;
@@ -229,6 +263,7 @@ export async function startRuntime({ repo, directory, explicitlyEnabled, databas
       require,
       setupCode,
       password,
+      adminLogin,
       shared: { money: require('@tugeel/shared/money'), pos: require('@tugeel/shared/pos') },
       stock: app.get(StockPostingService),
       close,

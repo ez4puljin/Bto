@@ -9,7 +9,7 @@ import { seedHistory } from './history.mjs';
 import { reconcile } from './reconcile.mjs';
 
 export function optionsOf(argv) {
-  const options = { apply: false, repo: process.cwd(), through: LAST_DAY };
+  const options = { apply: false, through: LAST_DAY };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--apply') options.apply = true;
@@ -24,6 +24,7 @@ export function optionsOf(argv) {
     throw new Error('--through must be a day in 2026-06-01..2026-11-23');
   if (options.apply && options.database !== QA_DATABASE)
     throw new Error(`--apply requires --database ${QA_DATABASE}`);
+  if (options.apply && !options.repo?.trim()) throw new Error('--apply requires explicit --repo');
   return options;
 }
 

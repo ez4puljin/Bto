@@ -7,8 +7,8 @@ The owner requested a full review, fixes and realistic testing with exactly 500 
 60 grouped fictional suppliers and six months of business history. Existing owner data must remain
 intact. The dedicated local database is `bto_qa_six_month_20261124` on `127.0.0.1:15432`.
 It is provisioned and migrated separately using normal migration tooling. The generator never
-resets, drops or migrates a database and requires the normal `app` role. The ordinary owner
-database `bto_local_shiro`, its environment and ports 3300/5173 remain unchanged.
+resets, drops or migrates a database and requires the normal `app` role. The operational
+database, its environment and running services remain unchanged.
 
 The period is June 1 through November 23, 2026: six calendar month groups, with an explicitly
 partial November. Suppliers and customers are fictional, emails use `example.invalid` and no
@@ -36,7 +36,7 @@ and removes the run lock. The later browse API runs with the real clock and no s
 The generator runs API modules only: no worker, cron processing, fiscal submissions, SMS/email,
 printing or LLM calls. Its fresh environment contains no provider, admin or migrator secrets;
 an additional process-local socket/fetch fence permits only the QA API and local PostgreSQL.
-Source environments are read only. Generated QA authentication secrets stay in the private local
+Operational environment files are never read. Generated QA authentication secrets stay in the private local
 QA environment file; passwords and access/edge tokens do not appear in public reports.
 
 Deterministic IDs and payload hashes, persisted pending/completed operations and idempotency keys
@@ -71,3 +71,15 @@ This keeps the database effectiveness guard intact and the historical claims hon
 Evidence includes a deterministic preview, pure guard/clock/checkpoint tests, the run manifest,
 independent acceptance report, business-month counts and browseable QA UI. A populated database
 alone is not an acceptance result: reconciliation and traces must pass or be reported as failed.
+
+
+The tool must never run against the real system, on Windows or on the Ubuntu production host.
+The allow-list is hard-coded to `127.0.0.1:15432/bto_qa_six_month_20261124` without URL query
+or host overrides, reinforced by client/socket guards and server-side `current_database()` and
+normal `app` role checks. A non-empty database without this tool's checkpoint is refused. No
+platform exception permits another target. `--apply` requires explicit `--repo`; target/run-directory
+checks precede any filesystem mutation, and a supplied `BTO_QA_DATABASE_URL` is checked before
+reading files. Only a pre-provisioned tool-owned `qa.env` may supply credentials otherwise; the
+application's `.env` is never consulted. The public default administrator is `qa-admin`; private
+`BTO_QA_ADMIN_LOGIN` can identify an already existing QA account without changing it. Browse-only
+startup requires that password-ready account and never creates or resets an administrator.

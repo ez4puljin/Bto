@@ -12,6 +12,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -107,6 +108,26 @@ export const payrollTerms = pgTable(
   (t) => [
     check('payroll_terms_salary', sql`${t.baseSalary} >= 0`),
     check('payroll_terms_items_array', sql`jsonb_typeof(${t.items}) = 'array'`),
+  ],
+);
+
+/** Dated employee-only salary; null means resume the position's salary (ADR-0244). */
+export const payrollSalaryOverrides = pgTable(
+  'payroll_salary_overrides',
+  {
+    userId: userRef('user_id').notNull(),
+    effectiveMonth: text('effective_month').notNull(),
+    baseSalary: money('base_salary'),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.effectiveMonth] }),
+    check('payroll_salary_overrides_month', sql`${t.effectiveMonth} ~ ${MONTH}`),
+    check(
+      'payroll_salary_overrides_nonnegative',
+      sql`${t.baseSalary} >= 0 AND ${t.baseSalary} <> 'NaN'::numeric`,
+    ),
   ],
 );
 

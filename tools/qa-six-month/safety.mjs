@@ -3,6 +3,14 @@ import { QA_DATABASE } from './dataset.mjs';
 
 export const QA_API_PORT = 3301;
 export const QA_WEB_PORT = 5174;
+export const QA_ADMIN_LOGIN = 'qa-admin';
+
+export function qaAdminLogin(values) {
+  const login = values.BTO_QA_ADMIN_LOGIN ?? QA_ADMIN_LOGIN;
+  if (typeof login !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(login))
+    throw new Error('Invalid private QA administrator login');
+  return login;
+}
 
 export function assertQaUrl(value, label = 'database') {
   let url;
@@ -37,6 +45,7 @@ export function assertClientTarget(client) {
 }
 
 export function assertRunDirectory(repo, directory) {
+  if (typeof repo !== 'string' || !repo.trim()) throw new Error('Explicit --repo is required');
   const root = resolve(repo, '.data/local-dev/qa-six-month');
   const target = resolve(directory ?? root);
   const tail = relative(root, target);

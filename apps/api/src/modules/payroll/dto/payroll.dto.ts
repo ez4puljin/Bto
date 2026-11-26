@@ -169,6 +169,14 @@ export class PayrollTermsDto {
   @ApiProperty({ description: 'Only active terms put the person on a payroll run' })
   active: boolean;
   @ApiProperty(AMOUNT) baseSalary: string;
+  @ApiProperty({ enum: ['POSITION', 'PERSONAL', 'LEGACY'] }) salarySource:
+    'POSITION' | 'PERSONAL' | 'LEGACY';
+  @ApiProperty({ enum: ['POSITION', 'PERSONAL', 'LEGACY'], nullable: true }) nextSalarySource:
+    'POSITION' | 'PERSONAL' | 'LEGACY' | null;
+  @ApiProperty({ type: String, nullable: true }) positionBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) positionNextBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) positionNextEffectiveMonth: string | null;
+
   @ApiProperty({ type: String, nullable: true }) nextBaseSalary: string | null;
   @ApiProperty({ type: String, nullable: true }) nextEffectiveMonth: string | null;
   @ApiProperty() paysSocialInsurance: boolean;
@@ -181,11 +189,21 @@ export class PayrollTermsDto {
 
 @ApiSchema({ name: 'PayrollTermsRequest' })
 export class PayrollTermsRequestDto {
-  @ApiPropertyOptional({ ...AMOUNT, description: 'Omit for employees assigned to a position' })
+  @ApiPropertyOptional({
+    ...AMOUNT,
+    description:
+      'For assigned staff, schedules an employee-only override next month; omit to preserve inheritance',
+  })
   @ValidateIf((_object, value: unknown) => value !== undefined)
   @IsString()
   @Matches(PAYROLL_AMOUNT_PATTERN)
   baseSalary?: string;
+  @ApiPropertyOptional({
+    description: 'Resume the position salary next month; cannot accompany baseSalary',
+  })
+  @IsOptional()
+  @IsBoolean()
+  usePositionSalary?: boolean;
   @ApiProperty() @IsBoolean() paysSocialInsurance: boolean;
   @ApiPropertyOptional({
     type: Number,
@@ -213,6 +231,14 @@ export class PayrollMyTermsDto {
   @ApiProperty({ type: String, nullable: true }) positionSalaryEffectiveMonth: string | null;
   @ApiProperty({ type: String, nullable: true }) position: string | null;
   @ApiProperty(AMOUNT) baseSalary: string;
+  @ApiProperty({ enum: ['POSITION', 'PERSONAL', 'LEGACY'] }) salarySource:
+    'POSITION' | 'PERSONAL' | 'LEGACY';
+  @ApiProperty({ enum: ['POSITION', 'PERSONAL', 'LEGACY'], nullable: true }) nextSalarySource:
+    'POSITION' | 'PERSONAL' | 'LEGACY' | null;
+  @ApiProperty({ type: String, nullable: true }) positionBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) positionNextBaseSalary: string | null;
+  @ApiProperty({ type: String, nullable: true }) positionNextEffectiveMonth: string | null;
+
   @ApiProperty({ type: String, nullable: true }) nextBaseSalary: string | null;
   @ApiProperty({ type: String, nullable: true }) nextEffectiveMonth: string | null;
   @ApiProperty() paysSocialInsurance: boolean;

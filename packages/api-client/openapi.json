@@ -75054,6 +75054,35 @@
             "description": "Money as text, «300000» or «300000.50»",
             "example": "300000.00"
           },
+          "salarySource": {
+            "enum": [
+              "POSITION",
+              "PERSONAL",
+              "LEGACY"
+            ],
+            "type": "string"
+          },
+          "nextSalarySource": {
+            "nullable": true,
+            "enum": [
+              "POSITION",
+              "PERSONAL",
+              "LEGACY"
+            ],
+            "type": "string"
+          },
+          "positionBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionNextBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionNextEffectiveMonth": {
+            "type": "string",
+            "nullable": true
+          },
           "nextBaseSalary": {
             "type": "string",
             "nullable": true
@@ -75083,6 +75112,11 @@
           "positionSalaryEffectiveMonth",
           "position",
           "baseSalary",
+          "salarySource",
+          "nextSalarySource",
+          "positionBaseSalary",
+          "positionNextBaseSalary",
+          "positionNextEffectiveMonth",
           "nextBaseSalary",
           "nextEffectiveMonth",
           "paysSocialInsurance",
@@ -75328,6 +75362,35 @@
             "description": "Money as text, «300000» or «300000.50»",
             "example": "300000.00"
           },
+          "salarySource": {
+            "enum": [
+              "POSITION",
+              "PERSONAL",
+              "LEGACY"
+            ],
+            "type": "string"
+          },
+          "nextSalarySource": {
+            "nullable": true,
+            "enum": [
+              "POSITION",
+              "PERSONAL",
+              "LEGACY"
+            ],
+            "type": "string"
+          },
+          "positionBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionNextBaseSalary": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionNextEffectiveMonth": {
+            "type": "string",
+            "nullable": true
+          },
           "nextBaseSalary": {
             "type": "string",
             "nullable": true
@@ -75376,6 +75439,11 @@
           "hasTerms",
           "active",
           "baseSalary",
+          "salarySource",
+          "nextSalarySource",
+          "positionBaseSalary",
+          "positionNextBaseSalary",
+          "positionNextEffectiveMonth",
           "nextBaseSalary",
           "nextEffectiveMonth",
           "paysSocialInsurance",
@@ -75391,8 +75459,12 @@
         "properties": {
           "baseSalary": {
             "type": "string",
-            "description": "Omit for employees assigned to a position",
+            "description": "For assigned staff, schedules an employee-only override next month; omit to preserve inheritance",
             "example": "300000.00"
+          },
+          "usePositionSalary": {
+            "type": "boolean",
+            "description": "Resume the position salary next month; cannot accompany baseSalary"
           },
           "paysSocialInsurance": {
             "type": "boolean"

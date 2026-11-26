@@ -1,4 +1,5 @@
 import { PAYROLL_AMOUNT_PATTERN } from '@tugeel/shared/payroll';
+import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
 import { matchesQuery, queryTerms, searchKeys } from '@tugeel/shared/text';
 import { Wallet } from 'lucide-react';
@@ -61,7 +62,18 @@ function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
   const action = useAction();
   const { terms } = props;
   const positionDerived = terms.positionId !== null;
-  const [salary, setSalary] = useState(terms.hasTerms ? terms.baseSalary.replace(/\.00$/, '') : '');
+  // Keep the comparison baseline with the form draft: a background refetch may refresh props.
+  const [initialSalary] = useState(() =>
+    (terms.nextBaseSalary ?? (terms.hasTerms || positionDerived ? terms.baseSalary : '')).replace(
+      /\.00$/,
+      '',
+    ),
+  );
+  const positionCurrentSalary = terms.positionBaseSalary ?? null;
+  const positionNextSalary = terms.positionNextBaseSalary ?? null;
+  const positionSalary = positionNextSalary ?? positionCurrentSalary;
+  const [salary, setSalary] = useState(initialSalary);
+  const [usePositionSalary, setUsePositionSalary] = useState(false);
   const [insured, setInsured] = useState(terms.paysSocialInsurance);
   const [active, setActive] = useState(terms.hasTerms ? terms.active : true);
   const [items, setItems] = useState<ItemDraft[]>(() => draftsOf(terms.items));
@@ -80,7 +92,7 @@ function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!positionDerived && !PAYROLL_AMOUNT_PATTERN.test(salary)) {
+    if (!usePositionSalary && !PAYROLL_AMOUNT_PATTERN.test(salary)) {
       setError('validation.money');
       return;
     }
@@ -92,7 +104,11 @@ function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
     const ok = await action.run(() =>
       mutations.saveTerms.mutateAsync({
         userId: terms.userId,
-        ...(positionDerived ? {} : { baseSalary: salary }),
+        ...(usePositionSalary
+          ? { usePositionSalary: true }
+          : !positionDerived || !new Decimal(salary).eq(initialSalary || '0')
+            ? { baseSalary: salary }
+            : {}),
         paysSocialInsurance: insured,
         templateId,
         items: requestOf(items),
@@ -117,54 +133,83 @@ function TermsDialog(props: { terms: PayrollTerms; onClose: () => void }) {
           <ProblemAlert problem={action.problem} />
           <div className="@container">
             <div className="grid gap-4 @lg:grid-cols-3">
-              {positionDerived ? (
-                <div className="space-y-1.5">
-                  <p className="text-sm font-medium">{t('payroll.web.terms.salary')}</p>
-                  <p className="font-mono text-lg">{money(terms.baseSalary)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t('hr.positions.derivedSalary', { name: terms.position })}
-                  </p>
-                  {terms.positionSalaryEffectiveMonth &&
-                  terms.positionSalaryEffectiveMonth > businessDate().slice(0, 7) ? (
-                    <p className="text-xs text-muted-foreground">
-                      {t('hr.positions.assignmentHint', {
-                        month: terms.positionSalaryEffectiveMonth,
-                      })}
+              <FormField label={t('payroll.web.terms.salary')} htmlFor="terms-salary" error={error}>
+                <MoneyInput
+                  id="terms-salary"
+                  autoFocus={canManage}
+                  suffix="₮"
+                  disabled={!canManage}
+                  value={salary}
+                  onValueChange={(raw) => {
+                    setError(undefined);
+                    setUsePositionSalary(false);
+                    setSalary(raw);
+                  }}
+                />
+                {positionDerived ? (
+                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                    {positionCurrentSalary !== null ? (
+                      <p>
+                        {t('payroll.web.terms.positionDefault', {
+                          amount: money(positionCurrentSalary),
+                        })}
+                      </p>
+                    ) : null}
+                    {positionNextSalary !== null && terms.positionNextEffectiveMonth ? (
+                      <p>
+                        {t('payroll.web.terms.positionScheduled', {
+                          amount: money(positionNextSalary),
+                          month: terms.positionNextEffectiveMonth,
+                        })}
+                      </p>
+                    ) : null}
+                    <p>
+                      {t('payroll.web.terms.currentSalary', { amount: money(terms.baseSalary) })}
                     </p>
-                  ) : null}
-                  {terms.nextBaseSalary && terms.nextEffectiveMonth ? (
-                    <p className="text-xs text-muted-foreground">
-                      {t('hr.positions.scheduledAmount', {
-                        amount: money(terms.nextBaseSalary),
-                        month: terms.nextEffectiveMonth,
-                      })}
-                    </p>
-                  ) : null}
-                  {canReadPositions ? (
-                    <Link className="text-xs text-link" to="/hr/positions">
-                      {t('hr.positions.title')}
-                    </Link>
-                  ) : null}
-                </div>
-              ) : (
-                <FormField
-                  label={t('payroll.web.terms.salary')}
-                  htmlFor="terms-salary"
-                  error={error}
-                >
-                  <MoneyInput
-                    id="terms-salary"
-                    autoFocus={canManage}
-                    suffix="₮"
-                    disabled={!canManage}
-                    value={salary}
-                    onValueChange={(raw) => {
-                      setError(undefined);
-                      setSalary(raw);
-                    }}
-                  />
-                </FormField>
-              )}
+                    <p>{t('payroll.web.terms.personalSalaryHint')}</p>
+                    {(terms.nextSalarySource ?? terms.salarySource) === 'PERSONAL' &&
+                    !usePositionSalary ? (
+                      <p>{t('payroll.web.terms.personalSalary')}</p>
+                    ) : null}
+                    {terms.positionSalaryEffectiveMonth &&
+                    terms.positionSalaryEffectiveMonth > businessDate().slice(0, 7) ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('hr.positions.assignmentHint', {
+                          month: terms.positionSalaryEffectiveMonth,
+                        })}
+                      </p>
+                    ) : null}
+                    {terms.nextBaseSalary !== null && terms.nextEffectiveMonth ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('hr.positions.scheduledAmount', {
+                          amount: money(terms.nextBaseSalary),
+                          month: terms.nextEffectiveMonth,
+                        })}
+                      </p>
+                    ) : null}
+                    {canManage && positionSalary !== null ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setError(undefined);
+                          setUsePositionSalary(true);
+                          setSalary(positionSalary.replace(/\.00$/, ''));
+                        }}
+                      >
+                        {t('payroll.web.terms.usePositionSalary')}
+                      </Button>
+                    ) : null}
+                    {usePositionSalary ? <p>{t('payroll.web.terms.resetSalaryHint')}</p> : null}
+                    {canReadPositions ? (
+                      <Link className="text-xs text-link" to="/hr/positions">
+                        {t('hr.positions.title')}
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
+              </FormField>
               <FormField
                 label={t('payroll.web.terms.insured')}
                 htmlFor="terms-insured"
