@@ -1,0 +1,30 @@
+{
+  "who": "codex",
+  "slug": "qa-history-tools",
+  "paths": [
+    "docs/decisions/ADR-0247-overnight-qa-history.md",
+    "tools/qa-six-month/README.md",
+    "tools/qa-six-month/catalogue.mjs",
+    "tools/qa-six-month/clock.mjs",
+    "tools/qa-six-month/clock.test.mjs",
+    "tools/qa-six-month/dataset.mjs",
+    "tools/qa-six-month/dataset.test.mjs",
+    "tools/qa-six-month/history.mjs",
+    "tools/qa-six-month/journal.mjs",
+    "tools/qa-six-month/journal.test.mjs",
+    "tools/qa-six-month/plan.mjs",
+    "tools/qa-six-month/pos-accounts.mjs",
+    "tools/qa-six-month/pos-accounts.test.mjs",
+    "tools/qa-six-month/reconcile.mjs",
+    "tools/qa-six-month/reconcile.test.mjs",
+    "tools/qa-six-month/repair-rejected-location.mjs",
+    "tools/qa-six-month/run-current-expiry.mjs",
+    "tools/qa-six-month/run.mjs",
+    "tools/qa-six-month/run.test.mjs",
+    "tools/qa-six-month/runtime.mjs",
+    "tools/qa-six-month/safety.mjs",
+    "tools/qa-six-month/safety.test.mjs"
+  ],
+  "what": "Submit inactive isolated QA tools with prerequisite preflight and fake-only validation; no execution",
+  "since": "2026-11-26T05:11:02.003Z"
+}
