@@ -5,7 +5,12 @@ import { clearToasts } from '@/lib/toast';
 import { clearQueryClients } from '@/test/query-clients';
 
 // The shelves are on hold on screen (lib/features.ts); the tests cover the shelf paths as built.
-vi.mock('@/lib/features', () => ({ BINS_SOON: false, EBARIMT_PER_PRODUCT: true }));
+// The news dialog stays shut so that it never covers the page a test reads (ADR-0251).
+vi.mock('@/lib/features', () => ({
+  BINS_SOON: false,
+  EBARIMT_PER_PRODUCT: true,
+  NEWS_DIALOG: false,
+}));
 
 // `pnpm check` runs every workspace's tests at once; a page that waits for sign-in, then its
 // data, can need more than the default 1 s under that load (the first test of a file booting the

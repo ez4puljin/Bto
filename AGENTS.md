@@ -32,6 +32,11 @@ You never push to `main` (it is protected). The owner's PC lands your work throu
    (`node tools/brain/board.mjs say brain "<question>" --slug <slug>`) and wait.
 4. Make one small, focused change. Need an ADR or a migration number? Only
    `node tools/brain/board.mjs number adr|migration <slug>` (prints `NNNN`); never pick one yourself.
+   A change people will see (a screen, a flow, a rule, a print) adds one news entry in the same
+   branch (ADR-0251): `apps/web/src/features/news/content/<YYYY-MM-DD>-<slug>.md`, a `# ` title and
+   two to five plain Mongolian lines (what is new, where it is in the menu, who may use it). Bto
+   shows it to every person who has not read it yet. Fixes nobody notices, tools and documents need
+   none.
 5. Run `pnpm check:fast` until it prints `check:fast green`. A change of stock, money, rights or a
    migration also runs its integration suites (`pnpm --filter @tugeel/api run test:integration --
    <pattern>`, needs the development PostgreSQL: `docker compose up -d --wait`).

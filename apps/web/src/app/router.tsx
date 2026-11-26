@@ -173,6 +173,7 @@ import { PosVoidsPage } from '@/features/pos/voids-page';
 import { PosVoucherPrintPage } from '@/features/pos/voucher-print-page';
 import { PosVouchersPage } from '@/features/pos/vouchers-page';
 import { GuideArticlePage, GuidePage } from '@/features/guide/guide-pages';
+import { NewsPage } from '@/features/news/news-pages';
 import { PhoneCallPage } from '@/features/phone-agent/phone-call-page';
 import { PhoneCallsPage } from '@/features/phone-agent/phone-calls-page';
 import { PhoneLinesPage } from '@/features/phone-agent/phone-lines-page';
@@ -402,6 +403,8 @@ export const routes: RouteObject[] = [
           ...appRoutes(),
           ...hrRoutes(),
           { path: 'guide', handle: { width: 'reading' }, element: <GuidePage /> },
+          // ADR-0251: every «Шинэ өөрчлөлт», to read again what the dialog showed.
+          { path: 'news', handle: { width: 'reading' }, element: <NewsPage /> },
           {
             path: 'guide/:category/:article',
             handle: { width: 'reading' },

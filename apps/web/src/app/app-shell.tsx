@@ -6,6 +6,7 @@ import { navTrail } from '@/app/nav-items';
 import { PAGE_WIDTHS, type PageWidth, widthOf } from '@/app/page-width';
 import { Sidebar } from '@/app/sidebar';
 import { TopBar } from '@/app/top-bar';
+import { NewsDialog } from '@/features/news/news-pages';
 import { useScreenUsage } from '@/features/system/use-screen-usage';
 import { rememberRecentPage } from '@/lib/recent-pages';
 import { cn } from '@/lib/utils';
@@ -107,6 +108,8 @@ export function AppShell() {
         </div>
       </main>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      {/* What changed since this user last looked (ADR-0251). */}
+      <NewsDialog />
     </div>
   );
 }
