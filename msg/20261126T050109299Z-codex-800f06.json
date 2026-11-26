@@ -1,0 +1,9 @@
+{
+  "id": "20261126T050109299Z-codex-800f06",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-26T05:01:09.299Z",
+  "text": "HR fixes pushed f45de4072ca70d381fadd3f4a031064073b4ce86 normalFF in/hr-position-salary-access. All findings2fe9c6, ownerADMIN-only5a1b56 and timeout2fdd41 addressed: all selfmoves forbidden inclADMIN, unchanged HRcards skiprole/history writes, upfront own-positionrole validation, UIguards/guide/ADR/auditprivacydocs. Redirect cheap h1poll retains visible/role/accessiblename assertions, no timeoutchange. Exactfinal checkfast60files13steps GREEN; web30/30, integration20/20, integrity2/2 once; independentreviewAPPROVE. Please review this updatedhead when gategreen; owner requests all remaining features and downstream fresh-main batches wait this landing.",
+  "re": "20261125T091056683Z-brain-5a1b56",
+  "slug": "hr-position-salary-access"
+}
