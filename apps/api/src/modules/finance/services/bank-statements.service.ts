@@ -18,7 +18,13 @@ import { inTransaction } from '../../../common/db/transaction';
 import { type ErkhetRow, erkhetWorkbook } from '../../../common/excel/erkhet-workbook';
 import { CodedError } from '../../../common/errors/coded-error';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
-import { AuditService, type AuthContext, StorageService } from '../../identity';
+import {
+  AuditQueryService,
+  AuditService,
+  type AuthContext,
+  StorageService,
+  UserNamesService,
+} from '../../identity';
 import { CustomersService, SuppliersService } from '../../partners';
 import { bankStatementLines, bankStatements, bankStatementSettings, invoices } from '../schema';
 import { dateInDescription, kindOfLine, parseBankStatement } from './bank-statement-parser';
@@ -46,6 +52,9 @@ export interface BankRules {
   feeAction: BankLineAction;
   feeExportType: BankExportType;
   partyCode: string;
+  /** The Erkhet party a fee and a settlement line are filled with (ADR-0250); '' follows `partyCode`. */
+  feePartyCode: string;
+  settlementPartyCode: string;
   counterAccountIds: number[];
 }
 
@@ -68,6 +77,8 @@ export interface BankStatementSummary {
   totalDebit: Decimal;
   filledCount: number;
   postedCount: number;
+  /** Lines in the books edited since: «Гүйлгээ засах» writes them again (ADR-0250). */
+  changedCount: number;
   missing: Record<BankLineMissing, number>;
 }
 
@@ -96,6 +107,11 @@ export interface BankLineView {
   paymentId: number | null;
   journalEntryId: number | null;
   postedAt: Date | null;
+  /** In the books, and edited since: what the books hold differs from the line. */
+  changed: boolean;
+  /** A fee's or a settlement's party from the rules, when the line names none of its own. */
+  rulePartyCode: string | null;
+  rulePartyName: string | null;
   missing: BankLineMissing[];
 }
 
@@ -119,6 +135,34 @@ export interface BankLinePatch {
   exportType?: BankExportType | null;
 }
 
+/** One change of a day's lines, newest first (ADR-0250): who, when, which line, what moved. */
+export interface BankHistoryEntry {
+  id: number;
+  occurredAt: Date;
+  actorName: string | null;
+  /** UPDATE (an edit), POST (written to the books), REPOST («Гүйлгээ засах»), VOID (taken back). */
+  action: string;
+  statementId: number;
+  accountNumber: string;
+  lineNo: number;
+  credit: Decimal;
+  debit: Decimal;
+  changes: { field: string; before: string | null; after: string | null }[];
+}
+
+/** A month's totals of one bank account, by the lines' own dates (ADR-0250, «Сарын хөл дүн»). */
+export interface BankMonthTotal {
+  accountNumber: string;
+  accountCode: string | null;
+  accountName: string | null;
+  lineCount: number;
+  dayCount: number;
+  credit: Decimal;
+  debit: Decimal;
+  net: Decimal;
+  fees: Decimal;
+}
+
 export interface BankPostFailure {
   lineId: number;
   lineNo: number;
@@ -128,6 +172,8 @@ export interface BankPostFailure {
 
 export interface BankPostResult {
   posted: number;
+  /** Lines in the books written again because they were edited (ADR-0250). */
+  updated: number;
   skipped: number;
   failures: BankPostFailure[];
   statement: BankStatementDetail;
@@ -140,8 +186,44 @@ interface Books {
   arId: number | null;
   apId: number | null;
   rules: BankRules;
-  /** The rules' «Харилцагчийн код» as Bto's customer and supplier, for a fee or settlement on a party account. */
-  ruleParty: { customerId: number | null; supplierId: number | null };
+  /** The rules' party of a fee and a settlement as Bto's customer and supplier, for a party account. */
+  ruleParties: Record<'FEE' | 'SETTLEMENT', RuleParty>;
+}
+
+interface RuleParty {
+  code: string;
+  name: string | null;
+  customerId: number | null;
+  supplierId: number | null;
+}
+
+/** The fields of a line the books take: an edit of any of them after posting is a change. */
+const POSTED_FIELDS = [
+  'customerId',
+  'supplierId',
+  'counterAccountId',
+  'description',
+  'action',
+] as const;
+type PostedFields = Pick<LineRow, (typeof POSTED_FIELDS)[number]>;
+
+function postedFieldsOf(line: LineRow): PostedFields {
+  return {
+    customerId: line.customerId,
+    supplierId: line.supplierId,
+    counterAccountId: line.counterAccountId,
+    description: line.description,
+    action: line.action,
+  };
+}
+
+/** A line in the books whose fields have moved since it was written (ADR-0250). */
+export function isChanged(line: LineRow): boolean {
+  if (line.postedAt === null || line.kind !== 'NORMAL') return false;
+  const held = line.postedFields as Partial<PostedFields> | null;
+  if (held === null || typeof held !== 'object') return false;
+  const now = postedFieldsOf(line);
+  return POSTED_FIELDS.some((field) => (held[field] ?? null) !== now[field]);
 }
 
 const DIGITS_AROUND = (number: string) => new RegExp(`(^|\\D)${number}(\\D|$)`);
@@ -151,7 +233,7 @@ function ruleFill(
   kind: BankLineKind,
   bankDescription: string,
   debit: Decimal,
-  rules: BankRules,
+  rules: Omit<BankRules, 'feePartyCode' | 'settlementPartyCode'>,
 ): Pick<LineRow, 'counterAccountId' | 'description' | 'action' | 'exportType'> {
   if (kind === 'FEE') {
     return {
@@ -208,6 +290,8 @@ export class BankStatementsService {
     private readonly moneyAccounts: MoneyAccountsService,
     private readonly journal: JournalService,
     private readonly payments: PaymentsService,
+    private readonly auditLog: AuditQueryService,
+    private readonly userNames: UserNamesService,
   ) {}
 
   // ---- Reading ----
@@ -489,7 +573,7 @@ export class BankStatementsService {
         action: 'UPDATE',
         entity: 'bank_statement_lines',
         entityId: lineId,
-        after: { ...patch },
+        ...changeOf(line, row),
       });
       return row;
     });
@@ -524,19 +608,31 @@ export class BankStatementsService {
         .for('update');
       let count = 0;
       for (const line of lines) {
-        if (line.postedAt !== null || line.kind !== 'NORMAL') continue;
+        if (line.kind !== 'NORMAL') continue;
         // The file is only money out's to choose: money in among the ticked lines just keeps its own.
         const { exportType, ...rest } = input.patch;
         const patch = line.debit.isZero() || exportType === undefined ? rest : input.patch;
         const changes = this.patchFor(line, patch, books);
-        await tx
+        const [row] = await tx
           .update(bankStatementLines)
           .set({
             ...changes,
             ...(input.descriptionFromBank ? { description: withPrefix(line.bankDescription) } : {}),
             updatedAt: new Date(),
           })
-          .where(eq(bankStatementLines.id, line.id));
+          .where(eq(bankStatementLines.id, line.id))
+          .returning();
+        if (row) {
+          const change = changeOf(line, row);
+          if (Object.keys(change.after).length > 0) {
+            await this.audit.record(tx, ctx, {
+              action: 'UPDATE',
+              entity: 'bank_statement_lines',
+              entityId: line.id,
+              ...change,
+            });
+          }
+        }
         count += 1;
       }
       await this.audit.record(tx, ctx, {
@@ -555,7 +651,9 @@ export class BankStatementsService {
   /**
    * Writes the ready lines to the books, each in its own transaction, so one refused line (a closed
    * month, an inactive customer) leaves the others in. A statement's fees of a day are one entry, as
-   * the old fee export summed them. Lines still lacking something are only counted.
+   * the old fee export summed them. Lines still lacking something are only counted. A line in the
+   * books edited since is written again on its own (ADR-0250, «Гүйлгээ засах»): its document is
+   * reversed and the new one posted in one transaction; every other line in the books stays as it is.
    */
   async post(
     ctx: AuthContext,
@@ -580,36 +678,45 @@ export class BankStatementsService {
       );
     }
     const chosen = input.lineIds ? new Set(input.lineIds) : null;
-    const lines = (await this.linesOf(id, this.db)).filter(
-      (line) => line.postedAt === null && (chosen === null || chosen.has(line.id)),
+    const all = (await this.linesOf(id, this.db)).filter(
+      (line) => chosen === null || chosen.has(line.id),
     );
+    const lines = all.filter((line) => line.postedAt === null);
+    const edited = all.filter(isChanged);
     const ready = lines.filter((line) => missingOf(line, books).length === 0);
-    const units: LineRow[][] = [];
+    const units: { lines: LineRow[]; again: boolean }[] = [];
     const fees = new Map<string, LineRow[]>();
     for (const line of ready) {
       if (line.kind !== 'FEE') {
-        units.push([line]);
+        units.push({ lines: [line], again: false });
         continue;
       }
       const day = fees.get(line.businessDate) ?? [];
       day.push(line);
       fees.set(line.businessDate, day);
     }
-    units.push(...fees.values());
+    units.push(...[...fees.values()].map((day) => ({ lines: day, again: false })));
+    const editedReady = edited.filter((line) => missingOf(line, books).length === 0);
+    units.push(...editedReady.map((line) => ({ lines: [line], again: true })));
 
     let posted = 0;
+    let updated = 0;
     const failures: BankPostFailure[] = [];
     for (const unit of units) {
-      const first = unit[0];
+      const first = unit.lines[0];
       if (!first) continue;
       try {
-        await this.postUnit(ctx, unit, account, books);
-        posted += unit.length;
+        if (unit.again) {
+          if (await this.postAgain(ctx, first.id, account, books)) updated += 1;
+        } else {
+          await this.postUnit(ctx, unit.lines, account, books);
+          posted += unit.lines.length;
+        }
       } catch (error) {
         if (!(error instanceof CodedError)) throw error;
         // Another press got there first: the line is in the books once, as it should be.
         if (error.code === 'BANK_LINE_POSTED') continue;
-        for (const line of unit) {
+        for (const line of unit.lines) {
           failures.push({
             lineId: line.id,
             lineNo: line.lineNo,
@@ -621,7 +728,8 @@ export class BankStatementsService {
     }
     return {
       posted,
-      skipped: lines.length - ready.length,
+      updated,
+      skipped: lines.length - ready.length + edited.length - editedReady.length,
       failures,
       statement: await this.get(id),
     };
@@ -651,84 +759,156 @@ export class BankStatementsService {
           lineNo: first.lineNo,
         });
       }
-      const missing = locked.flatMap((line) => missingOf(line, books));
-      if (missing.length > 0) {
-        throw new AppError('BANK_LINE_INCOMPLETE', `line ${first.lineNo} changed and lacks data`, {
-          lineNo: first.lineNo,
-        });
-      }
-      const counter = books.accounts.get(first.counterAccountId ?? 0);
-      if (!counter) throw invalid('counterAccountId', 'exists', 'a counter account');
-      if (counter.id === account.glAccountId) {
-        throw invalid('counterAccountId', 'different', 'another account than the bank');
-      }
-      const key = `bank-line-${first.id}-${first.postAttempt}`;
-      const debit = locked.reduce((sum, line) => sum.plus(line.debit), new Decimal(0));
-      const credit = locked.reduce((sum, line) => sum.plus(line.credit), new Decimal(0));
-      const moneyIn = credit.gt(0);
-      const amount = moneyIn ? credit : debit;
-      const description = first.description.slice(0, FINANCE_LIMITS.maxDescription);
-      const zero = new Decimal(0);
-      let reference: { paymentId: number | null; journalEntryId: number | null };
-      if (
-        moneyIn &&
-        first.customerId !== null &&
-        counter.id === books.arId &&
-        first.action !== 'CREATE'
-      ) {
-        // A customer's money on the receivable: a voucher settling the oldest invoices first; what is
-        // left stays their open credit (ADR-0060 #5). «Үүсгэх» goes on as an entry, settling nothing.
-        const voucher = await this.payments.recordInTx(tx, ctx, {
-          kind: 'CUSTOMER_PAYMENT',
-          moneyAccountId: account.id,
-          customerId: first.customerId,
-          glAccountId: null,
-          amount,
-          paidOn: first.businessDate,
-          description,
-          reference: first.bankCounterpart.slice(0, FINANCE_LIMITS.maxReference) || null,
-          counterpartyName: null,
-          collectedBy: null,
-          key,
-        });
-        reference = { paymentId: voucher.id, journalEntryId: null };
-      } else {
-        const entryId = await this.journal.postManualInTx(
-          tx,
-          ctx,
-          {
-            entryDate: first.businessDate,
-            description,
-            lines: [
-              {
-                accountId: account.glAccountId,
-                moneyAccountId: account.id,
-                debit: moneyIn ? amount : zero,
-                credit: moneyIn ? zero : amount,
-              },
-              {
-                accountId: counter.id,
-                debit: moneyIn ? zero : amount,
-                credit: moneyIn ? amount : zero,
-                ...partyOf(first, counter, books),
-              },
-            ],
-          },
-          key,
-        );
-        reference = { paymentId: null, journalEntryId: entryId };
-      }
+      const reference = await this.book(tx, ctx, locked, account, books, first.postAttempt);
       await tx
         .update(bankStatementLines)
-        .set({ ...reference, postedAt: new Date(), postedBy: ctx.userId, updatedAt: new Date() })
+        .set({
+          ...reference,
+          postedAt: new Date(),
+          postedBy: ctx.userId,
+          postedFields: postedFieldsOf(first),
+          updatedAt: new Date(),
+        })
         .where(inArray(bankStatementLines.id, ids));
       await this.audit.record(tx, ctx, {
         action: 'POST',
         entity: 'bank_statement_lines',
         entityId: first.id,
-        after: { ...reference, lines: ids, amount: amount.toFixed(2) },
+        after: { ...reference, lines: ids },
       });
     });
+  }
+
+  /**
+   * «Гүйлгээ засах» for one edited line in the books (ADR-0250): its document's own reversal and the
+   * new document in one transaction, under the line's next source key. False when the line is no
+   * longer changed (another press wrote it, or the edit was taken back).
+   */
+  private async postAgain(
+    ctx: AuthContext,
+    lineId: number,
+    account: MoneyAccount,
+    books: Books,
+  ): Promise<boolean> {
+    return inTransaction(this.db, async (tx) => {
+      const [line] = await tx
+        .select()
+        .from(bankStatementLines)
+        .where(eq(bankStatementLines.id, lineId))
+        .for('update');
+      if (!line) throw notFound('bank_statement_line', lineId);
+      if (!isChanged(line)) return false;
+      const before = { paymentId: line.paymentId, journalEntryId: line.journalEntryId };
+      if (line.paymentId !== null) {
+        await this.payments.voidInTx(tx, ctx, line.paymentId, TEXT.history.editReason);
+      } else if (line.journalEntryId !== null) {
+        await this.journal.reverseManualInTx(tx, ctx, line.journalEntryId, {
+          description: TEXT.history.editReason,
+        });
+      }
+      const attempt = line.postAttempt + 1;
+      const reference = await this.book(tx, ctx, [line], account, books, attempt);
+      await tx
+        .update(bankStatementLines)
+        .set({
+          ...reference,
+          postAttempt: attempt,
+          postedAt: new Date(),
+          postedBy: ctx.userId,
+          postedFields: postedFieldsOf(line),
+          updatedAt: new Date(),
+        })
+        .where(eq(bankStatementLines.id, line.id));
+      const held = (line.postedFields ?? {}) as Record<string, unknown>;
+      const now = postedFieldsOf(line);
+      const fields = POSTED_FIELDS.filter((field) => (held[field] ?? null) !== now[field]);
+      await this.audit.record(tx, ctx, {
+        action: 'REPOST',
+        entity: 'bank_statement_lines',
+        entityId: line.id,
+        before: { ...before, ...Object.fromEntries(fields.map((f) => [f, held[f] ?? null])) },
+        after: { ...reference, ...Object.fromEntries(fields.map((f) => [f, now[f]])) },
+      });
+      return true;
+    });
+  }
+
+  /** Writes locked, complete lines as one document: a customer's voucher or a journal entry. */
+  private async book(
+    tx: Tx,
+    ctx: AuthContext,
+    locked: readonly LineRow[],
+    account: MoneyAccount,
+    books: Books,
+    attempt: number,
+  ): Promise<{ paymentId: number | null; journalEntryId: number | null }> {
+    const first = locked[0];
+    if (!first) throw new Error('nothing to book');
+    const missing = locked.flatMap((line) => missingOf(line, books));
+    if (missing.length > 0) {
+      throw new AppError('BANK_LINE_INCOMPLETE', `line ${first.lineNo} changed and lacks data`, {
+        lineNo: first.lineNo,
+      });
+    }
+    const counter = books.accounts.get(first.counterAccountId ?? 0);
+    if (!counter) throw invalid('counterAccountId', 'exists', 'a counter account');
+    if (counter.id === account.glAccountId) {
+      throw invalid('counterAccountId', 'different', 'another account than the bank');
+    }
+    const key = `bank-line-${first.id}-${attempt}`;
+    const debit = locked.reduce((sum, line) => sum.plus(line.debit), new Decimal(0));
+    const credit = locked.reduce((sum, line) => sum.plus(line.credit), new Decimal(0));
+    const moneyIn = credit.gt(0);
+    const amount = moneyIn ? credit : debit;
+    const description = first.description.slice(0, FINANCE_LIMITS.maxDescription);
+    const zero = new Decimal(0);
+    if (
+      moneyIn &&
+      first.customerId !== null &&
+      counter.id === books.arId &&
+      first.action !== 'CREATE'
+    ) {
+      // A customer's money on the receivable: a voucher settling the oldest invoices first; what is
+      // left stays their open credit (ADR-0060 #5). «Үүсгэх» goes on as an entry, settling nothing.
+      const voucher = await this.payments.recordInTx(tx, ctx, {
+        kind: 'CUSTOMER_PAYMENT',
+        moneyAccountId: account.id,
+        customerId: first.customerId,
+        glAccountId: null,
+        amount,
+        paidOn: first.businessDate,
+        description,
+        reference: first.bankCounterpart.slice(0, FINANCE_LIMITS.maxReference) || null,
+        counterpartyName: null,
+        collectedBy: null,
+        key,
+      });
+      return { paymentId: voucher.id, journalEntryId: null };
+    }
+    const entryId = await this.journal.postManualInTx(
+      tx,
+      ctx,
+      {
+        entryDate: first.businessDate,
+        description,
+        lines: [
+          {
+            accountId: account.glAccountId,
+            moneyAccountId: account.id,
+            debit: moneyIn ? amount : zero,
+            credit: moneyIn ? zero : amount,
+          },
+          {
+            accountId: counter.id,
+            debit: moneyIn ? zero : amount,
+            credit: moneyIn ? amount : zero,
+            ...partyOf(first, counter, books),
+          },
+        ],
+      },
+      key,
+    );
+    return { paymentId: null, journalEntryId: entryId };
   }
 
   /**
@@ -767,6 +947,7 @@ export class BankStatementsService {
           journalEntryId: null,
           postedAt: null,
           postedBy: null,
+          postedFields: null,
           postAttempt: sql`${bankStatementLines.postAttempt} + 1`,
           updatedAt: new Date(),
         })
@@ -803,6 +984,8 @@ export class BankStatementsService {
         feeAction: row.feeAction,
         feeExportType: row.feeExportType,
         partyCode: row.partyCode,
+        feePartyCode: row.feePartyCode ?? '',
+        settlementPartyCode: row.settlementPartyCode ?? '',
         counterAccountIds: row.counterAccountIds,
       };
     }
@@ -820,6 +1003,8 @@ export class BankStatementsService {
       feeAction: 'CLOSE',
       feeExportType: 'BANK',
       partyCode: DEFAULT_PARTY_CODE,
+      feePartyCode: '',
+      settlementPartyCode: '',
       counterAccountIds: [],
     };
   }
@@ -851,6 +1036,8 @@ export class BankStatementsService {
       feeAction: input.feeAction,
       feeExportType: input.feeExportType,
       partyCode: input.partyCode.trim(),
+      feePartyCode: input.feePartyCode.trim() || null,
+      settlementPartyCode: input.settlementPartyCode.trim() || null,
       counterAccountIds: [...new Set(input.counterAccountIds)],
       updatedBy: ctx.userId,
       updatedAt: new Date(),
@@ -888,6 +1075,123 @@ export class BankStatementsService {
       });
     });
     return this.rules();
+  }
+
+  // ---- The day's history and the month's totals ----
+
+  /** Every change of the lines of a day's statements, newest first (ADR-0250). */
+  async dayHistory(date: string): Promise<BankHistoryEntry[]> {
+    const rows = await this.linesOfDate(date);
+    if (rows.length === 0) return [];
+    const byId = new Map(rows.map((row) => [row.line.id, row]));
+    const result = await this.auditLog.entriesOf({
+      targets: [{ entity: 'bank_statement_lines', ids: [...byId.keys()] }],
+      limit: 500,
+    });
+    const books = await this.books();
+    const values = (field: string) =>
+      result.data.flatMap((entry) =>
+        [entry.before, entry.after].flatMap((side) => {
+          const value = (side as Record<string, unknown> | null)?.[field];
+          return typeof value === 'number' ? [value] : [];
+        }),
+      );
+    const [customers, suppliers, names] = await Promise.all([
+      this.customers.getMany([...new Set(values('customerId'))]),
+      this.suppliers.getMany([...new Set(values('supplierId'))]),
+      this.userNames.namesOf(
+        result.data.flatMap((entry) =>
+          entry.actorKind === 'STAFF' && entry.actorId !== null ? [entry.actorId] : [],
+        ),
+      ),
+    ]);
+    const customer = new Map(customers.map((row) => [row.id, `${row.name} · ${row.code}`]));
+    const supplier = new Map(suppliers.map((row) => [row.id, `${row.name} · ${row.code}`]));
+    const shown = (field: string, value: unknown): string | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'number') {
+        if (field === 'customerId') return customer.get(value) ?? String(value);
+        if (field === 'supplierId') return supplier.get(value) ?? String(value);
+        if (field === 'counterAccountId') {
+          const account = books.accounts.get(value);
+          return account ? `${account.code} · ${account.name}` : String(value);
+        }
+        return String(value);
+      }
+      return typeof value === 'string' ? value : JSON.stringify(value);
+    };
+    const shownFields = new Set<string>([...POSTED_FIELDS, 'exportType']);
+    return result.data.flatMap((entry): BankHistoryEntry[] => {
+      const row = byId.get(Number.parseInt(entry.entityId, 10));
+      if (!row) return [];
+      const before = (entry.before ?? {}) as Record<string, unknown>;
+      const after = (entry.after ?? {}) as Record<string, unknown>;
+      const fields = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((field) =>
+        shownFields.has(field),
+      );
+      return [
+        {
+          id: entry.id,
+          occurredAt: entry.occurredAt,
+          actorName: entry.actorId === null ? entry.actorLabel : (names.get(entry.actorId) ?? null),
+          action: entry.action,
+          statementId: row.statement.id,
+          accountNumber: row.statement.accountNumber,
+          lineNo: row.line.lineNo,
+          credit: row.line.credit,
+          debit: row.line.debit,
+          changes: fields.map((field) => ({
+            field,
+            before: field in before ? shown(field, before[field]) : null,
+            after: shown(field, after[field]),
+          })),
+        },
+      ];
+    });
+  }
+
+  /**
+   * «Сарын хөл дүн»: each bank account's lines of a month by their own date, the money in and out,
+   * the net and the fees among the money out (ADR-0250).
+   */
+  async monthTotals(from: string, to: string): Promise<BankMonthTotal[]> {
+    const books = await this.books();
+    const rows = await this.db
+      .select({ line: bankStatementLines, statement: bankStatements })
+      .from(bankStatementLines)
+      .innerJoin(bankStatements, eq(bankStatements.id, bankStatementLines.statementId))
+      .where(
+        and(gte(bankStatementLines.businessDate, from), lte(bankStatementLines.businessDate, to)),
+      );
+    const totals = new Map<string, BankMonthTotal & { days: Set<string> }>();
+    for (const { line, statement } of rows) {
+      const account = moneyAccountOf(statement, books);
+      const total = totals.get(statement.accountNumber) ?? {
+        accountNumber: statement.accountNumber,
+        accountCode: account?.glAccountCode ?? null,
+        accountName: account?.name ?? null,
+        lineCount: 0,
+        dayCount: 0,
+        credit: new Decimal(0),
+        debit: new Decimal(0),
+        net: new Decimal(0),
+        fees: new Decimal(0),
+        days: new Set<string>(),
+      };
+      total.lineCount += 1;
+      total.days.add(line.businessDate);
+      total.credit = total.credit.plus(line.credit);
+      total.debit = total.debit.plus(line.debit);
+      if (line.kind === 'FEE') total.fees = total.fees.plus(line.debit);
+      totals.set(statement.accountNumber, total);
+    }
+    return [...totals.values()]
+      .sort((a, b) => a.accountNumber.localeCompare(b.accountNumber))
+      .map(({ days, ...total }) => ({
+        ...total,
+        dayCount: days.size,
+        net: total.credit.minus(total.debit),
+      }));
   }
 
   // ---- Erkhet's files ----
@@ -946,7 +1250,12 @@ export class BankStatementsService {
       .sort((a, b) => a.date.localeCompare(b.date) || a.code.localeCompare(b.code))
       .map((sum) => ({
         date: sum.date,
-        cells: moneyCells(books.rules.feeDescription, books.rules.partyCode, feeCode, sum.code),
+        cells: moneyCells(
+          books.rules.feeDescription,
+          books.ruleParties.FEE.code,
+          feeCode,
+          sum.code,
+        ),
         amount: sum.total.toFixed(2),
       }));
     return {
@@ -972,7 +1281,8 @@ export class BankStatementsService {
           ? parties.customers.get(line.customerId)
           : line.supplierId !== null
             ? parties.suppliers.get(line.supplierId)
-            : undefined) ?? books.rules.partyCode;
+            : undefined) ??
+        (line.kind === 'NORMAL' ? books.rules.partyCode : books.ruleParties[line.kind].code);
       const text = line.description || line.bankDescription;
       if (file !== 'RECEIVABLE') {
         return {
@@ -1028,16 +1338,28 @@ export class BankStatementsService {
       this.moneyAccounts.list(),
       this.rules(),
     ]);
-    const code = rules.partyCode.trim();
-    const [customer] = code ? await this.customers.findByCodes([code]) : [];
-    const [supplier] = code ? await this.suppliers.findByCodes([code]) : [];
+    const party = async (raw: string): Promise<RuleParty> => {
+      const code = raw.trim();
+      const [customer] = code ? await this.customers.findByCodes([code]) : [];
+      const [supplier] = code ? await this.suppliers.findByCodes([code]) : [];
+      return {
+        code,
+        name: customer?.name ?? supplier?.name ?? null,
+        customerId: customer?.id ?? null,
+        supplierId: supplier?.id ?? null,
+      };
+    };
+    const [fee, settlement] = await Promise.all([
+      party(rules.feePartyCode || rules.partyCode),
+      party(rules.settlementPartyCode || rules.partyCode),
+    ]);
     return {
       accounts: new Map(list.map((account) => [account.id, account])),
       money,
       arId: list.find((account) => account.role === 'AR')?.id ?? null,
       apId: list.find((account) => account.role === 'AP')?.id ?? null,
       rules,
-      ruleParty: { customerId: customer?.id ?? null, supplierId: supplier?.id ?? null },
+      ruleParties: { FEE: fee, SETTLEMENT: settlement },
     };
   }
 
@@ -1252,10 +1574,38 @@ export class BankStatementsService {
         paymentId: line.paymentId,
         journalEntryId: line.journalEntryId,
         postedAt: line.postedAt,
+        changed: isChanged(line),
+        ...ruleParty(line, books),
         missing: missingOf(line, books),
       };
     });
   }
+}
+
+/** The party the rules give a fee or a settlement that names none, shown on its line. */
+function ruleParty(
+  line: LineRow,
+  books: Books,
+): { rulePartyCode: string | null; rulePartyName: string | null } {
+  if (line.kind === 'NORMAL' || line.customerId !== null || line.supplierId !== null) {
+    return { rulePartyCode: null, rulePartyName: null };
+  }
+  const rule = books.ruleParties[line.kind];
+  return { rulePartyCode: rule.code || null, rulePartyName: rule.name };
+}
+
+/** The fields an edit moved, before and after, for the day's history (ADR-0250). */
+function changeOf(
+  before: LineRow,
+  after: LineRow,
+): { before: Record<string, unknown>; after: Record<string, unknown> } {
+  const out = { before: {} as Record<string, unknown>, after: {} as Record<string, unknown> };
+  for (const field of [...POSTED_FIELDS, 'exportType'] as const) {
+    if ((before[field] ?? null) === (after[field] ?? null)) continue;
+    out.before[field] = before[field] ?? null;
+    out.after[field] = after[field] ?? null;
+  }
+  return out;
 }
 
 /** The Erkhet file a line goes to; a fee has its own export. */
@@ -1293,12 +1643,8 @@ function moneyCells(
   ];
 }
 
+/** A fee and a settlement follow the rules; any other line is edited, in the books or not (ADR-0250). */
 function assertEditable(line: LineRow): void {
-  if (line.postedAt !== null) {
-    throw new AppError('BANK_LINE_POSTED', `line ${line.lineNo} is in the books`, {
-      lineNo: line.lineNo,
-    });
-  }
   if (line.kind !== 'NORMAL') {
     throw new AppError('BANK_LINE_LOCKED', `line ${line.lineNo} follows the settings`, {
       lineNo: line.lineNo,
@@ -1336,9 +1682,10 @@ function partyOf(
     return { customerId: line.customerId, supplierId: line.supplierId };
   }
   if (account.journal !== 'RECEIVABLE_PAYABLE') return { customerId: null, supplierId: null };
+  const rule = books.ruleParties[line.kind];
   return account.kind === 'ASSET'
-    ? { customerId: books.ruleParty.customerId, supplierId: null }
-    : { customerId: null, supplierId: books.ruleParty.supplierId };
+    ? { customerId: rule.customerId, supplierId: null }
+    : { customerId: null, supplierId: rule.supplierId };
 }
 
 /** The statement's money account: the link, the number on the account, the number in its name. */
@@ -1392,6 +1739,7 @@ function summaryOf(
     totalDebit: main.reduce((sum, line) => sum.plus(line.debit), new Decimal(0)),
     filledCount: filled,
     postedCount: main.filter((line) => line.postedAt !== null).length,
+    changedCount: main.filter(isChanged).length,
     missing,
   };
 }

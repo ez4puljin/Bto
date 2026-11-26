@@ -8064,6 +8064,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/finance/bank-statements/month-totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** «Сарын хөл дүн»: each bank account's month by the lines' own dates (ADR-0250). */
+        get: operations["BankStatements_monthTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finance/bank-statements/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every change of the lines of a day's statements, newest first (ADR-0250). */
+        get: operations["BankStatements_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/finance/bank-statements/export-manifest": {
         parameters: {
             query?: never;
@@ -22991,6 +23025,10 @@ export interface components {
             feeExportType: components["schemas"]["BankExportType"];
             /** @example 30000 */
             partyCode: string;
+            /** @example 30000 */
+            feePartyCode: string;
+            /** @example 30000 */
+            settlementPartyCode: string;
             counterAccountIds: number[];
         };
         BankStatementRulesRequest: {
@@ -23002,7 +23040,49 @@ export interface components {
             feeAction: components["schemas"]["BankLineAction"];
             feeExportType: components["schemas"]["BankExportType"];
             partyCode: string;
+            /** @description Left out or empty: the general party code. */
+            feePartyCode?: string;
+            settlementPartyCode?: string;
             counterAccountIds: number[];
+        };
+        BankMonthTotal: {
+            accountNumber: string;
+            accountCode: string | null;
+            accountName: string | null;
+            lineCount: number;
+            dayCount: number;
+            /** @example 12006380.00 */
+            credit: string;
+            /** @example 2180000.00 */
+            debit: string;
+            /** @example 9826380.00 */
+            net: string;
+            /** @example 3600.00 */
+            fees: string;
+        };
+        BankHistoryChange: {
+            /** @example counterAccountId */
+            field: string;
+            before: string | null;
+            after: string | null;
+        };
+        BankHistoryEntry: {
+            id: number;
+            occurredAt: string;
+            actorName: string | null;
+            /**
+             * @description UPDATE, POST, REPOST or VOID
+             * @example UPDATE
+             */
+            action: string;
+            statementId: number;
+            accountNumber: string;
+            lineNo: number;
+            /** @example 0.00 */
+            credit: string;
+            /** @example 1000.00 */
+            debit: string;
+            changes: components["schemas"]["BankHistoryChange"][];
         };
         BankExportManifest: {
             RECEIVABLE: number;
@@ -23042,6 +23122,8 @@ export interface components {
             totalDebit: string;
             filledCount: number;
             postedCount: number;
+            /** @description Lines in the books edited since (ADR-0250) */
+            changedCount: number;
             missing: components["schemas"]["BankStatementMissing"];
         };
         BankStatementUploadRequest: {
@@ -23089,6 +23171,10 @@ export interface components {
             paymentId: number | null;
             journalEntryId: number | null;
             postedAt: string | null;
+            /** @description In the books and edited since (ADR-0250) */
+            changed: boolean;
+            rulePartyCode: string | null;
+            rulePartyName: string | null;
             missing: components["schemas"]["BankLineMissing"][];
         };
         BankStatementDetail: {
@@ -23114,6 +23200,8 @@ export interface components {
             totalDebit: string;
             filledCount: number;
             postedCount: number;
+            /** @description Lines in the books edited since (ADR-0250) */
+            changedCount: number;
             missing: components["schemas"]["BankStatementMissing"];
             lines: components["schemas"]["BankStatementLine"][];
         };
@@ -23156,6 +23244,8 @@ export interface components {
         };
         BankStatementPostResult: {
             posted: number;
+            /** @description Edited lines in the books written again (ADR-0250) */
+            updated: number;
             /** @description Lines still lacking something */
             skipped: number;
             failures: components["schemas"]["BankPostFailure"][];
@@ -49395,6 +49485,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BankStatementRules"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_monthTotals: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankMonthTotal"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    BankStatements_history: {
+        parameters: {
+            query: {
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankHistoryEntry"][];
                 };
             };
             /** @description RFC 9457 problem details */

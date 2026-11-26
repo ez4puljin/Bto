@@ -23,6 +23,7 @@ interface StatementJson {
   totalDebit: string;
   filledCount: number;
   postedCount: number;
+  changedCount: number;
   missing: Record<string, number>;
 }
 interface LineJson {
@@ -43,6 +44,8 @@ interface LineJson {
   paymentId: number | null;
   journalEntryId: number | null;
   postedAt: string | null;
+  changed: boolean;
+  rulePartyCode: string | null;
   missing: string[];
 }
 interface DetailJson extends StatementJson {
@@ -55,6 +58,7 @@ interface UploadJson {
 }
 interface PostJson {
   posted: number;
+  updated: number;
   skipped: number;
   failures: { lineNo: number; code: string }[];
   statement: DetailJson;
@@ -376,9 +380,14 @@ describe('bank statements, «Банкны хуулга хаах»', () => {
     expect(second).toMatchObject({ posted: 0, skipped: 0, failures: [] });
     expect(await finance.invoice(invoiceTwo.id)).toMatchObject({ openAmount: '4000.00' });
 
-    // Posted: no edit, no swap, no delete.
-    const edit = await patch(id, income.id, { description: 'засвар' }).expect(409);
-    expect((edit.body as { code: string }).code).toBe('BANK_LINE_POSTED');
+    // Posted: an edit marks the line for «Гүйлгээ засах» (ADR-0250); no swap, no delete.
+    const edit = (await patch(id, income.id, { description: 'засвар' }).expect(200))
+      .body as LineJson;
+    expect(edit).toMatchObject({ changed: true, paymentId: posted?.paymentId });
+    // Put back as it was, the line is in step with the books again.
+    const back = (await patch(id, income.id, { description: posted?.description }).expect(200))
+      .body as LineJson;
+    expect(back.changed).toBe(false);
     const swap = await http()
       .post(`/api/v1/finance/bank-statements/${id}/swap`)
       .set(bearer(accountant))
@@ -737,5 +746,140 @@ describe('bank statements, «Банкны хуулга хаах»', () => {
         .expect(200)
     ).body as { data: { entryId: number; party: { code: string | null } | null }[] };
     expect(lines.data.find((row) => row.entryId === entry.id)?.party?.code).toBe(shop.code);
+  });
+  it('writes again only the lines edited after posting, and keeps the day’s history (ADR-0250)', async () => {
+    const finance = financeApi(app, accountant);
+    const day = addDays(today, -3);
+    const uploaded = (
+      await upload(
+        await statementFile([
+          [`${day.replaceAll('-', '/')} 09:00`, '5', 0, 0, 3000, 0, 'Засварын орлого', 5000000031],
+          [`${day.replaceAll('-', '/')} 09:10`, '5', 0, 1200, 0, 0, 'Засварын зардал', 5000000032],
+        ]),
+      )
+    ).body as UploadJson;
+    const id = uploaded.statement?.id ?? 0;
+    let statement = await detail(id);
+    const [income, expense] = statement.lines;
+    if (!income || !expense) throw new Error('lines missing');
+    const cost = await finance.account('730101');
+    await patch(id, income.id, { customerId: shop.id }).expect(200);
+    await patch(id, expense.id, { counterAccountId: cost.id, exportType: 'BANK' }).expect(200);
+    const first = (await post(id).expect(200)).body as PostJson;
+    expect(first).toMatchObject({ posted: 2, updated: 0, failures: [] });
+    const voucher = first.statement.lines[0]?.paymentId ?? 0;
+    const entry = first.statement.lines[1]?.journalEntryId ?? 0;
+
+    // One line edited after posting: only it is written again, its old entry reversed.
+    const edited = (await patch(id, expense.id, { description: 'Засварласан утга' }).expect(200))
+      .body as LineJson;
+    expect(edited.changed).toBe(true);
+    statement = await detail(id);
+    expect(statement.changedCount).toBe(1);
+    const second = (await post(id).expect(200)).body as PostJson;
+    expect(second).toMatchObject({ posted: 0, updated: 1, failures: [] });
+    const [keptIncome, newExpense] = second.statement.lines;
+    expect(keptIncome?.paymentId).toBe(voucher);
+    expect(newExpense).toMatchObject({ changed: false, description: 'Засварласан утга' });
+    expect(newExpense?.journalEntryId).toEqual(expect.any(Number));
+    expect(newExpense?.journalEntryId).not.toBe(entry);
+    expect((await finance.journalGet(newExpense?.journalEntryId ?? 0)).description).toBe(
+      'Засварласан утга',
+    );
+    expect(await finance.paymentGet(voucher)).toMatchObject({ status: 'POSTED' });
+    expect(second.statement.changedCount).toBe(0);
+    // Nothing changed since: a press writes nothing.
+    expect((await post(id).expect(200)).body).toMatchObject({ posted: 0, updated: 0 });
+
+    // The day's history: the edit with its before and after, the posting and the new posting.
+    const history = (
+      await http()
+        .get('/api/v1/finance/bank-statements/history')
+        .query({ date: day })
+        .set(bearer(office))
+        .expect(200)
+    ).body as {
+      action: string;
+      lineNo: number;
+      changes: { field: string; before: string | null; after: string | null }[];
+    }[];
+    const repost = history.find((row) => row.action === 'REPOST');
+    expect(repost?.lineNo).toBe(expense.lineNo);
+    expect(repost?.changes).toEqual([
+      { field: 'description', before: expense.description, after: 'Засварласан утга' },
+    ]);
+    expect(history.filter((row) => row.action === 'POST')).toHaveLength(2);
+    const update = history.find(
+      (row) => row.action === 'UPDATE' && row.changes.some((c) => c.field === 'counterAccountId'),
+    );
+    expect(update?.changes.find((c) => c.field === 'counterAccountId')?.after).toContain('730101');
+
+    // «Сарын хөл дүн»: the month of the lines' own dates, net and fees per account.
+    const totals = (
+      await http()
+        .get('/api/v1/finance/bank-statements/month-totals')
+        .query({ month: day.slice(0, 7) })
+        .set(bearer(office))
+        .expect(200)
+    ).body as {
+      accountNumber: string;
+      accountCode: string | null;
+      lineCount: number;
+      dayCount: number;
+      credit: string;
+      debit: string;
+      net: string;
+      fees: string;
+    }[];
+    const mine = totals.find((row) => row.accountNumber === NUMBER);
+    expect(mine?.accountCode).toBe('110900');
+    expect(mine?.dayCount).toBeGreaterThanOrEqual(1);
+    expect(new Decimal(mine?.credit ?? '0').minus(mine?.debit ?? '0').toFixed(2)).toBe(mine?.net);
+    expect(new Decimal(mine?.credit ?? '0').gte(3000)).toBe(true);
+  });
+
+  it('fills a fee’s party from its own code in the rules and writes it to the fee file', async () => {
+    const rules = (
+      await http().get('/api/v1/finance/bank-statements/rules').set(bearer(accountant)).expect(200)
+    ).body as Record<string, unknown>;
+    await http()
+      .put('/api/v1/finance/bank-statements/rules')
+      .set(bearer(accountant))
+      .send({ ...rules, feePartyCode: '30001' })
+      .expect(200);
+    const saved = (
+      await http().get('/api/v1/finance/bank-statements/rules').set(bearer(accountant)).expect(200)
+    ).body as { feePartyCode: string; settlementPartyCode: string };
+    expect(saved.feePartyCode).toBe('30001');
+    const day = addDays(today, -4);
+    const uploaded = (
+      await upload(
+        await statementFile([
+          [`${day.replaceAll('-', '/')} 10:00`, '5', 0, 70, 0, 0, 'Гүйлгээний хураамж', ''],
+        ]),
+      )
+    ).body as UploadJson;
+    const line = (await detail(uploaded.statement?.id ?? 0)).lines[0];
+    expect(line).toMatchObject({ kind: 'FEE', rulePartyCode: '30001' });
+    const file = await http()
+      .get('/api/v1/finance/bank-statements/export-fees.xlsx')
+      .query({ from: day, to: day })
+      .set(bearer(accountant))
+      .buffer(true)
+      .parse((res, done) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => done(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    const book = new ExcelJS.Workbook();
+    const bytes: unknown = file.body;
+    await book.xlsx.load(bytes as ArrayBuffer);
+    expect(book.worksheets[0]?.getRow(2).getCell(3).value).toBe('30001');
+    await http()
+      .put('/api/v1/finance/bank-statements/rules')
+      .set(bearer(accountant))
+      .send({ ...rules, feePartyCode: '' })
+      .expect(200);
   });
 });

@@ -1,14 +1,16 @@
 import { BANK_EXPORT_FILES } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
-import { businessDate } from '@tugeel/shared/time';
+import { businessDate, businessDateTime, daysInMonth } from '@tugeel/shared/time';
 import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
   Download,
+  History,
   Landmark,
   LoaderCircle,
+  Sigma,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -19,13 +21,22 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { DateInput } from '@/components/date-input';
+import { DateInput, MonthInput } from '@/components/date-input';
 import { FormField } from '@/components/form';
 import { EmptyState, SegmentedControl } from '@/components/list';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -40,7 +51,15 @@ import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { cn } from '@/lib/utils';
-import { type BankStatement, useBankCalendar, useBankDay, useBankMutations } from './bank-api';
+import {
+  type BankMonthTotal,
+  type BankStatement,
+  useBankCalendar,
+  useBankDay,
+  useBankHistory,
+  useBankMonthTotals,
+  useBankMutations,
+} from './bank-api';
 import { BankRulesPanel } from './bank-rules-panel';
 import { BankStatementPanel } from './bank-statement-panel';
 import { save } from './report-helpers';
@@ -158,6 +177,7 @@ function MonthCalendar(props: {
   const counts = new Map((days.data ?? []).map((day) => [day.date, day.count]));
   const total = (days.data ?? []).reduce((sum, day) => sum + day.count, 0);
   const [year = '', mon = '1'] = props.month.split('-');
+  const [totalsOpen, setTotalsOpen] = useState(false);
   return (
     <div className="rounded-xl bg-card p-3 shadow-card ring-1 ring-black/[0.06]">
       <div className="mb-3 flex items-center justify-between">
@@ -242,15 +262,158 @@ function MonthCalendar(props: {
         </div>
         <div className="text-lg font-semibold tabular-nums">{total}</div>
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        className="mt-2 w-full"
-        onClick={() => props.onPick(props.today)}
-      >
-        {t('finance.bankStatements.calendar.today')}
-      </Button>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Button type="button" variant="outline" onClick={() => setTotalsOpen(true)}>
+          <Sigma />
+          {t('finance.bankStatements.monthTotals.open')}
+        </Button>
+        <Button type="button" variant="outline" onClick={() => props.onPick(props.today)}>
+          {t('finance.bankStatements.calendar.today')}
+        </Button>
+      </div>
+      <MonthTotalsDialog
+        open={totalsOpen}
+        month={props.month}
+        onClose={() => setTotalsOpen(false)}
+      />
     </div>
+  );
+}
+
+/** «Сарын хөл дүн» (ADR-0250): each bank account's month in one table, the sum of all in its foot. */
+function MonthTotalsDialog(props: { open: boolean; month: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [month, setMonth] = useState(props.month);
+  const [seen, setSeen] = useState(props.month);
+  if (seen !== props.month) {
+    setSeen(props.month);
+    setMonth(props.month);
+  }
+  const totals = useBankMonthTotals(month, props.open);
+  const rows = totals.data ?? [];
+  const sum = (pick: (row: BankMonthTotal) => string) =>
+    rows.reduce((acc, row) => acc.plus(pick(row)), new Decimal(0)).toFixed(2);
+  const [year = '', mon = '1'] = month.split('-');
+  return (
+    <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} guard={false} size="xl">
+        <DialogHeader>
+          <DialogTitle>{t('finance.bankStatements.monthTotals.title')}</DialogTitle>
+          <DialogDescription>{t('finance.bankStatements.monthTotals.hint')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t('finance.bankStatements.calendar.previous')}
+            onClick={() => setMonth(shiftMonth(month, -1))}
+          >
+            <ChevronLeft />
+          </Button>
+          <div className="min-w-32 text-center text-sm font-semibold">
+            {t('common.calendar.title', { year, month: Number.parseInt(mon, 10) })}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t('finance.bankStatements.calendar.next')}
+            onClick={() => setMonth(shiftMonth(month, 1))}
+          >
+            <ChevronRight />
+          </Button>
+        </div>
+        <ProblemAlert
+          problem={totals.error ? problemFromError(totals.error) : null}
+          onRetry={() => void totals.refetch()}
+        />
+        {totals.isPending ? (
+          <div className="flex justify-center py-8 text-muted-foreground">
+            <LoaderCircle aria-hidden className="size-5 animate-spin" />
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState title={t('finance.bankStatements.monthTotals.empty')} icon={Sigma} />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className="text-[0.8125rem]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('finance.bankStatements.monthTotals.account')}</TableHead>
+                  <TableHead className="text-right">
+                    {t('finance.bankStatements.monthTotals.lines')}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t('finance.bankStatements.monthTotals.credit')}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t('finance.bankStatements.monthTotals.debit')}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t('finance.bankStatements.monthTotals.net')}
+                  </TableHead>
+                  <TableHead className="text-right">
+                    {t('finance.bankStatements.monthTotals.fees')}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.accountNumber}>
+                    <TableCell>
+                      <div className="font-medium tabular-nums">{row.accountNumber}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.accountCode
+                          ? `${row.accountCode}${row.accountName ? ` · ${row.accountName}` : ''}`
+                          : t('finance.bankStatements.monthTotals.unlinked')}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <div>{row.lineCount}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {t('finance.bankStatements.monthTotals.days', { count: row.dayCount })}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right text-success tabular-nums">
+                      {formatMnt(row.credit)}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive tabular-nums">
+                      {formatMnt(row.debit)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatMnt(row.net)}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground tabular-nums">
+                      {formatMnt(row.fees)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow className="font-semibold">
+                  <TableCell>{t('finance.bankStatements.monthTotals.total')}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {rows.reduce((acc, row) => acc + row.lineCount, 0)}
+                  </TableCell>
+                  <TableCell className="text-right text-success tabular-nums">
+                    {formatMnt(sum((row) => row.credit))}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive tabular-nums">
+                    {formatMnt(sum((row) => row.debit))}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMnt(sum((row) => row.net))}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMnt(sum((row) => row.fees))}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -303,6 +466,7 @@ function DayPanel(props: {
   const [uploading, setUploading] = useState(false);
   const [combining, setCombining] = useState(false);
   const [feesOpen, setFeesOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [removing, setRemoving] = useState<BankStatement | null>(null);
   const statements = day.data ?? [];
 
@@ -367,6 +531,14 @@ function DayPanel(props: {
           {t('finance.bankStatements.day.count', { count: statements.length })}
         </Badge>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={statements.length === 0}
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History />
+            {t('finance.bankStatements.history.open')}
+          </Button>
           <Button variant="outline" onClick={() => setFeesOpen(true)}>
             <Download />
             {t('finance.bankStatements.day.fees')}
@@ -438,6 +610,7 @@ function DayPanel(props: {
         </div>
       )}
       <FeeExportDialog open={feesOpen} date={props.date} onClose={() => setFeesOpen(false)} />
+      <HistoryDialog open={historyOpen} date={props.date} onClose={() => setHistoryOpen(false)} />
       <ConfirmDialog
         open={removing !== null}
         title={t('finance.bankStatements.card.removeTitle')}
@@ -578,17 +751,33 @@ function StatementCard(props: {
   );
 }
 
+/** The bank fees as one Erkhet file: a month (by the lines' own dates) or any span of days. */
 function FeeExportDialog(props: { open: boolean; date: string; onClose: () => void }) {
   const { t } = useTranslation();
   const mutations = useBankMutations();
+  const thisMonth = businessDate().slice(0, 7);
+  const [mode, setMode] = useState<'month' | 'range'>('month');
+  const [month, setMonth] = useState(props.date.slice(0, 7));
   const [from, setFrom] = useState(props.date);
   const [to, setTo] = useState(props.date);
   const [seen, setSeen] = useState(props.date);
   if (seen !== props.date) {
     setSeen(props.date);
+    setMonth(props.date.slice(0, 7));
     setFrom(props.date);
     setTo(props.date);
   }
+  const sheet = t('finance.bankStatements.erkhet.feeSheet');
+  const span =
+    mode === 'month' && /^\d{4}-\d{2}$/.test(month)
+      ? {
+          from: `${month}-01`,
+          to: `${month}-${String(daysInMonth(month)).padStart(2, '0')}`,
+          name: `${sheet}_${month}.xlsx`,
+        }
+      : mode === 'range' && from && to && from <= to
+        ? { from, to, name: `${from}_${to}_${sheet}.xlsx` }
+        : null;
   return (
     <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
       <DialogContent closeLabel={t('common.close')} guard={false}>
@@ -596,35 +785,162 @@ function FeeExportDialog(props: { open: boolean; date: string; onClose: () => vo
           <DialogTitle>{t('finance.bankStatements.feeExport.title')}</DialogTitle>
           <DialogDescription>{t('finance.bankStatements.feeExport.hint')}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FormField htmlFor="bank-fee-from" label={t('finance.bankStatements.feeExport.from')}>
-            <DateInput id="bank-fee-from" value={from} onChange={setFrom} />
-          </FormField>
-          <FormField htmlFor="bank-fee-to" label={t('finance.bankStatements.feeExport.to')}>
-            <DateInput id="bank-fee-to" value={to} onChange={setTo} />
-          </FormField>
-        </div>
+        <SegmentedControl
+          name={t('finance.bankStatements.feeExport.modeLabel')}
+          options={['month', 'range'] as const}
+          value={mode}
+          label={(value) =>
+            value === 'month'
+              ? t('finance.bankStatements.feeExport.byMonth')
+              : t('finance.bankStatements.feeExport.byRange')
+          }
+          onChange={setMode}
+        />
+        {mode === 'month' ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-end gap-2">
+              <FormField
+                htmlFor="bank-fee-month"
+                label={t('finance.bankStatements.feeExport.month')}
+              >
+                <MonthInput id="bank-fee-month" value={month} onChange={setMonth} />
+              </FormField>
+              <Button type="button" variant="outline" onClick={() => setMonth(thisMonth)}>
+                {t('finance.bankStatements.feeExport.thisMonth')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMonth(shiftMonth(thisMonth, -1))}
+              >
+                {t('finance.bankStatements.feeExport.lastMonth')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t('finance.bankStatements.feeExport.monthHint')}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField htmlFor="bank-fee-from" label={t('finance.bankStatements.feeExport.from')}>
+              <DateInput id="bank-fee-from" value={from} onChange={setFrom} />
+            </FormField>
+            <FormField htmlFor="bank-fee-to" label={t('finance.bankStatements.feeExport.to')}>
+              <DateInput id="bank-fee-to" value={to} onChange={setTo} />
+            </FormField>
+          </div>
+        )}
+        <p className="rounded-lg bg-canvas px-3 py-2 text-xs text-muted-foreground">
+          {t('finance.bankStatements.feeExport.combinedNote')}
+        </p>
         <ProblemAlert problem={problemFromError(mutations.exportFees.error)} />
         <DialogFooter closeLabel={t('common.cancel')}>
           <Button
             pending={mutations.exportFees.isPending}
-            disabled={!from || !to || from > to}
-            onClick={() =>
+            disabled={span === null}
+            onClick={() => {
+              if (!span) return;
               mutations.exportFees.mutate(
-                { from, to },
+                { from: span.from, to: span.to },
                 {
                   onSuccess: (blob) => {
-                    save(blob, `${from}_${to}_${t('finance.bankStatements.erkhet.feeSheet')}.xlsx`);
+                    save(blob, span.name);
                     props.onClose();
                   },
                 },
-              )
-            }
+              );
+            }}
           >
             <CalendarDays />
             {t('finance.bankStatements.feeExport.download')}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Every change of the day's lines, newest first (ADR-0250): who, when, which line, what moved. */
+function HistoryDialog(props: { open: boolean; date: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const history = useBankHistory(props.date, props.open);
+  const entries = history.data ?? [];
+  const value = (field: string, text: string | null) => {
+    if (text === null || text === '') return t('finance.bankStatements.empty');
+    if (field === 'action')
+      return t(`finance.bankStatements.actions.${text}`, { defaultValue: text });
+    if (field === 'exportType') {
+      return t(`finance.bankStatements.exportTypes.${text}`, { defaultValue: text });
+    }
+    return text;
+  };
+  return (
+    <Dialog open={props.open} onOpenChange={(open) => (open ? undefined : props.onClose())}>
+      <DialogContent closeLabel={t('common.close')} guard={false} size="lg">
+        <DialogHeader>
+          <DialogTitle>{t('finance.bankStatements.history.title')}</DialogTitle>
+          <DialogDescription>
+            {t('finance.bankStatements.history.hint', { date: props.date })}
+          </DialogDescription>
+        </DialogHeader>
+        <ProblemAlert
+          problem={history.error ? problemFromError(history.error) : null}
+          onRetry={() => void history.refetch()}
+        />
+        {history.isPending ? (
+          <div className="flex justify-center py-8 text-muted-foreground">
+            <LoaderCircle aria-hidden className="size-5 animate-spin" />
+          </div>
+        ) : entries.length === 0 ? (
+          <EmptyState title={t('finance.bankStatements.history.empty')} icon={History} />
+        ) : (
+          <ol className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+            {entries.map((entry) => {
+              const amount = new Decimal(entry.credit).gt(0) ? entry.credit : entry.debit;
+              return (
+                <li key={entry.id} className="rounded-lg bg-canvas px-3 py-2 text-[0.8125rem]">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Badge variant={entry.action === 'REPOST' ? 'warning' : 'secondary'}>
+                      {t(`finance.bankStatements.history.actions.${entry.action}`, {
+                        defaultValue: entry.action,
+                      })}
+                    </Badge>
+                    <span className="font-medium tabular-nums">
+                      {t('finance.bankStatements.history.line', {
+                        account: entry.accountNumber,
+                        lineNo: entry.lineNo,
+                      })}
+                    </span>
+                    <span className="tabular-nums text-muted-foreground">{formatMnt(amount)}</span>
+                    <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                      {businessDateTime(new Date(entry.occurredAt)).slice(0, 16)} ·{' '}
+                      {entry.actorName ?? t('finance.bankStatements.history.system')}
+                    </span>
+                  </div>
+                  {entry.changes.length > 0 ? (
+                    <ul className="mt-1 space-y-0.5 text-xs">
+                      {entry.changes.map((change) => (
+                        <li key={change.field} className="flex flex-wrap gap-x-1.5">
+                          <span className="text-muted-foreground">
+                            {t(`finance.bankStatements.history.fields.${change.field}`, {
+                              defaultValue: change.field,
+                            })}
+                            :
+                          </span>
+                          <span className="line-through decoration-muted-foreground/60">
+                            {value(change.field, change.before)}
+                          </span>
+                          <span aria-hidden>→</span>
+                          <span className="font-medium">{value(change.field, change.after)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        )}
       </DialogContent>
     </Dialog>
   );
