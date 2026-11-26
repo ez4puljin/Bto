@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PAYROLL_LIMITS } from '@tugeel/shared/payroll';
-import { businessDate } from '@tugeel/shared/time';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { addMonths, businessDate } from '@tugeel/shared/time';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { type PositionSalarySchedule, PositionsService } from '../../hr';
-import { type AuthContext, AuditService } from '../../identity';
+import { type AuthContext, AuditService, StaffAccountsService } from '../../identity';
 import {
   amountOf,
   checkedItems,
@@ -17,7 +17,7 @@ import {
   storedItems,
 } from '../kpi-sheet';
 import { assertPayroll, PAYROLL_MANAGE } from '../payroll.rights';
-import { payrollKpiTemplates, payrollTerms } from '../schema';
+import { payrollKpiTemplates, payrollSalaryOverrides, payrollTerms } from '../schema';
 import { PayrollPeopleService, type PayrollPerson } from './payroll-people.service';
 
 export interface KpiTemplate {
@@ -35,7 +35,9 @@ export interface KpiTemplateInput {
   items: KpiSheetItemInput[];
 }
 
-/** The position supplies salary; personal terms keep KPI, insurance and participation settings. */
+export type PayrollSalarySource = 'POSITION' | 'PERSONAL' | 'LEGACY';
+
+/** Position defaults with dated employee-only overrides; KPI and insurance stay personal. */
 export interface PayTerms {
   userId: number;
   fullName: string;
@@ -48,6 +50,11 @@ export interface PayTerms {
   hasTerms: boolean;
   active: boolean;
   baseSalary: string;
+  salarySource: PayrollSalarySource;
+  nextSalarySource: PayrollSalarySource | null;
+  positionBaseSalary: string | null;
+  positionNextBaseSalary: string | null;
+  positionNextEffectiveMonth: string | null;
   nextBaseSalary: string | null;
   nextEffectiveMonth: string | null;
   paysSocialInsurance: boolean;
@@ -61,6 +68,7 @@ export interface PayTerms {
 
 export interface PayTermsInput {
   baseSalary?: string;
+  usePositionSalary?: boolean;
   paysSocialInsurance: boolean;
   templateId: number | null;
   items: KpiSheetItemInput[];
@@ -89,6 +97,7 @@ export class PayrollTermsService {
     private readonly audit: AuditService,
     private readonly people: PayrollPeopleService,
     private readonly positions: PositionsService,
+    private readonly accounts: StaffAccountsService,
   ) {}
 
   // ── templates ─────────────────────────────────────────────────────────────
@@ -285,6 +294,10 @@ export class PayrollTermsService {
       people.map((person) => person.userId),
       businessDate().slice(0, 7),
     );
+    const overrides = await this.overrides(
+      executor,
+      people.map((person) => person.userId),
+    );
     return people
       .filter((person) => !person.left || terms.has(person.userId))
       .map((person) =>
@@ -293,6 +306,7 @@ export class PayrollTermsService {
           terms.get(person.userId) ?? null,
           templateName,
           salaries.get(person.userId),
+          overrides.get(person.userId) ?? [],
         ),
       );
   }
@@ -300,56 +314,88 @@ export class PayrollTermsService {
   async one(userId: number, executor: Db | Tx = this.db): Promise<PayTerms> {
     const person = (await this.people.byId()).get(userId);
     if (!person) throw notFound('employee', userId);
-    const [[row], templates, salaries] = await Promise.all([
+    const [[row], templates, salaries, overrides] = await Promise.all([
       executor.select().from(payrollTerms).where(eq(payrollTerms.userId, userId)),
       this.templates(true, executor),
       this.positions.salarySchedulesForUsers(executor, [userId], businessDate().slice(0, 7)),
+      this.overrides(executor, [userId]),
     ]);
     return this.view(
       person,
       row ?? null,
       new Map(templates.map((entry) => [entry.id, entry.name])),
       salaries.get(userId),
+      overrides.get(userId) ?? [],
     );
   }
 
   async save(ctx: AuthContext, userId: number, input: PayTermsInput): Promise<PayTerms> {
     assertPayroll(ctx, PAYROLL_MANAGE);
-    const person = (await this.people.byId()).get(userId);
-    if (!person) throw notFound('employee', userId);
     const requestedSalary =
       input.baseSalary === undefined ? undefined : amountOf('baseSalary', input.baseSalary);
+    if (input.usePositionSalary && requestedSalary !== undefined)
+      throw invalid('baseSalary', 'conflict', 'choose a personal salary or the position salary');
     const items = checkedItems(input.items);
     await inTransaction(this.db, async (tx) => {
+      // The same first lock as HR assignment/catalog writes; read the card only after it.
+      await this.accounts.lockAccess(tx);
+      const positionId = await this.positions.currentPositionId(tx, userId);
+      if (input.usePositionSalary && positionId === null)
+        throw invalid(
+          'usePositionSalary',
+          'position',
+          'an unassigned employee has no position salary',
+        );
       if (input.templateId !== null) await this.template(tx, input.templateId);
       const [before] = await tx
         .select()
         .from(payrollTerms)
         .where(eq(payrollTerms.userId, userId))
         .for('update');
-      const salary = (
-        await this.positions.baseSalariesForUsers(tx, [userId], businessDate().slice(0, 7))
-      ).get(userId);
-      if (person.positionId !== null) {
-        const currentSalary =
-          salary?.baseSalary ??
-          (before && before.positionLegacySalary !== false ? before.baseSalary.toFixed(2) : '0.00');
-        if (requestedSalary && !requestedSalary.eq(currentSalary)) {
-          throw invalid('baseSalary', 'positionSalary', 'change the base salary on the position');
-        }
-      } else if (requestedSalary === undefined) {
+      if (positionId === null && requestedSalary === undefined)
         throw invalid('baseSalary', 'isDefined', 'a legacy employee needs a base salary');
+      if (positionId !== null && (requestedSalary !== undefined || input.usePositionSalary)) {
+        const effectiveMonth = addMonths(`${businessDate().slice(0, 7)}-01`, 1).slice(0, 7);
+        const [prior] = await tx
+          .select()
+          .from(payrollSalaryOverrides)
+          .where(
+            and(
+              eq(payrollSalaryOverrides.userId, userId),
+              eq(payrollSalaryOverrides.effectiveMonth, effectiveMonth),
+            ),
+          );
+        const amount = input.usePositionSalary ? null : requestedSalary!;
+        await tx
+          .insert(payrollSalaryOverrides)
+          .values({ userId, effectiveMonth, baseSalary: amount, updatedBy: ctx.userId })
+          .onConflictDoUpdate({
+            target: [payrollSalaryOverrides.userId, payrollSalaryOverrides.effectiveMonth],
+            set: { baseSalary: amount, updatedBy: ctx.userId, updatedAt: sql`now()` },
+          });
+        await this.audit.record(tx, ctx, {
+          action: prior ? 'UPDATE' : 'CREATE',
+          entity: 'payroll_salary_override',
+          entityId: userId,
+          // Audit readers need not have payroll permission: keep private amounts in payroll.
+          before: prior
+            ? { effectiveMonth, salarySource: prior.baseSalary === null ? 'POSITION' : 'PERSONAL' }
+            : undefined,
+          after: {
+            effectiveMonth,
+            salarySource: amount === null ? 'POSITION' : 'PERSONAL',
+            changed: !prior || prior.baseSalary?.toFixed(2) !== amount?.toFixed(2),
+          },
+        });
       }
       // Keep the old personal amount solely as a fallback for months before position rates began.
       const baseSalary =
-        person.positionId !== null
-          ? (before?.baseSalary ?? amountOf('baseSalary', '0'))
-          : requestedSalary;
+        positionId !== null ? (before?.baseSalary ?? amountOf('baseSalary', '0')) : requestedSalary;
       if (baseSalary === undefined) throw new Error('base salary missing');
       const values = {
         baseSalary,
         positionLegacySalary:
-          person.positionId === null || (before ? before.positionLegacySalary !== false : false),
+          positionId === null || (before ? before.positionLegacySalary !== false : false),
         paysSocialInsurance: input.paysSocialInsurance,
         templateId: input.templateId,
         items,
@@ -394,19 +440,26 @@ export class PayrollTermsService {
     positionSalaryEffectiveMonth: string | null;
     position: string | null;
     baseSalary: string;
+    salarySource: PayrollSalarySource;
+    nextSalarySource: PayrollSalarySource | null;
+    positionBaseSalary: string | null;
+    positionNextBaseSalary: string | null;
+    positionNextEffectiveMonth: string | null;
     nextBaseSalary: string | null;
     nextEffectiveMonth: string | null;
     paysSocialInsurance: boolean;
     items: KpiSheetItem[];
     kpiTotal: string;
   }> {
-    const [[row], salaries, people] = await Promise.all([
+    const [[row], salaries, people, overrides] = await Promise.all([
       this.db.select().from(payrollTerms).where(eq(payrollTerms.userId, userId)),
       this.positions.salarySchedulesForUsers(this.db, [userId], businessDate().slice(0, 7)),
       this.people.byId(),
+      this.overrides(this.db, [userId]),
     ]);
     const schedule = salaries.get(userId);
     const salary = schedule?.current;
+    const amounts = this.salaryView(row ?? null, schedule, overrides.get(userId) ?? []);
     const person = people.get(userId);
     const active = row?.active ?? salary != null;
     const items = active && row ? storedItems(row.items) : [];
@@ -415,9 +468,8 @@ export class PayrollTermsService {
       positionId: person?.positionId ?? null,
       positionSalaryEffectiveMonth: person?.positionSalaryEffectiveMonth ?? null,
       position: person?.position ?? null,
-      baseSalary: active ? (salary?.baseSalary ?? row?.baseSalary.toFixed(2) ?? '0.00') : '0.00',
-      nextBaseSalary: schedule?.next?.baseSalary ?? null,
-      nextEffectiveMonth: schedule?.next?.effectiveMonth ?? null,
+      ...amounts,
+      baseSalary: active ? amounts.baseSalary : '0.00',
       paysSocialInsurance: row?.paysSocialInsurance ?? true,
       items,
       kpiTotal: totalOf(items),
@@ -435,16 +487,27 @@ export class PayrollTermsService {
       people.map((person) => person.userId),
       month,
     );
+    const overrides = await this.overrides(
+      executor,
+      people.map((person) => person.userId),
+    );
     const terms = new Map(rows.map((row) => [row.userId, row]));
     const result = new Map<number, ActivePayTerms>();
     for (const person of people) {
       const row = terms.get(person.userId);
       const salary = salaries.get(person.userId);
       if (row?.active === false || (!row && !salary)) continue;
+      const personal = (overrides.get(person.userId) ?? []).find(
+        (event) => event.effectiveMonth <= month,
+      );
       if (!salary && person.positionId !== null && (!row || row.positionLegacySalary === false))
         continue;
       result.set(person.userId, {
-        baseSalary: salary?.baseSalary ?? row?.baseSalary.toFixed(2) ?? '0.00',
+        baseSalary:
+          personal?.baseSalary?.toFixed(2) ??
+          salary?.baseSalary ??
+          row?.baseSalary.toFixed(2) ??
+          '0.00',
         position: salary?.position ?? person.position,
         paysSocialInsurance: row?.paysSocialInsurance ?? true,
         items: row ? storedItems(row.items) : [],
@@ -458,6 +521,7 @@ export class PayrollTermsService {
     row: typeof payrollTerms.$inferSelect | null,
     templateName: ReadonlyMap<number, string>,
     schedule: PositionSalarySchedule | undefined,
+    overrides: (typeof payrollSalaryOverrides.$inferSelect)[],
   ): PayTerms {
     const items = row ? storedItems(row.items) : [];
     const salary = schedule?.current;
@@ -472,15 +536,77 @@ export class PayrollTermsService {
       left: person.left,
       hasTerms: row !== null || salary != null,
       active: row?.active ?? salary != null,
-      baseSalary: salary?.baseSalary ?? row?.baseSalary.toFixed(2) ?? '0.00',
-      nextBaseSalary: schedule?.next?.baseSalary ?? null,
-      nextEffectiveMonth: schedule?.next?.effectiveMonth ?? null,
+      ...this.salaryView(row, schedule, overrides),
       paysSocialInsurance: row?.paysSocialInsurance ?? true,
       templateId: row?.templateId ?? null,
       templateName: row?.templateId ? (templateName.get(row.templateId) ?? null) : null,
       items,
       kpiTotal: totalOf(items),
       updatedAt: row?.updatedAt ?? null,
+    };
+  }
+  private async overrides(executor: Db | Tx, userIds: readonly number[]) {
+    const result = new Map<number, (typeof payrollSalaryOverrides.$inferSelect)[]>();
+    if (!userIds.length) return result;
+    const rows = await executor
+      .select()
+      .from(payrollSalaryOverrides)
+      .where(inArray(payrollSalaryOverrides.userId, [...userIds]))
+      .orderBy(desc(payrollSalaryOverrides.effectiveMonth));
+    for (const row of rows) result.set(row.userId, [...(result.get(row.userId) ?? []), row]);
+    return result;
+  }
+
+  private salaryView(
+    row: typeof payrollTerms.$inferSelect | null,
+    schedule: PositionSalarySchedule | undefined,
+    overrides: (typeof payrollSalaryOverrides.$inferSelect)[],
+  ): Pick<
+    PayTerms,
+    | 'baseSalary'
+    | 'salarySource'
+    | 'nextBaseSalary'
+    | 'nextEffectiveMonth'
+    | 'nextSalarySource'
+    | 'positionBaseSalary'
+    | 'positionNextBaseSalary'
+    | 'positionNextEffectiveMonth'
+  > {
+    const month = businessDate().slice(0, 7);
+    const at = (target: string) => {
+      const personal = overrides.find((entry) => entry.effectiveMonth <= target);
+      const position =
+        schedule?.next && schedule.next.effectiveMonth <= target
+          ? schedule.next
+          : schedule?.current;
+      if (personal?.baseSalary != null)
+        return { amount: personal.baseSalary.toFixed(2), source: 'PERSONAL' as const };
+      if (position) return { amount: position.baseSalary, source: 'POSITION' as const };
+      return { amount: row?.baseSalary.toFixed(2) ?? '0.00', source: 'LEGACY' as const };
+    };
+    const current = at(month);
+    const futureMonths = [
+      ...new Set([
+        ...overrides.map((entry) => entry.effectiveMonth),
+        ...(schedule?.next ? [schedule.next.effectiveMonth] : []),
+      ]),
+    ]
+      .filter((value) => value > month)
+      .sort();
+    const next = futureMonths
+      .map((effectiveMonth) => ({ ...at(effectiveMonth), effectiveMonth }))
+      .find(
+        (candidate) => candidate.amount !== current.amount || candidate.source !== current.source,
+      );
+    return {
+      baseSalary: current.amount,
+      salarySource: current.source,
+      nextBaseSalary: next?.amount ?? null,
+      nextEffectiveMonth: next?.effectiveMonth ?? null,
+      nextSalarySource: next?.source ?? null,
+      positionBaseSalary: schedule?.current?.baseSalary ?? null,
+      positionNextBaseSalary: schedule?.next?.baseSalary ?? null,
+      positionNextEffectiveMonth: schedule?.next?.effectiveMonth ?? null,
     };
   }
 }

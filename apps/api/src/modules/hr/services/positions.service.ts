@@ -11,6 +11,7 @@ import {
   type AuthContext,
   type PositionRole,
   StaffAccountsService,
+  UserNamesService,
 } from '../../identity';
 import {
   hrEmployeePositionAssignments,
@@ -65,7 +66,19 @@ export class PositionsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly accounts: StaffAccountsService,
+    private readonly names: UserNamesService,
   ) {}
+
+  /** Minimal card binding read inside the caller's access-locked transaction. */
+  async currentPositionId(executor: Db | Tx, userId: number): Promise<number | null> {
+    if (!(await this.names.namesOf([userId], executor)).has(userId))
+      throw notFound('employee', userId);
+    const [card] = await executor
+      .select({ positionId: hrEmployees.positionId })
+      .from(hrEmployees)
+      .where(eq(hrEmployees.userId, userId));
+    return card?.positionId ?? null;
+  }
 
   async canViewSalary(ctx: AuthContext): Promise<boolean> {
     return ctx.permissions.has('hr.payroll.view') || this.accounts.isAdmin(this.db, ctx);

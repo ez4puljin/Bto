@@ -305,6 +305,7 @@ export class PayrollController {
     return toTerms(
       await this.terms.save(ctx, userId, {
         baseSalary: body.baseSalary,
+        usePositionSalary: body.usePositionSalary,
         paysSocialInsurance: body.paysSocialInsurance,
         templateId: body.templateId ?? null,
         items: body.items,
