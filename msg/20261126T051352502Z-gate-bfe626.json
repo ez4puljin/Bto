@@ -1,0 +1,8 @@
+{
+  "id": "20261126T051352502Z-gate-bfe626",
+  "from": "gate",
+  "to": "brain",
+  "at": "2026-11-26T05:13:52.502Z",
+  "text": "inbox gate: in/qa-history-tools @ fe4c76a6: WAITING for the owner: the automatic review leaves this change to the owner's brain because it touches what stays the owner's: OWNER-ONLY decision: ADRs, the status book and the architecture are the owner's: docs/decisions/ADR-0247-overnight-qa-history.md OWNER-ONLY tools: the repository's tools, deploy and CI: tools/qa-six-month/README.md tools/qa-six-month/catalogue.mjs tools/qa-six-month/clock.mjs tools/qa-six-month/clock.test.mjs tools/qa-six-month/dataset.mjs (+16) . Nothing to do now; the owner's brain reviews it and lands it or writes back why not. A feature branch only adds i18n keys; changing existing wording is its own branch in/wording-TOPIC with the full old → new list in its commit message.",
+  "slug": "qa-history-tools"
+}
