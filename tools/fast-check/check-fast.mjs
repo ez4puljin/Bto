@@ -242,12 +242,55 @@ function run(step) {
   });
 }
 
+// A red step's section: its last 80 lines as before, and before them the heads of the failures that
+// lie above that tail (vitest's «FAIL <file> > <suite> > <test>» and «× …» lines with the error's
+// first lines, jest's «● <suite> › <test>» with its message), which the inbox gate's digest names
+// to the other side (tools/brain/inbox.sh check_digest). A DOM dump is never a head. At most 120
+// lines. Self-contained: brain.test.mjs reads it from this file.
+function redSection(output, tail = 80, most = 120) {
+  const lines = output.trim().split('\n');
+  const shown = lines.slice(-tail);
+  const above = lines.length - shown.length;
+  const plain = (line) =>
+    line.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[ -/]*[@-~]`, 'g'), '').trim();
+  const ERROR = /^(?:[A-Z][\w.]*)?(?:Error|Exception)(?:\s*\[[^\]]*\])?:|^AssertionError\b/;
+  const DOM = /^<\/?[A-Za-z][\w:.-]*|^\/?>$|^[\w:.@-]+=(?:"[^"]*"?|\{.*)$|^\.\.\.$/;
+  const DETAIL = /^(?:[-+] |Expected|Received|expect\(|thrown|Number of calls)/;
+  const heads = [];
+  let want = 0; // lines still to look at for the error of the last head
+  let detail = 0; // lines of its message still to keep
+  for (let i = 0; i < above && heads.length < most - tail - 1; i += 1) {
+    const line = plain(lines[i]);
+    if (!line) continue;
+    if (/^(?:FAIL|×|✗|✕)\s+\S.* > /.test(line) || /^FAIL\s+\S+\.(?:test|spec)\./.test(line)) {
+      heads.push(lines[i]);
+      want = 6;
+      detail = 0;
+    } else if (/^● /.test(line) && line !== '● Console') {
+      heads.push(lines[i]);
+      want = 6;
+      detail = 4;
+    } else if (want > 0 && ERROR.test(line)) {
+      heads.push(lines[i]);
+      want = 0;
+      detail = 4;
+    } else if (detail > 0 && !DOM.test(line) && (DETAIL.test(line) || ERROR.test(line))) {
+      heads.push(lines[i]);
+      detail -= 1;
+    } else {
+      want = Math.max(0, want - 1);
+      if (detail > 0 && DOM.test(line)) detail = 0;
+    }
+  }
+  if (heads.length === 0) return shown;
+  return [...heads, `... (${above} more lines of output; their failures' heads above)`, ...shown];
+}
+
 const results = await Promise.all(steps.map(run));
 const failed = results.filter((result) => !result.ok);
 for (const result of failed) {
-  const lines = result.output.trim().split('\n');
   console.log(`\n--- ${result.name} ---`);
-  console.log(lines.slice(-80).join('\n'));
+  console.log(redSection(result.output).join('\n'));
 }
 console.log(
   `\ncheck:fast ${failed.length === 0 ? 'green' : 'RED'} in ${seconds(started).trim()}s ` +

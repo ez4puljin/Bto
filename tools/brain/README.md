@@ -241,7 +241,7 @@ bash tools/brain/inbox.sh auto on|off|status      the automatic review's switch 
 - **LIGHT lands at once:** `land.sh in-<slug>` (its `check:fast`, its push; the real system takes
   it by itself). Landed: `LANDED <sha>`, and the remote branch is deleted (only while it still
   points at that head). Red (exit 4), a conflict (3) or anything else: the task is dropped and the
-  check's last lines go back.
+  reason goes back (red: with the check's digest, below).
 - **GUARDED waits for review:** `check:fast` runs in the copy; green leaves the task open as
   `WAITING-REVIEW` (in `status`, on the monitor and as a pending status on GitHub). The automatic
   review (below) takes it; what it leaves, the brain reviews like a `bto-core` task (`bto-review` on
@@ -251,9 +251,31 @@ bash tools/brain/inbox.sh auto on|off|status      the automatic review's switch 
 - **Written back** with `gh` as the owner: a commit status `bto/inbox-gate` (success, pending,
   failure) and a commit comment on the branch's head, in English with one Mongolian line, once per
   result. If GitHub cannot be reached the next ticks try again (five times). The repository is
-  public: GitHub gets the failing step's name (`web types`) and «details in the gate's log on the
-  Bto PC», never a check's or `land.sh`'s output or a local path; the tail stays in `status` and the
-  logs.
+  public: never `land.sh`'s output or a local path. A red check's status names the failing step
+  (`web types`) and says «what failed is in the commit comment and on the team board».
+- **A red check is named, not shown** (2026-11-25: the other AI waited an hour and a half for
+  a screenshot): `check_digest` reads the check's output (colour codes stripped) and makes a short
+  digest per red step: vitest's failing test (`FAIL <file> > <suite> > <test>`), the first frame
+  inside the repository as `file:line:col` with at most the three numbered source lines before the
+  `^`, the error's first line and the totals; jest's `● <suite> › <test>`, its message and first
+  frame; tsc's and eslint's first five errors (`file:line:col`, then «+N more»); the files Prettier
+  names; i18n's missing keys; otherwise the step's last lines, never a runner's footer or a DOM dump.
+  Paths become repository-relative and a line with U+FFFD (binary garbage) is dropped. A line that
+  carries a secret is dropped: a key naming one (`pass`, `pwd`, `secret`, `token`, `key`,
+  `credential`, `auth`, `cookie`, `session`, with any prefix or suffix, `SMTP_PASS`) followed by
+  `=` or, quoted or not, by `:` (a path's `file.ts:12:5` is not); any `Authorization:` or
+  `Cookie:` line; `Bearer …`; a URL with a password or of a database; `ghp_`/`github_pat_`; a
+  JWT-shaped value; and any ALL_CAPS `NAME=value` of six or more characters (the known cost: a
+  test's text that looks like that is dropped too). A test that only names a token stays. Then the
+  values themselves go: `review.mjs scrub --env-from` with the check's copy (GUARDED: the task's
+  copy; LIGHT: `land.sh`'s gate copy `~/bto-work/_gate`) and with `~/bto-dev`, where every copy's
+  `.env` comes from; if anything fails, the digest is «unavailable», never unscrubbed. The digest is cut at a line with «… (+N more)» at
+  1200 characters. Both red paths (LIGHT through `land.sh` exit 4, GUARDED in the copy) put it into
+  the commit comment («What failed in `pnpm check:fast`»), the board message to the branch's side
+  and to the brain, and the reason in `status`; it is kept as `logs/<slug>-<head>.digest`, the whole
+  output stays in the attempt's log. check-fast.mjs keeps what it needs: a red step's section is its
+  last 80 lines with, before them, the heads of the failures above that tail (vitest's `FAIL … > …`
+  and the error's first lines, jest's `● … › …` and its message; never a DOM dump), at most 120.
 - **The books** are in `~/bto-work/.brain/inbox/`: `items/<slug>` (the attempt: branch, head, state,
   class, files, task, reason, landed), `log` (one line a result), `logs/<slug>-<head>.log` (the
   task, the merge, the check, the landing; the last 50), `gh.log`. `BTO_INBOX_REMOTE` (default

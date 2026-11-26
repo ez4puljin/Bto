@@ -1096,8 +1096,14 @@ test('inbox: the guard rails are refused, whatever else comes with them', () => 
 const FAKE_CHECK = [
   "import { existsSync } from 'node:fs';",
   'if (existsSync(`${process.env.INBOX_DIR}/red`)) {',
-  "  console.log('FAIL    0.1s  web types');",
+  // As check-fast.mjs prints a red step: its line, then its section; a local path and a line with
+  // a secret in it, which never reach the other side.
+  "  console.log('FAIL    0.1s  web types\\n\\n--- web types ---');",
   "  console.log('/home/u/bto-work/in-x/apps/web/src/a.tsx(1,1): error TS2322: wrong');",
+  "  console.log('  DATABASE_URL=postgres://app:PlantedPw-9876@127.0.0.1:15432/tugeel');",
+  // A value of the copy's .env that no rule of the digest knows: only review.mjs scrub removes it.
+  "  console.log('src/b.tsx(2,2): error TS2304: Cannot find name Zx9-planted-value-77.');",
+  "  console.log('\\ncheck:fast RED in 0.1s (1 changed files since 0123abcd, 1 steps)');",
   '  process.exit(1);',
   '}',
   "console.log('check:fast green');",
@@ -1154,7 +1160,7 @@ const FAKE_CLAUDE = [
 ].join('\n');
 
 const PLANTED_SECRET = 'planted-jwt-secret-0123456789';
-const PLANTED_ENV = `DATABASE_URL=postgres://app:PlantedPw-9876@127.0.0.1:15432/tugeel\nJWT_SECRET=${PLANTED_SECRET}`;
+const PLANTED_ENV = `DATABASE_URL=postgres://app:PlantedPw-9876@127.0.0.1:15432/tugeel\nJWT_SECRET=${PLANTED_SECRET}\nFOO=Zx9-planted-value-77`;
 
 function makeInbox({ board = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'bto-inbox-'));
@@ -1569,16 +1575,522 @@ test('inbox: a branch not from main, a bad name and a red check are refused', ()
     assert.match(inbox.item('Bad_Name').reason, /the branch is in\/<slug>/);
     assert.equal(inbox.item('red-page').state, 'REFUSED');
     assert.match(inbox.item('red-page').reason, /check:fast is red: .*TS2322/);
-    // GitHub (a public repository) gets the step's name, never the output or a local path.
+    // GitHub (a public repository): the status names the step; the comment adds the digest (the
+    // error by its repository path), never a local path or a secret.
     const told = inbox.gh().filter((line) => line.includes(inbox.item('red-page').head));
     assert.ok(told.length > 0);
     for (const line of told) {
-      assert.doesNotMatch(line, /TS2322|\/home\//);
+      assert.doesNotMatch(line, /\/home\/|PlantedPw|postgres:|Zx9-planted-value-77/);
     }
-    assert.ok(told.some((line) => line.includes("red (web types); details in the gate's log")));
+    const status = told.find((line) => line.includes('/statuses/'));
+    assert.doesNotMatch(status, /TS2322/);
+    assert.ok(
+      status.includes(
+        'red (web types); what failed is in the commit comment and on the team board',
+      ),
+    );
+    assert.ok(
+      told.some(
+        (line) =>
+          line.includes('/comments') &&
+          line.includes('web types:') &&
+          line.includes('apps/web/src/a.tsx:1:1 TS2322: wrong'),
+      ),
+    );
     assert.ok(!existsSync(join(inbox.books, 'lanes/in-red-page')));
     assert.ok(!existsSync(join(inbox.dir, 'bto-work/in-red-page')));
     assert.equal(inbox.originGit('log', '-1', '--format=%s', 'main'), 'start');
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+// --- the digest of a red check (check_digest): what the other side's AI fixes from ----------------
+
+const checkDigestFn = () => {
+  const fn = /^check_digest\(\) \{\n[\s\S]*?\n\}\n/m.exec(readFileSync(inboxScript, 'utf8'))?.[0];
+  assert.ok(fn, 'check_digest found');
+  return fn;
+};
+const digestOf = (log, max = 1200) => {
+  const dir = mkdtempSync(join(tmpdir(), 'bto-digest-'));
+  try {
+    writeFileSync(join(dir, 'check.log'), log);
+    const run = spawnSync(
+      'bash',
+      [
+        '-c',
+        `${checkDigestFn()}\ncheck_digest "$1" "$2"`,
+        'digest',
+        join(dir, 'check.log'),
+        String(max),
+      ],
+      { encoding: 'utf8' },
+    );
+    assert.equal(run.status, 0, run.stderr);
+    return run.stdout;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+const E = '\u001b';
+const steps = (...lines) => [...lines, ''].join('\n');
+const RED_END = 'check:fast RED in 120.8s (59 changed files since HEAD~1, 13 steps)';
+// check-fast.mjs's redSection (a red step's printed section), read from the script itself: the
+// script runs its check when imported.
+const redSection = (() => {
+  const source = readFileSync(join(root, 'tools/fast-check/check-fast.mjs'), 'utf8');
+  const fn = /^function redSection\([\s\S]*?\n\}\n/m.exec(source)?.[0];
+  assert.ok(fn, 'redSection found in check-fast.mjs');
+  return new Function(`${fn}\nreturn redSection;`)();
+})();
+
+// What vitest printed for in/hr-position-salary-access 9b7852b8 (2026-11-25), colour codes and all:
+// the failure's head, a DOM dump far longer than 80 lines, the frames, the source and the footer.
+const VITEST_RED = (() => {
+  const dom = [];
+  for (let i = 0; i < 70; i += 1) {
+    dom.push(`            ${E}[33mclass${E}[39m=${E}[32m"flex shrink-0 gap-0.5"${E}[39m`);
+    dom.push(`          ${E}[36m<button${E}[39m`);
+    dom.push(`          ${E}[36m>${E}[39m`);
+  }
+  return [
+    ` ${E}[2mRUN${E}[22m  v5.0.3 /home/u/bto-work/in-x/apps/web`,
+    '',
+    ` ${E}[31m×${E}[39m employee page > leads the old addresses to the list and the employee ${E}[33m5012${E}[2mms${E}[22m${E}[39m`,
+    '',
+    `${E}[31m⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯${E}[39m`,
+    '',
+    ` ${E}[31mFAIL${E}[39m  src/features/hr/employee-page.test.tsx > employee page > leads the old addresses to the list and the employee`,
+    `${E}[31mTestingLibraryElementError: Unable to find an accessible element with the role "heading" and name "Дорж Бат"${E}[39m`,
+    '',
+    'Ignored nodes: comments, script, style',
+    `${E}[36m<body${E}[39m`,
+    ...dom,
+    '            ...',
+    `${E}[90m ${E}[2m❯${E}[22m waitForWrapper ../../node_modules/@testing-library/dom/dist/wait-for.js:${E}[2m163:27${E}[22m${E}[39m`,
+    `${E}[90m ${E}[2m❯${E}[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:${E}[2m86:33${E}[22m${E}[39m`,
+    `${E}[36m ${E}[2m❯${E}[22m src/features/hr/employee-page.test.tsx:${E}[2m164:25${E}[22m${E}[39m`,
+    `    ${E}[90m162|${E}[39m     const { router } = renderApp('/users/7', signedIn(ADMIN_ME));`,
+    `    ${E}[90m163|${E}[39m     await waitFor(() => expect(router.state.location.pathname).toBe('/users/7'));`,
+    `    ${E}[90m164|${E}[39m     expect(await screen.findByRole('heading', { name: 'Дорж Бат' })).toBeTruthy();`,
+    `    ${E}[90m   |${E}[39m                         ${E}[31m^${E}[39m`,
+    `    ${E}[90m165|${E}[39m   });`,
+    `    ${E}[90m166|${E}[39m`,
+    '',
+    `${E}[31m${E}[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯${E}[22m${E}[39m`,
+    '',
+    `${E}[2m Test Files ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[2m | ${E}[22m${E}[1m${E}[32m2 passed${E}[39m${E}[22m${E}[90m (3)${E}[39m`,
+    `${E}[2m      Tests ${E}[22m ${E}[1m${E}[31m1 failed${E}[39m${E}[22m${E}[2m | ${E}[22m${E}[1m${E}[32m26 passed${E}[39m${E}[22m${E}[90m (27)${E}[39m`,
+    `${E}[2m   Start at ${E}[22m 13:52:34`,
+    `${E}[2m   Duration ${E}[22m 47.95s${E}[2m (tests 55%, transform 29%)${E}[22m`,
+    '',
+    `${E}[2m  Transform ${E}[22m ${E}[33mtransforming modules took 30.04s${E}[39m`,
+    `${E}[2m            ${E}[22m ${E}[2mpersist transforms across runs with ${E}[22m${E}[33mfsModuleCache: true${E}[39m`,
+    `${E}[2m            ${E}[22m ${E}[2mlearn more: https://vitest.dev/guide/improving-performance${E}[22m`,
+  ].join('\n');
+})();
+const TEST_NAME = 'leads the old addresses to the list and the employee';
+
+test("check-fast: a red step's section keeps the failures' heads above its last 80 lines, bounded", () => {
+  const lines = VITEST_RED.split('\n');
+  const section = redSection(VITEST_RED);
+  assert.ok(section.length <= 120, String(section.length));
+  // The tail as before.
+  assert.deepEqual(section.slice(-80), lines.slice(-80));
+  const heads = section.slice(0, -81).join('\n');
+  assert.ok(heads.includes(`employee page > ${TEST_NAME}`));
+  assert.ok(
+    heads.includes(`src/features/hr/employee-page.test.tsx > employee page > ${TEST_NAME}`),
+  );
+  assert.ok(heads.includes('TestingLibraryElementError: Unable to find an accessible element'));
+  assert.doesNotMatch(heads, /<button|<body|class=|Ignored nodes|RUN/);
+  assert.match(
+    section.at(-81),
+    /^\.\.\. \(\d+ more lines of output; their failures' heads above\)$/,
+  );
+  // Output that fits, or has no head above its tail, is printed as before.
+  assert.deepEqual(redSection('a\nb\n'), ['a', 'b']);
+  const plain = Array.from({ length: 200 }, (_, i) => `line ${i}`).join('\n');
+  assert.deepEqual(redSection(plain), plain.split('\n').slice(-80));
+  // jest: «● suite › test» and its message; a hundred failures stay within 120 lines.
+  const jest = ['FAIL src/modules/sales/totals.spec.ts'];
+  for (let i = 0; i < 100; i += 1)
+    jest.push(
+      `  ● sales totals › case ${i}`,
+      '',
+      '    expect(received).toBe(expected) // Object.is equality',
+      '',
+      '    Expected: "1.10"',
+      '    Received: "1.1"',
+      ...Array.from({ length: 10 }, (_, k) => `      at frame ${k} (src/a.ts:${k}:1)`),
+    );
+  const jestSection = redSection(jest.join('\n'));
+  assert.ok(jestSection.length <= 120, String(jestSection.length));
+  assert.deepEqual(jestSection.slice(0, 5), [
+    'FAIL src/modules/sales/totals.spec.ts',
+    '  ● sales totals › case 0',
+    '    expect(received).toBe(expected) // Object.is equality',
+    '    Expected: "1.10"',
+    '    Received: "1.1"',
+  ]);
+  assert.ok(!jestSection.slice(0, -81).some((line) => line.includes(' at frame ')));
+});
+
+test('digest: a red vitest step names the test, its error, file:line, the source lines and the totals, without the DOM or the footer', () => {
+  // As check-fast.mjs prints it: the step's line, then its section (redSection) of the real output.
+  const log = steps(
+    'ok      9.1s  build packages',
+    'ok      0.4s  i18n keys',
+    'FAIL   49.4s  web tests (3)',
+    'ok    111.6s  web types',
+    '',
+    '--- web tests (3) ---',
+    ...redSection(VITEST_RED),
+    '',
+    RED_END,
+  );
+  const digest = digestOf(log);
+  assert.match(digest, /^web tests \(3\):\n/);
+  assert.ok(
+    digest.includes(
+      `FAIL apps/web/src/features/hr/employee-page.test.tsx > employee page > ${TEST_NAME}`,
+    ),
+  );
+  assert.ok(digest.includes(TEST_NAME));
+  assert.match(digest, /TestingLibraryElementError: Unable to find an accessible element/);
+  assert.match(digest, /at apps\/web\/src\/features\/hr\/employee-page\.test\.tsx:164:25/);
+  assert.ok(digest.includes('src/features/hr/employee-page.test.tsx:164'));
+  assert.match(digest, /162\|.*\n.*163\|.*\n.*164\|.*\n.*\|\s+\^/);
+  assert.doesNotMatch(digest, /165\||node_modules/);
+  assert.match(digest, /Test Files {2}1 failed \| 2 passed \(3\)/);
+  assert.match(digest, /Tests {2}1 failed \| 26 passed \(27\)/);
+  assert.doesNotMatch(
+    digest,
+    /persist transforms|fsModuleCache|Duration|Start at|<button|class=|Ignored nodes|more lines of output|\/home\//,
+  );
+  assert.ok(!digest.includes(E), 'no ESC character');
+  assert.ok(digest.length <= 1200);
+});
+
+test('digest: a red jest step names the test, the message and its first frame in the repository', () => {
+  const log = steps(
+    'FAIL    8.0s  api tests (1)',
+    '',
+    '--- api tests (1) ---',
+    `${E}[1m${E}[31mFAIL${E}[39m${E}[22m src/modules/sales/totals.spec.ts`,
+    '  ● sales totals › rounds the VAT per line',
+    '',
+    '    expect(received).toBe(expected) // Object.is equality',
+    '',
+    '    Expected: "1.10"',
+    '    Received: "1.1"',
+    '',
+    '      10 |   it("rounds the VAT per line", () => {',
+    '    > 11 |     expect(vat("11")).toBe("1.10");',
+    '         |                       ^',
+    '      12 |   });',
+    '',
+    '      at Object.<anonymous> (src/modules/sales/totals.spec.ts:11:23)',
+    '      at Promise.then.completed (../../node_modules/jest-circus/build/utils.js:298:28)',
+    '',
+    'Test Suites: 1 failed, 1 total',
+    'Tests:       1 failed, 4 passed, 5 total',
+    'Time:        3.2 s',
+    'Ran all test suites within paths "src/modules/sales/totals.spec.ts".',
+    '',
+    RED_END,
+  );
+  const digest = digestOf(log);
+  assert.match(digest, /^api tests \(1\):/);
+  assert.match(digest, /FAIL apps\/api\/src\/modules\/sales\/totals\.spec\.ts/);
+  assert.match(digest, /● sales totals › rounds the VAT per line/);
+  assert.match(digest, /expect\(received\)\.toBe\(expected\)/);
+  assert.match(digest, /Expected: "1\.10"/);
+  assert.match(digest, /Received: "1\.1"/);
+  assert.match(digest, /> 11 \|/);
+  assert.match(digest, /at apps\/api\/src\/modules\/sales\/totals\.spec\.ts:11:23/);
+  assert.match(digest, /Tests: {2}1 failed, 4 passed, 5 total/);
+  assert.doesNotMatch(digest, /jest-circus|Ran all test suites|Time:/);
+});
+
+test('digest: a red tsc step gives its first errors as file:line, then how many more', () => {
+  const errors = [];
+  for (let i = 1; i <= 7; i += 1)
+    errors.push(
+      `src/features/hr/position-kit.tsx(${i * 10},5): error TS2322: Type 'string' is not assignable to type 'number'.`,
+    );
+  const log = steps(
+    'FAIL   30.1s  web types',
+    'FAIL    1.0s  api types',
+    '',
+    '--- web types ---',
+    ...errors,
+    "  The expected type comes from property 'n' which is declared here",
+    '',
+    '--- api types ---',
+    "/home/u/bto-work/in-x/apps/api/src/modules/hr/a.ts(3,1): error TS2304: Cannot find name 'x'.",
+    '',
+    RED_END,
+  );
+  const digest = digestOf(log);
+  assert.match(
+    digest,
+    /web types:\n {2}apps\/web\/src\/features\/hr\/position-kit\.tsx:10:5 TS2322: Type 'string'/,
+  );
+  assert.match(digest, /position-kit\.tsx:50:5 TS2322/);
+  assert.doesNotMatch(digest, /position-kit\.tsx:60:5/);
+  assert.match(digest, /… \(\+2 more type errors\)/);
+  assert.match(
+    digest,
+    /api types:\n {2}apps\/api\/src\/modules\/hr\/a\.ts:3:1 TS2304: Cannot find name 'x'\./,
+  );
+  assert.doesNotMatch(digest, /\/home\/|expected type comes from/);
+});
+
+test('digest: a red eslint step names the file, line and rule; prettier names its files', () => {
+  const log = steps(
+    'FAIL    9.0s  eslint (changed files)',
+    'FAIL    1.0s  prettier (changed files)',
+    '',
+    '--- eslint (changed files) ---',
+    '',
+    '/home/u/bto-work/in-x/apps/web/src/features/hr/positions-page.tsx',
+    '  12:7   error  Literal Cyrillic is not allowed in .tsx: use an i18n key  no-restricted-syntax',
+    '  40:1   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any',
+    '',
+    '/home/u/bto-work/in-x/apps/api/src/modules/hr/services/positions.service.ts',
+    '  88:20  error  Number( is banned on NUMERIC values  no-restricted-globals',
+    '',
+    '✖ 3 problems (3 errors, 0 warnings)',
+    '',
+    '--- prettier (changed files) ---',
+    'Checking formatting...',
+    '[warn] apps/web/src/features/hr/positions-page.tsx',
+    '[warn] docs/modules/hr.md',
+    '[warn] Code style issues found in 2 files. Run Prettier with --write to fix.',
+    '',
+    RED_END,
+  );
+  const digest = digestOf(log);
+  assert.match(
+    digest,
+    /apps\/web\/src\/features\/hr\/positions-page\.tsx:12:7 error Literal Cyrillic.* {2}no-restricted-syntax/,
+  );
+  assert.match(digest, /positions-page\.tsx:40:1 error Unexpected any/);
+  assert.match(
+    digest,
+    /apps\/api\/src\/modules\/hr\/services\/positions\.service\.ts:88:20 error Number\(/,
+  );
+  assert.match(digest, /✖ 3 problems \(3 errors, 0 warnings\)/);
+  assert.match(
+    digest,
+    /prettier \(changed files\):\n {2}not formatted \(prettier --write\):\n {4}apps\/web\/src\/features\/hr\/positions-page\.tsx\n {4}docs\/modules\/hr\.md/,
+  );
+  assert.doesNotMatch(digest, /\/home\/|Code style issues|Checking formatting/);
+});
+
+test("digest: a step nothing is recognised in gets its last lines, never the runners' footers", () => {
+  const log = steps(
+    'FAIL    2.0s  i18n keys',
+    'FAIL    3.0s  staff app tests (1)',
+    '',
+    '--- i18n keys ---',
+    'mn.json has no such key (2):',
+    '  apps/web/src/features/hr/positions-page.tsx:12  hr.positions.title',
+    '  apps/mobile/app/(tabs)/stock.tsx:40  stock.count.*  (no such branch)',
+    '',
+    '--- staff app tests (1) ---',
+    'something went badly wrong while starting the worker',
+    'the worker exited with code 139',
+    `${E}[2m Test Files ${E}[22m no tests`,
+    `${E}[2m   Duration ${E}[22m 1.2s`,
+    `${E}[2m            ${E}[22m ${E}[2mpersist transforms across runs with ${E}[22m${E}[33mfsModuleCache: true${E}[39m`,
+    `${E}[2m            ${E}[22m ${E}[2mlearn more: https://vitest.dev/guide/improving-performance${E}[22m`,
+    '',
+    RED_END,
+  );
+  const digest = digestOf(log);
+  assert.match(
+    digest,
+    /i18n keys:\n {2}mn\.json has no such key \(2\):\n {4}apps\/web\/src\/features\/hr\/positions-page\.tsx:12 {2}hr\.positions\.title/,
+  );
+  assert.match(
+    digest,
+    /staff app tests \(1\):\n {2}something went badly wrong while starting the worker\n {2}the worker exited with code 139\n/,
+  );
+  assert.doesNotMatch(digest, /persist transforms|learn more|Duration|check:fast RED/);
+  // A log check-fast never finished: its last lines, still without a footer.
+  const crashed = digestOf(
+    "Error: Cannot find module '/home/u/bto-work/in-x/node_modules/vitest/vitest.mjs'\n",
+  );
+  assert.match(crashed, /^check:fast:\n +Error: Cannot find module '\(a local path\)/);
+});
+
+test('digest: a line that looks like it carries a secret is dropped; a long digest is cut at a line', () => {
+  const log = steps(
+    'FAIL    3.0s  shared tests (1)',
+    '',
+    '--- shared tests (1) ---',
+    'connecting with DATABASE_URL=postgres://app:PlantedPw-9876@127.0.0.1:15432/tugeel',
+    'header Authorization: Bearer abc.def.ghi',
+    'login with password=hunter2-please',
+    '{ token: "eyJhbGciOi.eyJzdWIiOi.c2lnbmF0dXJl" }',
+    'session secret: s3cr3t-value-123',
+    'cloned with ghp_abcdefghijklmnop0123',
+    'apiKey=AKIA1234',
+    'the worker could not start',
+    '× auth > refreshes the token before it ends',
+    'FAIL  src/a.test.ts > menu > keeps the secret menu hidden',
+    'Error: the token was not refreshed',
+    '',
+    RED_END,
+  );
+  const digest = digestOf(log);
+  // Lines that only name a token or a secret stay.
+  assert.match(digest, /refreshes the token before it ends/);
+  assert.match(digest, /keeps the secret menu hidden/);
+  assert.match(digest, /Error: the token was not refreshed/);
+  assert.doesNotMatch(digest, /PlantedPw|postgres:|Bearer|hunter2|password|eyJ|s3cr3t|ghp_|AKIA/i);
+  // The review of 2026-11-25: each of these came through the first rule unchanged. Alone in a step
+  // (the fallback shows its last lines) and as an assertion's Expected/Received lines.
+  const leaks = [
+    'Authorization: Basic dXNlcjpwYXNz',
+    '"password": "hunter2hunter2"',
+    '+   "token": "abcdefghijkl"',
+    'SMTP_PASS=abc',
+    'ENCRYPTION_KEY=0123456789abcdef',
+    'STRIPE_KEY=abcdef',
+    'DB_URL=file:/home/u/bto-work/in-x/dev.db',
+  ];
+  for (const leak of leaks) {
+    const alone = digestOf(
+      steps(
+        'FAIL    1.0s  shared tests (1)',
+        '',
+        '--- shared tests (1) ---',
+        'the step before',
+        leak,
+        '',
+        RED_END,
+      ),
+    );
+    assert.match(alone, /the step before/, leak);
+    assert.ok(!alone.includes(leak.replace(/^\+ +/, '')), `${leak} → ${alone}`);
+  }
+  const diff = digestOf(
+    steps(
+      'FAIL    1.0s  web tests (1)',
+      '',
+      '--- web tests (1) ---',
+      ' FAIL  src/settings.test.ts > settings > reads the mail settings',
+      'AssertionError: expected { …(2) } to deeply equal { …(2) }',
+      '- Expected',
+      '+ Received',
+      '-   "password": "hunter2hunter2",',
+      '+   "token": "abcdefghijkl"',
+      '-   "count": 2',
+      '',
+      RED_END,
+    ),
+  );
+  assert.match(diff, /AssertionError: expected/);
+  assert.match(diff, /- {3}"count": 2|- Expected/);
+  assert.doesNotMatch(diff, /hunter2|abcdefghijkl/);
+  // Names that only name one stay, and so does a path with «key» or «session» in it.
+  const names = digestOf(
+    steps(
+      'FAIL    1.0s  web types',
+      '',
+      '--- web types ---',
+      "src/features/auth/session-key.tsx(4,2): error TS2322: Type 'string' is not assignable to type 'number'.",
+      '',
+      RED_END,
+    ),
+  );
+  assert.match(names, /apps\/web\/src\/features\/auth\/session-key\.tsx:4:2 TS2322/);
+  // A line of binary garbage (U+FFFD) is dropped.
+  assert.doesNotMatch(
+    digestOf(
+      steps(
+        'FAIL    1.0s  i18n keys',
+        '',
+        '--- i18n keys ---',
+        'plain text',
+        'bad \uFFFD\uFFFD bytes',
+        '',
+        RED_END,
+      ),
+    ),
+    /bad/,
+  );
+  const many = [];
+  for (let i = 1; i <= 40; i += 1) {
+    many.push(`FAIL    1.0s  step ${i} types`);
+  }
+  const sections = [];
+  for (let i = 1; i <= 40; i += 1) {
+    sections.push(
+      `--- step ${i} types ---`,
+      `src/f${i}.ts(1,1): error TS2322: Type 'string' is not assignable to type 'number' in a long message.`,
+    );
+  }
+  const cut = digestOf(steps(...many, '', ...sections, '', RED_END), 1200);
+  assert.ok(cut.length <= 1200, String(cut.length));
+  const lines = cut.trimEnd().split('\n');
+  assert.match(lines.at(-1), /^… \(\+\d+ more\)$/);
+  for (const line of lines.slice(0, -1))
+    assert.match(line, /^(step \d+ types:| {2}src\/f\d+\.ts:1:1 TS2322: .*\.)$/);
+});
+
+test('inbox: a red GUARDED check is REFUSED and its digest is told on the board and in the commit comment', () => {
+  const inbox = makeInbox({ board: true });
+  try {
+    writeFileSync(join(inbox.dir, 'red'), '');
+    const head = inbox.push('red-rule', {
+      'apps/api/src/modules/sales/s.ts': 'export const s = 7;\n',
+    });
+    const tick = inbox.run('tick');
+    assert.equal(tick.status, 0, tick.stderr);
+    const item = inbox.item('red-rule');
+    assert.equal(item.state, 'REFUSED');
+    assert.equal(item.class, 'guarded');
+    assert.equal(item.reason_mn, 'pnpm check:fast улаан');
+    assert.match(
+      item.reason,
+      /^pnpm check:fast is red: web types: apps\/web\/src\/a\.tsx:1:1 TS2322: wrong/,
+    );
+    // The full output stays in the attempt's log on this PC; the digest beside it.
+    const log = readFileSync(
+      join(inbox.books, `inbox/logs/red-rule-${head.slice(0, 8)}.log`),
+      'utf8',
+    );
+    assert.match(log, /\/home\/u\/bto-work\/in-x\/apps\/web\/src\/a\.tsx\(1,1\): error TS2322/);
+    assert.ok(existsSync(join(inbox.books, `inbox/logs/red-rule-${head.slice(0, 8)}.digest`)));
+    const mail = JSON.parse(inbox.codex('inbox', '--json').stdout);
+    assert.equal(mail.length, 1);
+    assert.match(
+      mail[0].text,
+      /^inbox gate: in\/red-rule @ [0-9a-f]{8}: REFUSED: pnpm check:fast is red \(web types\)/,
+    );
+    assert.match(
+      mail[0].text,
+      /What failed in pnpm check:fast:\nweb types:\n {2}apps\/web\/src\/a\.tsx:1:1 TS2322: wrong/,
+    );
+    assert.ok(mail[0].text.length <= 1600, String(mail[0].text.length));
+    const comment = inbox.gh().find((line) => line.includes(`commits/${head}/comments`));
+    assert.ok(comment.includes('What failed in `pnpm check:fast`'));
+    assert.ok(comment.includes('apps/web/src/a.tsx:1:1 TS2322: wrong'));
+    for (const text of [mail[0].text, ...inbox.gh()])
+      assert.doesNotMatch(text, /\/home\/|PlantedPw|postgres:|Zx9-planted-value-77/);
+    assert.doesNotMatch(item.reason, /Zx9-planted-value-77/);
+    // Another refusal of a later head carries no digest of this one.
+    rmSync(join(inbox.dir, 'red'));
+    const next = inbox.push('red-rule', { 'tools/brain/x.sh': 'x\n' }, 'rails', { onTop: true });
+    inbox.run('tick');
+    assert.equal(inbox.item('red-rule').digest ?? '', '');
+    const later = inbox.gh().find((line) => line.includes(`commits/${next}/comments`));
+    assert.ok(later && !later.includes('What failed'));
   } finally {
     rmSync(inbox.dir, { recursive: true, force: true });
   }

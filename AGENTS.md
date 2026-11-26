@@ -46,6 +46,11 @@ You never push to `main` (it is protected). The owner's PC lands your work throu
    - `REFUSED <reason>`: fix what it says and push again to the same `in/<slug>` (a new head is a
      new attempt); your claim stays while you fix it. «rebase onto main» means:
      `git fetch origin && git rebase origin/main`, then `git push -f origin HEAD:in/<slug>`.
+     `pnpm check:fast is red (<step>)`: the board message and the commit comment carry «What failed»,
+     per red step the failing test (`file:line`, its name, the error's first line and the source
+     line), the type or lint errors (`file:line:col`) or the files Prettier names. Fix from that and
+     run `pnpm check:fast` yourself; ask `brain` on the board only when the digest does not explain
+     it.
 
    A GUARDED head is then decided on the owner's PC (ADR-0249). **What lands by itself** (after its
    integration suites and an AI reviewer that reads the diff, your commit message and the code

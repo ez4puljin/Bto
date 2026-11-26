@@ -221,7 +221,7 @@ board_release() {
 
 # A REFUSED or WAITING-REVIEW result, said to the branch's side on the board once (GitHub gets it too).
 board_tell() {
-  local item=$1 state name
+  local item=$1 state name text
   state=$(get "$item" state)
   case "$state" in
     REFUSED | WAITING-REVIEW) ;;
@@ -232,13 +232,34 @@ board_tell() {
   board_on && ! board_down || return 0
   name=$(get "$item" branch)
   name=${name#in/}
-  if BOARD_TIMEOUT=5 board say "$SIDE" --slug "$name" -- "inbox gate: in/$name @ $(get "$item" head | cut -c1-8): $SHORT$(findings_of "$item")" \
-    >/dev/null 2>>"$ISTATE/board.log"; then
+  text="inbox gate: in/$name @ $(get "$item" head | cut -c1-8): $SHORT$(findings_of "$item")$(digest_of "$item")"
+  if BOARD_TIMEOUT=5 board say "$SIDE" --slug "$name" -- "$text" >/dev/null 2>>"$ISTATE/board.log"; then
     set_key "$item" told "$state"
   else
     echo "  warning: the team board was not reached; the result is on GitHub only" >&2
     set_key "$item" told "$state"
   fi
+  # A red check is the brain's to know too: the same digest, so nobody here reads the log for them.
+  [ -z "$(digest_of "$item")" ] || board_brain "$name" "$text"
+}
+
+# A red check's digest of a refused head (red_digest), as lines after a newline (nothing otherwise).
+digest_of() {
+  local file
+  [ "$(get "$1" state)" = REFUSED ] || return 0
+  file=$(get "$1" digest)
+  [ -n "$file" ] && [ -s "$file" ] || return 0
+  printf '\nWhat failed in pnpm check:fast:\n'
+  head -c 1300 "$file"
+}
+
+# board_brain <slug> <text>: said to the brain as «gate» (the board takes no message to oneself), only
+# on a PC that joined the board as brain (a first --as would otherwise become its name). Never a
+# reason to stop.
+board_brain() {
+  [ -f "$BOARD_STATE/me" ] || return 0
+  PATH="$HOME/.local/opt/node/bin:$PATH" node "$BRAIN_DIR/board.mjs" --as gate --state "$BOARD_STATE" --timeout 5 \
+    say brain --slug "$1" -- "$2" >/dev/null 2>>"$ISTATE/board.log" || true
 }
 
 # The automatic review's findings of a refused head, as lines after a newline (nothing otherwise).
@@ -261,10 +282,7 @@ board_review() {
   name=${name#in/}
   BOARD_TIMEOUT=5 board say "$SIDE" --slug "$name" -- "$text" >/dev/null 2>>"$ISTATE/board.log" ||
     echo "  warning: the team board was not reached; the result is on GitHub only" >&2
-  # Only on a PC that joined the board as brain: a first --as would otherwise become its name.
-  [ -f "$BOARD_STATE/me" ] || return 0
-  PATH="$HOME/.local/opt/node/bin:$PATH" node "$BRAIN_DIR/board.mjs" --as gate --state "$BOARD_STATE" --timeout 5 \
-    say brain --slug "$name" -- "$text" >/dev/null 2>>"$ISTATE/board.log" || true
+  board_brain "$name" "$text"
 }
 
 # --- writing back to GitHub ---------------------------------------------------------------------
@@ -319,6 +337,15 @@ words_of() {
   SHORT=${SHORT:0:140}
 }
 
+# The digest of a red check as a block of the commit comment (an empty line otherwise); a fence in its
+# text cannot end the block.
+digest_block() {
+  local text
+  text=$(digest_of "$1" | sed '1d' | sed '1d' | sed 's/~~~/~ ~ ~/g')
+  [ -n "$text" ] || return 0
+  printf '\n**What failed in `pnpm check:fast`** (fix from this; the full log stays on the Bto PC):\n\n~~~text\n%s\n~~~\n' "$text"
+}
+
 # report <item>: the result as a commit status and a commit comment on the head, once per state.
 report() {
   local item=$1 head state repo body tries
@@ -339,8 +366,8 @@ report() {
     set_key "$item" reported "$state"
     return 0
   fi
-  body=$(printf '**Bto inbox gate: %s**\n\n%s\n\nМонгол: %s\n\n<sub>%s @ %s · tools/brain/inbox.sh (ADR-0242)</sub>\n' \
-    "$state" "$EN" "$MN" "$(get "$item" branch)" "${head:0:8}")
+  body=$(printf '**Bto inbox gate: %s**\n\n%s\n%s\nМонгол: %s\n\n<sub>%s @ %s · tools/brain/inbox.sh (ADR-0242)</sub>\n' \
+    "$state" "$EN" "$(digest_block "$item")" "$MN" "$(get "$item" branch)" "${head:0:8}")
   if timeout 60 "$GH" api -X POST "repos/$repo/statuses/$head" -f state="$GH_STATE" -f context="$CONTEXT" \
     -f description="$SHORT" >/dev/null 2>>"$ISTATE/gh.log" &&
     timeout 60 "$GH" api -X POST "repos/$repo/commits/$head/comments" -f body="$body" >/dev/null 2>>"$ISTATE/gh.log"; then
@@ -370,10 +397,12 @@ delete_branch() {
 
 # --- one attempt ---------------------------------------------------------------------------------
 
-# refuse <item> <reason> <Mongolian line> [<public reason>]
+# refuse <item> <reason> <Mongolian line> [<public reason>] [<digest file>]: the digest (a red check's,
+# red_digest) goes to the branch's side with the result; every other refusal clears it.
 refuse() {
   local item=$1 reason=$2 reason_mn=$3
   set_key "$item" reason_mn "$reason_mn"
+  set_key "$item" digest "${5:-}"
   set_state "$item" REFUSED "$reason" "${4:-}"
   echo "  REFUSED: $reason"
 }
@@ -392,6 +421,290 @@ failed_steps() {
   local steps
   steps=$(sed -nE 's/^FAIL +[0-9.]+s +(.*)$/\1/p' "$1" 2>/dev/null | head -n 5 | tr '\n' ',' | sed 's/,$//; s/,/, /g')
   [ -z "$steps" ] || printf ' (%s)' "$steps"
+}
+
+# check_digest <check:fast log> [<at most so many characters>]: what failed, short, for the branch's
+# side (the board, the commit comment): per red step its failing tests (vitest «FAIL a > b», jest
+# «● a › b»), the first frame inside the repository as file:line:col with at most the three numbered
+# source lines before the «^», the error's first line, the totals; tsc's and eslint's first errors;
+# the files prettier names; i18n's missing keys. A step nothing is recognised in gets the last lines
+# of its section, without the runners' footers or a DOM dump. Pure text: colour codes go first, a
+# local path becomes repository-relative (or «(a local path)»), a line that looks like it carries a
+# secret is dropped; cut at a line with «… (+N more)». The repository is public.
+check_digest() {
+  node - "$1" "${2:-1200}" <<'JS'
+  const fs = require('fs');
+  const posix = require('path').posix;
+  const [file, maxArg] = process.argv.slice(2);
+  const MAX = Math.max(200, Number(maxArg) || 1200);
+  let text = '';
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {}
+  const ESC = String.fromCharCode(27);
+  const clean = (s) =>
+    s
+      .replace(new RegExp(`${ESC}\\[[0-9;?]*[ -/]*[@-~]`, 'g'), '')
+      .replace(new RegExp(`${ESC}\\][^\\u0007${ESC}]*(?:\\u0007|${ESC}\\\\)?`, 'g'), '')
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '');
+  const lines = text.split('\n').map(clean);
+  // A line is dropped when it carries a value, not when it merely names one: «refreshes the token»
+  // stays. A key that names a secret (…pass…, pwd, secret, token, key, credential, auth, cookie,
+  // session, with any prefix or suffix: SMTP_PASS, ENCRYPTION_KEY) followed by «=» or, quoted or
+  // not, by «:» (never a path's «file.ts:12:5», never «KeyError:»); an Authorization or Cookie header
+  // whatever its value; an ALL_CAPS NAME=value of six or more characters (a test's text rarely looks
+  // like that); a bearer value, a URL with a password or of a database, a service token, a JWT, a
+  // private key. The values themselves are removed after this, by review.mjs scrub (red_digest).
+  const KEY = String.raw`(?<![\w./-])["']?[A-Za-z0-9_-]*(?:pass|pwd|secret|token|key|credential|auth|cookie|session)[A-Za-z0-9_-]*(?<!Error|Exception)["']?`;
+  const SECRET = new RegExp(
+    [
+      String.raw`${KEY}\s*=\s*\S`,
+      String.raw`${KEY}\s*:(?!\d+(?::\d+)?(?:\s|$))\s*\S`,
+      String.raw`\b(?:proxy-)?authorization\s*:|\b(?:set-)?cookie\s*:`,
+      String.raw`\bbearer\s+\S`,
+      String.raw`\b[a-z][a-z0-9+.-]{1,20}:\/\/[^\s/:@]+:[^\s/@]+@`,
+      String.raw`\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/`,
+      String.raw`\b(?:ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9]{8,}|\bgithub_pat_\w{8,}|\bxox[abpr]-[\w-]{8,}|\bAKIA[A-Z0-9]{12,}|\bsk-[A-Za-z0-9_-]{16,}`,
+      String.raw`\beyJ[\w-]{5,}\.[\w-]{5,}\.[\w-]{5,}|\b[\w-]{16,}\.[\w-]{16,}\.[\w-]{16,}\b`,
+      String.raw`-----BEGIN [A-Z ]*PRIVATE KEY`,
+    ].join('|'),
+    'i',
+  );
+  // The ALL_CAPS rule, case-sensitive (under the «i» above every «name=value» would be one).
+  const ENV_STYLE = /(?<![\w.-])[A-Z][A-Z0-9_]+\s*=\s*['"]?[^\s'"]{6,}/;
+  // Values of this process's environment whose names name a secret (or a URL, a DSN).
+  const ENV_VALUES = Object.entries(process.env)
+    .filter(([k, v]) => /pass|pwd|secret|token|key|credential|auth|cookie|session|url|dsn/i.test(k) && v && v.length >= 8)
+    .map(([, v]) => v);
+  const secret = (line) =>
+    SECRET.test(line) || ENV_STYLE.test(line) || ENV_VALUES.some((v) => line.includes(v));
+  const REPO = '(?:apps|packages|tools|docs|deploy|ci|scripts)/';
+  const local = (s) =>
+    s
+      .replace(new RegExp(`(^|[\\s('"=\`])/(?:[^\\s/:()'"\`]+/)+?(${REPO})`, 'g'), '$1$2')
+      .replace(/(^|[\s('"=`])\/(?:home|root|Users|tmp|var|srv|mnt|opt|media|run)\/[^\s'"`)]*/g, '$1(a local path)');
+  const cut = (s, n = 200) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+  const DIRS = [
+    [/^web /, 'apps/web'],
+    [/^staff app /, 'apps/mobile'],
+    [/^shared /, 'packages/shared'],
+    [/^api-client /, 'packages/api-client'],
+    [/^fin-contract /, 'packages/fin-contract'],
+    [/^api /, 'apps/api'],
+  ];
+  const dirOf = (name) => (DIRS.find(([re]) => re.test(name)) || [])[1] || '';
+  // A path as the repository names it, or null when it lies outside it (node_modules, node:, /).
+  const inRepo = (p, dir) => {
+    if (!p || /node_modules|^node:|^internal\/|^file:|^\(a local path\)/.test(p)) return null;
+    if (new RegExp(`^${REPO}`).test(p)) return p;
+    if (p.startsWith('/')) return null;
+    const joined = posix.normalize(dir ? `${dir}/${p}` : p);
+    return joined.startsWith('..') ? null : joined;
+  };
+  const FOOTER =
+    /^\.\.\. \(\d+ more lines of output|^(?:Start at|Duration|Transform|persist transforms|learn more|Snapshots|Time:|Ran all test suites|RUN\s|Test Files|Tests:?|Test Suites:|transforming modules|check:fast)\b|^[⎯─━=\-_~*\s]*(?:\[\d+\/\d+\])?[⎯─━=\-_~*\s]*$|^\[\d+\/\d+\]/;
+  const DOM = /^<\/?[A-Za-z][\w:.-]*|^\/?>$|^[\w:.@-]+=(?:"[^"]*"?|\{.*)$|^\.\.\.$/;
+
+  const failed = [];
+  for (const l of lines) {
+    const m = /^FAIL +[0-9.]+s +(.+?)\s*$/.exec(l);
+    if (m && !failed.includes(m[1])) failed.push(m[1]);
+  }
+  // The sections check-fast.mjs prints for its red steps («--- <step> ---»); build packages has none.
+  const sections = new Map();
+  let cur = null;
+  for (const l of lines) {
+    let m;
+    if ((m = /^--- (.+) ---$/.exec(l)) && failed.includes(m[1])) {
+      cur = m[1];
+      sections.set(cur, []);
+    } else if ((m = /^FAIL +[0-9.]+s +(build packages)\s*$/.exec(l))) {
+      cur = m[1];
+      sections.set(cur, []);
+    } else if (/^check:fast (?:RED|green) in /.test(l)) cur = null;
+    else if (cur) sections.get(cur).push(l);
+  }
+
+  function digestOf(name, body) {
+    const dir = dirOf(name);
+    const out = [];
+    const totals = [];
+    const seen = new Set();
+    const add = (s, list = out) => {
+      const line = cut(local(s.trimEnd()));
+      if (!line.trim() || line.includes('\uFFFD') || secret(line) || seen.has(line)) return;
+      seen.add(line);
+      list.push(line);
+    };
+    const tsc = [];
+    const eslint = [];
+    const prettier = [];
+    let eslintFile = null;
+    let frameWanted = true;
+    let codeWanted = true;
+    let errorWanted = true;
+    let code = [];
+    let follow = 0; // lines of a message to keep after an error or a jest test
+    let i18n = 0;
+    for (const raw of body) {
+      const l = raw.trim();
+      let m;
+      if (/^(?:>\s*)?\d+\s?\|/.test(l)) {
+        if (codeWanted) code.push(raw.trimEnd());
+        follow = 0;
+        continue;
+      }
+      if (/^\|\s*\^/.test(l)) {
+        if (codeWanted && code.length > 0) {
+          for (const c of code.slice(-3)) add(c);
+          add(raw.trimEnd());
+          codeWanted = false;
+        }
+        code = [];
+        continue;
+      }
+      code = [];
+      if (!l) continue;
+      if ((m = /^(?:FAIL|×|✗|✕)\s+(.+?)(?:\s+\d+(?:\.\d+)?\s*m?s)?(?:\s+\[.*\])?$/.exec(l)) && !/^\d/.test(m[1])) {
+        const [first, ...rest] = m[1].split(' ');
+        add(`FAIL ${inRepo(first, dir) || first}${rest.length ? ` ${rest.join(' ')}` : ''}`);
+        frameWanted = codeWanted = errorWanted = true;
+        follow = 0;
+        continue;
+      }
+      if ((m = /^● (.+)$/.exec(l)) && m[1] !== 'Console') {
+        add(`● ${m[1]}`);
+        frameWanted = codeWanted = errorWanted = true;
+        follow = 3;
+        continue;
+      }
+      if ((m = /^❯\s+(?:\S+\s+)?([^\s()]+):(\d+):(\d+)$/.exec(l)) || (m = /^at (?:.*?\()?([^\s()]+):(\d+):(\d+)\)?$/.exec(l))) {
+        follow = 0;
+        const p = inRepo(m[1], dir);
+        if (p && frameWanted) {
+          add(`  at ${p}:${m[2]}:${m[3]}`);
+          frameWanted = false;
+        }
+        continue;
+      }
+      if ((m = /^(.+?)\((\d+),(\d+)\): error (TS\d+): (.*)$/.exec(l))) {
+        tsc.push(`${inRepo(local(m[1]), dir) || local(m[1])}:${m[2]}:${m[3]} ${m[4]}: ${m[5]}`);
+        continue;
+      }
+      if ((m = /^(\d+):(\d+)\s+(error|warning)\s+(.+?)$/.exec(l)) && eslintFile) {
+        eslint.push(`${eslintFile}:${m[1]}:${m[2]} ${m[3]} ${m[4].replace(/\s{2,}/g, '  ')}`);
+        continue;
+      }
+      if (/^\S+\.(?:[cm]?[jt]sx?|json|md|css|html|ya?ml)$/.test(raw) && !raw.includes(' ')) {
+        eslintFile = inRepo(local(raw), '') || local(raw);
+        continue;
+      }
+      if (/^✖ \d+ problems?|^ESLint found too many/.test(l)) {
+        add(l, totals);
+        continue;
+      }
+      if ((m = /^\[warn\]\s+(\S+)$/.exec(l))) {
+        prettier.push(m[1]);
+        continue;
+      }
+      if (/^\[error\]\s+/.test(l)) {
+        add(l);
+        continue;
+      }
+      if (/^mn\.json has no such key/.test(l)) {
+        add(l);
+        i18n = 5;
+        continue;
+      }
+      if (i18n > 0 && /^\S+:\d+\s+\S/.test(l)) {
+        add(`  ${l}`);
+        i18n -= 1;
+        continue;
+      }
+      if ((m = /^(Test Files|Tests|Test Suites)(:?)\s+(.*\d+ (?:failed|passed).*)$/.exec(l))) {
+        add(`${m[1]}${m[2]}  ${m[3].replace(/\s{2,}/g, ' ')}`, totals);
+        continue;
+      }
+      if (
+        errorWanted &&
+        /^(?:[A-Z][\w.]*)?(?:Error|Exception)(?:\s*\[[^\]]*\])?:|^AssertionError\b|^Error: /.test(l)
+      ) {
+        add(`  ${l}`);
+        errorWanted = false;
+        follow = 4;
+        continue;
+      }
+      if (follow > 0) {
+        if (/^(?:[-+] |Expected|Received|expect\(|Error|Timeout|thrown|Number of calls)/.test(l) && !DOM.test(l)) add(`    ${l}`);
+        follow -= 1;
+      }
+    }
+    const some = (list, what, n = 5) => {
+      for (const s of list.slice(0, n)) add(s);
+      if (list.length > n) add(`… (+${list.length - n} more ${what})`);
+    };
+    some(tsc, 'type errors');
+    some(eslint, 'problems');
+    if (prettier.length > 0) {
+      add('not formatted (prettier --write):');
+      some(prettier.map((p) => `  ${inRepo(local(p), '') || local(p)}`), 'files', 8);
+    }
+    if (out.length === 0) {
+      const tail = body
+        .map((s) => s.trim())
+        .filter((s) => s && !FOOTER.test(s) && !DOM.test(s) && !/^\s*\d+\s?\|/.test(s));
+      for (const s of tail.slice(-6)) add(s);
+    }
+    for (const t of totals) out.push(t);
+    if (out.length === 0) out.push('(no output that can be shown: see the gate log on the Bto PC)');
+    return out;
+  }
+
+  const all = [];
+  if (failed.length === 0) {
+    all.push('check:fast:');
+    for (const s of digestOf('', lines)) all.push(`  ${s}`);
+  }
+  for (const name of failed) {
+    all.push(`${name}:`);
+    const mine = digestOf(name, sections.get(name) || []);
+    const keep = mine.slice(0, 14);
+    for (const s of keep) all.push(`  ${s}`);
+    if (mine.length > keep.length) all.push(`  … (+${mine.length - keep.length} more)`);
+  }
+  const shown = [];
+  let size = 0;
+  for (let i = 0; i < all.length; i++) {
+    const room = MAX - 20;
+    if (size + all[i].length + 1 > room) {
+      shown.push(`… (+${all.length - i} more)`);
+      break;
+    }
+    shown.push(all[i]);
+    size += all[i].length + 1;
+  }
+  process.stdout.write(`${shown.join('\n')}\n`);
+JS
+}
+
+# red_digest <item> <check:fast log> <copy>…: check_digest of a red check, then review.mjs scrub with
+# the .env values of each copy named (the check's own copy, and ~/bto-dev, where every copy's .env
+# comes from), the lines it removes dropped; kept beside the attempt's log for its report (also after
+# a restart); prints the file's name. Anything that fails gives the fixed text, never an unscrubbed
+# digest.
+red_digest() {
+  local item=$1 log=$2 file text copy
+  shift 2
+  file="$ISTATE/logs/$(basename "$item")-$(get "$item" head | cut -c1-8).digest"
+  text=$(check_digest "$log" 1200 2>/dev/null) || text=''
+  for copy in "$@"; do
+    [ -n "$text" ] || break
+    text=$(printf '%s\n' "$text" | node "$BRAIN_DIR/review.mjs" scrub --env-from "$copy" 2>/dev/null) || text=''
+  done
+  text=$(printf '%s\n' "$text" | grep -vF -- "$REMOVED_SECRET" || true)
+  [ -n "$text" ] || text="(the digest is unavailable: see the gate log on the Bto PC)"
+  printf '%s\n' "$text" >"$file"
+  echo "$file"
 }
 
 # Test hook (brain.test.mjs): the tick dies here, as a kill or a restart would stop it.
@@ -428,7 +741,7 @@ squash_into() {
 
 # land <item>: land.sh for its task; LANDED or REFUSED. Never pushes main itself.
 land_item() {
-  local item=$1 task out code sha live
+  local item=$1 task out code sha live digest
   task=$(get "$item" task)
   echo "  landing $task through land.sh"
   set_key "$item" phase land
@@ -467,9 +780,10 @@ land_item() {
       refuse "$item" "it conflicts with main: rebase onto main ($(printf '%s\n' "$out" | sed -nE 's/^CONFLICT: .*Files: (.*)$/\1/p' | head -c 300))" \
         "main-тай зөрчилдөж байна; main дээр rebase хийгээд" ;;
     4)
-      refuse "$item" "pnpm check:fast is red: $(tail -n 15 "$STATE/land-check.log" 2>/dev/null | tr '\n' ' ' | tr -s ' ' | tail -c 600)" \
+      digest=$(red_digest "$item" "$STATE/land-check.log" "$GATE" "$MAIN")
+      refuse "$item" "pnpm check:fast is red: $(tr '\n' ' ' <"$digest" | tr -s ' ' | head -c 600)" \
         "pnpm check:fast улаан" \
-        "pnpm check:fast is red$(failed_steps "$STATE/land-check.log"); details in the gate's log on the Bto PC" ;;
+        "pnpm check:fast is red$(failed_steps "$STATE/land-check.log"); what failed is in the commit comment and on the team board" "$digest" ;;
     *)
       refuse "$item" "the gate could not land it (land.sh exit $code): $(printf '%s\n' "$out" | tail -n 3 | tr '\n' ' ' | tail -c 300)" \
         "хаалга оруулж чадсангүй" \
@@ -480,7 +794,7 @@ land_item() {
 
 # check_item <item>: a GUARDED change is checked in its copy; green waits for the brain's review.
 check_item() {
-  local item=$1 task copy
+  local item=$1 task copy digest
   task=$(get "$item" task)
   copy="$WORK/$task"
   echo "  checking $task (pnpm check:fast)"
@@ -493,9 +807,10 @@ check_item() {
     echo "  WAITING-REVIEW: bash $BRAIN_DIR/inbox.sh approve $(get "$item" branch)"
   else
     cat "$LOG.check" >>"$LOG"
+    digest=$(red_digest "$item" "$LOG.check" "$copy" "$MAIN")
     drop_task "$task"
-    refuse "$item" "pnpm check:fast is red: $(tail -n 15 "$LOG.check" | tr '\n' ' ' | tr -s ' ' | tail -c 600)" "pnpm check:fast улаан" \
-      "pnpm check:fast is red$(failed_steps "$LOG.check"); details in the gate's log on the Bto PC"
+    refuse "$item" "pnpm check:fast is red: $(tr '\n' ' ' <"$digest" | tr -s ' ' | head -c 600)" "pnpm check:fast улаан" \
+      "pnpm check:fast is red$(failed_steps "$LOG.check"); what failed is in the commit comment and on the team board" "$digest"
     rm -f "$LOG.check"
   fi
 }
@@ -791,6 +1106,7 @@ reject_item() {
   local item=$1
   drop_task "$(get "$item" task)"
   set_key "$item" reason_mn "$3"
+  set_key "$item" digest ""
   set_state "$item" REFUSED "$2" "${4:-}"
   report "$item"
   echo "REFUSED $(get "$item" branch): $2"
@@ -1338,8 +1654,10 @@ case "$cmd" in
     withdraw_gone
     land_approved
     report_pending
-    # The last 50 attempts' logs.
-    find "$ISTATE/logs" -name '*.log' -printf '%T@ %p\n' | sort -rn | tail -n +51 | cut -d' ' -f2- | xargs -r rm -f
+    # The last 50 attempts' logs, and the last 50 red checks' digests.
+    for kind in log digest; do
+      find "$ISTATE/logs" -name "*.$kind" -printf '%T@ %p\n' | sort -rn | tail -n +51 | cut -d' ' -f2- | xargs -r rm -f
+    done
     ;;
   approve)
     item_of "${1:-}"
