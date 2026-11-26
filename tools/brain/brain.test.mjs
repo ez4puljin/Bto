@@ -2815,6 +2815,50 @@ test('review: a head the allow-list does not cover never reaches the suites or t
   }
 });
 
+test("review: auto all (ADR-0250) takes the owner's areas with the stricter model; a weakened test still waits", () => {
+  const inbox = makeInbox();
+  try {
+    assert.match(inbox.run('auto', 'all').stdout, /owner's areas too/);
+    assert.match(inbox.run('auto', 'status').stdout, /scope: all/);
+    inbox.push('schema-add', {
+      'apps/api/src/modules/reporting/r.ts': 'export const r = 7;\n',
+      'apps/api/src/db/migrations/0300_add.sql': 'ALTER TABLE x ADD COLUMN y text;\n',
+    });
+    inbox.run('tick');
+    assert.equal(inbox.item('schema-add').state, 'WAITING-REVIEW');
+    assert.match(inbox.run('review', '--dry-run').stdout, /reviewed here, auto all/);
+    const pass = inbox.run('review');
+    assert.equal(pass.status, 0, pass.stderr + pass.stdout);
+    assert.match(pass.stdout, /the owner's areas \(migration[^)]*\): reviewed here/);
+    assert.equal(inbox.item('schema-add').review, 'approved');
+    const argv = readFileSync(join(inbox.dir, 'claude-argv'), 'utf8').split('\0');
+    assert.equal(argv[argv.indexOf('--model') + 1], 'opus');
+    assert.match(argv[argv.indexOf('-p') + 1], /ADR-0250/);
+    assert.match(readFileSync(join(inbox.dir, 'suites'), 'utf8'), /--integrity/);
+    inbox.run('tick');
+    assert.equal(inbox.item('schema-add').state, 'LANDED');
+    inbox.push('add-test', {
+      'apps/api/src/modules/sales/s.spec.ts': "it('a', () => {});\nit('b', () => {});\n",
+    });
+    inbox.run('tick');
+    inbox.run('tick');
+    inbox.run('review');
+    inbox.run('tick');
+    assert.equal(inbox.item('add-test').state, 'LANDED');
+    inbox.push('skip-test', {
+      'apps/api/src/modules/sales/s.spec.ts': "it('a', () => {});\nit.skip('b', () => {});\n",
+    });
+    inbox.run('tick');
+    inbox.run('review');
+    assert.equal(inbox.item('skip-test').review, 'owner');
+    assert.match(inbox.item('skip-test').review_why, /tests-weakened/);
+    assert.match(inbox.run('auto', 'allowlist').stdout, /allow-list/);
+    assert.match(inbox.run('auto', 'status').stdout, /scope: allow-list/);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
 test('review: a test deleted or skipped in an allowed area waits for the owner', () => {
   const inbox = makeInbox();
   try {
