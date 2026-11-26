@@ -1,0 +1,10 @@
+{
+  "who": "brain",
+  "slug": "notes-hr-qa",
+  "paths": [
+    "docs/STATUS.md",
+    "docs/decisions/README.md"
+  ],
+  "what": "brain task notes-hr-qa",
+  "since": "2026-11-26T07:57:44.561Z"
+}
