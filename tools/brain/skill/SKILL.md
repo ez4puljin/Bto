@@ -37,6 +37,10 @@ words. You direct the work; workers do it. Decided in ADR-0213; the tools are in
    The slug is short and says the task (`cashier-photo`, `voucher-print-total`). The paths are the
    files or folders it may change. Exit 2 means another task holds one of them: either give this
    work to that task's worker (`SendMessage`), or start it after that task has landed.
+   A change people will see (a screen, a flow, a rule, a print) also holds its news entry,
+   `apps/web/src/features/news/content/<YYYY-MM-DD>-<slug>.md` (ADR-0251): the dialog «Шинэ
+   өөрчлөлт» shows it to everyone who has not read it. Fixes nobody notices, tools and documents
+   need none.
    A task with a migration holds `apps/api/src/db`; get its number first:
    `bash ~/bto-dev/tools/brain/task.sh number migration <slug>` (and `number adr <slug>` for a decision).
 5. **Start the worker** with the Agent tool and the brief below. Start every task that is ready in
@@ -154,6 +158,7 @@ Holds: <the paths from task.sh new>
 Read first: <the screen's files; the module document or ADRs for a guarded task>
 Details: <what you know: the owner's words (translated), the texts, the numbers, what must not change>
 Numbers: <migration NNNN, ADR NNNN; or none>
+News: <the entry file to write (ADR-0251), or none>
 Done when: <the visible result; the suites that must be green for a guarded task>
 ```
 
