@@ -6,6 +6,7 @@
     "apps/api/src/db/migrations/meta/0125_snapshot.json",
     "apps/api/src/db/migrations/meta/_journal.json",
     "apps/api/src/db/schema.ts",
+    "apps/api/src/modules/hr/services/positions.service.ts",
     "apps/api/src/modules/payroll/controllers/payroll.controller.ts",
     "apps/api/src/modules/payroll/dto/payroll.dto.ts",
     "apps/api/src/modules/payroll/schema.ts",
@@ -23,6 +24,6 @@
     "packages/api-client/openapi.json",
     "packages/api-client/src/generated/schema.ts"
   ],
-  "what": "Individual salary overrides reserved0125 ADR0244 with final owner policy and HR follow-ups",
+  "what": "Individual salary overrides with same-transaction employee binding read and saturated-pool regression",
   "since": "2026-11-26T09:08:51.969Z"
 }
