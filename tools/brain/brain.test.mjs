@@ -913,7 +913,8 @@ test('desk: which kinds a path is part of', () => {
   const kindsOf = (path) =>
     spawnSync('bash', [join(here, 'job.sh'), 'kinds-of', path], {
       encoding: 'utf8',
-      env: { ...process.env, BTO_WORK: work },
+      // HEAD, not origin/main: a pull request's CI checkout has no origin/main.
+      env: { ...process.env, BTO_WORK: work, BTO_BASE_REF: 'HEAD' },
     }).stdout;
   try {
     for (const path of [
