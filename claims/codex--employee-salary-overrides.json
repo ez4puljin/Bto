@@ -1,0 +1,28 @@
+{
+  "who": "codex",
+  "slug": "employee-salary-overrides",
+  "paths": [
+    "apps/api/src/db/migrations/0125_payroll_salary_overrides.sql",
+    "apps/api/src/db/migrations/meta/0125_snapshot.json",
+    "apps/api/src/db/migrations/meta/_journal.json",
+    "apps/api/src/db/schema.ts",
+    "apps/api/src/modules/payroll/controllers/payroll.controller.ts",
+    "apps/api/src/modules/payroll/dto/payroll.dto.ts",
+    "apps/api/src/modules/payroll/schema.ts",
+    "apps/api/src/modules/payroll/services/payroll-terms.service.ts",
+    "apps/api/test/integration/payroll-positions.int-spec.ts",
+    "apps/api/test/integrity/payroll-salary-overrides.spec.ts",
+    "apps/web/src/features/guide/content/hr/10-payroll-kpi.md",
+    "apps/web/src/features/guide/content/hr/11-positions.md",
+    "apps/web/src/features/hr/positions-page.test.tsx",
+    "apps/web/src/features/payroll/payroll-pages.test.tsx",
+    "apps/web/src/features/payroll/terms-page.tsx",
+    "docs/decisions/ADR-0243-position-salary-access.md",
+    "docs/decisions/ADR-0244-employee-salary-overrides.md",
+    "docs/modules/payroll.md",
+    "packages/api-client/openapi.json",
+    "packages/api-client/src/generated/schema.ts"
+  ],
+  "what": "Individual salary overrides reserved0125 ADR0244 with final owner policy and HR follow-ups",
+  "since": "2026-11-26T09:08:51.969Z"
+}
