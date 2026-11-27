@@ -97,6 +97,26 @@ const routes = () => ({
     ]),
   'GET /api/v1/money-accounts': () => json([CASH_BOX]),
   'GET /api/v1/journal-entries': () => json({ data: [], nextCursor: null }),
+  'GET /api/v1/receipts': () =>
+    list([
+      {
+        id: 8,
+        number: 'GR-20261019-0002',
+        supplierId: 5,
+        supplierName: 'МСМ ХХК',
+        supplierDocNo: null,
+        supplierDocDate: '2026-10-19',
+        status: 'POSTED',
+        costingStatus: 'PENDING',
+        paymentMethod: 'CREDIT',
+        origin: 'MANUAL',
+        originRef: null,
+        lineCount: 2,
+        netAmount: '5000.00',
+        effectiveDate: '2026-10-19',
+        createdAt: STAMP,
+      },
+    ]),
   'GET /api/v1/suppliers': () =>
     list([
       {
@@ -178,10 +198,38 @@ describe('supplier payables (F3, ADR-0091)', () => {
     expect(query.get('segmentId')).toBe('9');
   });
 
-  it('names the accountant who confirmed each receipt and has no separate matching', async () => {
-    renderApp('/finance/suppliers/5', signedIn(ACCOUNTANT_ME, routes()));
+  it('shows the supplier’s report for this month: confirmed receipts green, waiting ones apart', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(ACCOUNTANT_ME, routes());
+    renderApp('/finance/suppliers/5', fetchMock);
     const bill = await screen.findByRole('row', { name: /GR-20261018-0001/ });
     expect(within(bill).getByText('Б. Нягтлан')).toBeInTheDocument();
+    expect(bill).toHaveAttribute('data-confirmed', 'true');
+    const waiting = screen.getByRole('row', { name: /GR-20261019-0002/ });
+    expect(waiting).toHaveAttribute('data-pending', 'true');
+    expect(within(waiting).getByText(mn.finance.payables.notConfirmed)).toBeInTheDocument();
+    // Oldest first: the opening, the bill, the waiting receipt, the payment, the closing.
+    const order = screen
+      .getAllByRole('row')
+      .map((row) => row.textContent ?? '')
+      .filter((text) => /GR-|Ж-/.test(text));
+    expect(order.map((text) => /GR-20261018|GR-20261019|Ж-/.exec(text)?.[0])).toEqual([
+      'GR-20261018',
+      'GR-20261019',
+      'Ж-',
+    ]);
+    // This month by default; «Өмнөх сар» moves the period.
+    const ledgerUrl = () =>
+      new URL(calls(fetchMock, 'GET', '/api/v1/supplier-balances/5/ledger').at(-1)?.url ?? '');
+    expect(ledgerUrl().searchParams.get('from')).toMatch(/^\d{4}-\d{2}-01$/);
+    expect(screen.getByRole('button', { name: mn.finance.payables.thisMonth })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(screen.getByRole('button', { name: mn.finance.payables.previousMonth }));
+    expect(
+      await screen.findByRole('button', { name: mn.finance.payables.previousMonth, pressed: true }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: mn.finance.payables.confirmedBy }),
     ).toBeInTheDocument();

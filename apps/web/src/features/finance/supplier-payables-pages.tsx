@@ -1,5 +1,7 @@
-import { ClipboardCheck, Plus, Truck } from 'lucide-react';
-import { useDeferredValue, useId, useState } from 'react';
+import { BookOpen, CircleCheck, ClipboardCheck, Plus, Truck } from 'lucide-react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { Decimal } from '@tugeel/shared/money';
+import { addDays, addMonths, businessDate, businessMonthStart } from '@tugeel/shared/time';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -18,18 +20,18 @@ import {
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
+import { cn } from '@/lib/utils';
+import { type ReceiptSummary, useReceipts } from '@/features/inventory/api';
 import { NativeSelect } from '@/components/native-select';
 import { useSupplierCategories } from '@/features/partners/api';
 import { SegmentFilter } from '@/features/segments/segment-filter';
 import {
   type PayableEntry,
-  type SupplierBalance,
   useSupplierBalance,
   useSupplierBalances,
   useSupplierLedger,
@@ -52,14 +54,14 @@ const BALANCE_COLUMNS: readonly ColumnSpec[] = [
   { key: 'chevron', kind: 'chevron' },
 ];
 
-/** The ledger's columns: date, kind, document, who confirmed it, two sides, owed after. */
+/** The report's columns: date, kind, document, who confirmed it, two sides, owed after. */
 const LEDGER_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'date', kind: 'date' },
-  { key: 'kind', kind: 'text', weight: 1 },
-  { key: 'document', kind: 'number' },
-  { key: 'confirmedBy', kind: 'text', weight: 1, min: 8, drop: 1 },
-  { key: 'debit', kind: 'money' },
-  { key: 'credit', kind: 'money' },
+  { key: 'date', kind: 'date', width: 8 },
+  { key: 'kind', kind: 'text', weight: 1, min: 7 },
+  { key: 'document', kind: 'number', width: 11 },
+  { key: 'confirmedBy', kind: 'text', weight: 2, min: 9 },
+  { key: 'debit', kind: 'money', width: 9 },
+  { key: 'credit', kind: 'money', width: 9 },
   { key: 'owedAfter', kind: 'money', width: 10 },
 ];
 
@@ -200,26 +202,96 @@ export function SupplierBalancesPage() {
   );
 }
 
+type Period = { from: string; to: string };
+
+/** This month and the one before it in Ulaanbaatar days. */
+function monthsOf(today: string): { current: Period; previous: Period } {
+  const start = businessMonthStart();
+  const previousStart = addMonths(start, -1);
+  return {
+    current: { from: start, to: today },
+    previous: { from: previousStart, to: addDays(start, -1) },
+  };
+}
+
+/** One row of the report: a ledger line, or a receipt still waiting for its price check. */
+type ReportRow =
+  | { kind: 'line'; date: string; entry: PayableEntry }
+  | { kind: 'pending'; date: string; receipt: ReceiptSummary };
+
 /**
- * One supplier's payables (F3, ADR-0091): what the company owes, then the ledger newest first
- * (receipts' bills and their price corrections, returns, manual entries) with what is owed after
- * each line and, on a receipt's line, the accountant who confirmed its prices. There is no
- * separate matching step (owner 2026-11-27): a bill is made when the accountant confirms the
- * receipt's prices on the receipt itself, and a payment lowers what is owed when it is posted;
- * «Үнэ батлаагүй орлого» opens the supplier's receipts still waiting for that confirmation.
+ * One supplier's «Авлага өглөгийн тайлан» (owner 2026-11-27): the period (this month by default,
+ * the previous month or any range), its opening, debit, credit and closing, then every line of
+ * the period oldest first with the balance after it. A receipt whose prices the accountant
+ * confirmed is green and names that accountant; a posted receipt still waiting for the price
+ * check is listed in its place, muted, outside the balance, until it is confirmed on the receipt.
  */
 export function SupplierLedgerPage() {
   const { t } = useTranslation();
   const supplierId = Number.parseInt(useParams().id ?? '', 10);
-  const [params] = useSearchParams();
-  const setParam = useSetParam();
-  const from = params.get('from') ?? undefined;
-  const to = params.get('to') ?? undefined;
+  const [params, setParams] = useSearchParams();
+  const today = businessDate();
+  const months = monthsOf(today);
+  const from = params.get('from') ?? months.current.from;
+  const to = params.get('to') ?? months.current.to;
+  const setPeriod = (period: Partial<Period>) => {
+    const next = new URLSearchParams(params);
+    next.set('from', period.from ?? from);
+    next.set('to', period.to ?? to);
+    setParams(next, { replace: true });
+  };
   const balance = useSupplierBalance(supplierId);
   const ledger = useSupplierLedger(supplierId, { from, to });
-  const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
-  const erkhetLinks = useErkhetLinks(erkhetKeysOf(rows));
+  const pending = useReceipts({ supplierId, costingPending: true, from, to });
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = ledger;
+  // The report is the whole period: every page is read, oldest first on screen.
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const entries = useMemo(
+    () => (ledger.data?.pages.flatMap((page) => page.data) ?? []).slice().reverse(),
+    [ledger.data],
+  );
+  const waiting = useMemo(
+    () =>
+      (pending.data?.pages.flatMap((page) => page.data) ?? []).filter(
+        (receipt) => receipt.status === 'POSTED' && receipt.costingStatus === 'PENDING',
+      ),
+    [pending.data],
+  );
+  const rows = useMemo<ReportRow[]>(() => {
+    const lines: ReportRow[] = entries.map((entry) => ({
+      kind: 'line',
+      date: entry.entryDate,
+      entry,
+    }));
+    for (const receipt of waiting) {
+      const date = receipt.supplierDocDate ?? receipt.effectiveDate ?? '';
+      // After every line of its day, so the balances above it stay in order.
+      const at = lines.findIndex((row) => row.date > date);
+      const row: ReportRow = { kind: 'pending', date, receipt };
+      if (at === -1) lines.push(row);
+      else lines.splice(at, 0, row);
+    }
+    return lines;
+  }, [entries, waiting]);
+  const erkhetLinks = useErkhetLinks(erkhetKeysOf(entries));
   const summary = balance.data;
+  const opening = ledger.data?.pages[0]?.opening ?? '0.00';
+  const totals = useMemo(() => {
+    let debit = new Decimal(0);
+    let credit = new Decimal(0);
+    for (const entry of entries) {
+      debit = debit.plus(entry.debit);
+      credit = credit.plus(entry.credit);
+    }
+    return {
+      debit: debit.toFixed(2),
+      credit: credit.toFixed(2),
+      closing: new Decimal(opening).plus(credit).minus(debit).toFixed(2),
+    };
+  }, [entries, opening]);
+  const loading = ledger.isPending || hasNextPage;
 
   const crumbs = [{ label: t('finance.payables.title'), to: '/finance/suppliers' }];
   const loadProblem = problemFromError(balance.error);
@@ -235,6 +307,14 @@ export function SupplierLedgerPage() {
       </div>
     );
   }
+  const reportHref = `/reports/party-ledger?${new URLSearchParams({
+    from,
+    to,
+    s: String(supplierId),
+    sn: summary.name,
+    by: 'PARTY_ACCOUNT',
+  }).toString()}`;
+  const isPeriod = (period: Period) => from === period.from && to === period.to;
 
   return (
     <div className="space-y-4">
@@ -244,6 +324,12 @@ export function SupplierLedgerPage() {
         meta={
           <>
             <span className="font-mono">{summary.code}</span>
+            <span>
+              {t('finance.payables.owedNow')}:{' '}
+              <span className="font-mono font-semibold text-foreground">
+                {formatTugrik(summary.balance)}
+              </span>
+            </span>
             <Link
               className="text-link underline-offset-2 hover:underline"
               to={`/partners/suppliers/${supplierId}`}
@@ -253,34 +339,62 @@ export function SupplierLedgerPage() {
           </>
         }
         actions={
-          <Button variant="outline" asChild>
-            <Link to={`/inventory/receipts?supplierId=${supplierId}&costing=pending`}>
-              <ClipboardCheck />
-              {t('finance.payables.pendingReceipts')}
-            </Link>
-          </Button>
+          <>
+            <Button variant="outline" asChild>
+              <Link to={`/inventory/receipts?supplierId=${supplierId}&costing=pending`}>
+                <ClipboardCheck />
+                {t('finance.payables.pendingReceipts')}
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to={reportHref}>
+                <BookOpen />
+                {t('finance.payables.openReport')}
+              </Link>
+            </Button>
+          </>
         }
       />
-      <PayableCard balance={summary} />
-      <section aria-label={t('finance.payables.ledgerTitle')} className="space-y-3">
-        <FilterBar>
-          <DateRangeFilter
-            label={t('finance.fields.date')}
-            fromLabel={t('finance.fields.from')}
-            toLabel={t('finance.fields.to')}
-            from={from}
-            to={to}
-            onFrom={(value) => setParam('from', value)}
-            onTo={(value) => setParam('to', value)}
-          />
-          {ledger.data?.pages[0] && from ? (
-            <span className="text-sm text-muted-foreground">
-              {t('finance.fields.opening')}:{' '}
-              <span className="font-mono">{formatMnt(ledger.data.pages[0].opening)}</span>
-            </span>
-          ) : null}
-        </FilterBar>
-        <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
+      <FilterBar>
+        <div role="group" aria-label={t('finance.payables.period')} className="flex gap-1.5">
+          <Button
+            size="sm"
+            variant={isPeriod(months.current) ? 'default' : 'outline'}
+            aria-pressed={isPeriod(months.current)}
+            onClick={() => setPeriod(months.current)}
+          >
+            {t('finance.payables.thisMonth')}
+          </Button>
+          <Button
+            size="sm"
+            variant={isPeriod(months.previous) ? 'default' : 'outline'}
+            aria-pressed={isPeriod(months.previous)}
+            onClick={() => setPeriod(months.previous)}
+          >
+            {t('finance.payables.previousMonth')}
+          </Button>
+        </div>
+        <DateRangeFilter
+          label={t('finance.fields.date')}
+          fromLabel={t('finance.fields.from')}
+          toLabel={t('finance.fields.to')}
+          from={from}
+          to={to}
+          onFrom={(value) => setPeriod({ from: value ?? months.current.from })}
+          onTo={(value) => setPeriod({ to: value ?? today })}
+        />
+      </FilterBar>
+      <dl
+        aria-label={t('reports.ledger.titles.PARTY')}
+        className="grid grid-cols-2 gap-2 @container lg:grid-cols-4"
+      >
+        <Figure label={t('finance.payables.opening')} value={opening} />
+        <Figure label={t('finance.payables.debitTurnover')} value={totals.debit} />
+        <Figure label={t('finance.payables.creditTurnover')} value={totals.credit} />
+        <Figure label={t('finance.payables.closing')} value={totals.closing} strong />
+      </dl>
+      <ProblemAlert problem={problemFromError(ledger.error)} onRetry={ledger.refetch} />
+      <section aria-label={t('reports.ledger.titles.PARTY')} className="space-y-2">
         <ListCard scroll>
           <ListTable columns={LEDGER_COLUMNS}>
             <TableHeader>
@@ -295,85 +409,156 @@ export function SupplierLedgerPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ledger.isPending ? <SkeletonRows columns={7} /> : null}
-              {rows.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-mono">{entry.entryDate}</TableCell>
-                  <TableCell>
-                    {entry.erkhet ? (
-                      <ErkhetKind erkhet={entry.erkhet} reversal={entry.kind === 'VOID'} />
-                    ) : (
-                      t(`finance.apKinds.${entry.kind}`)
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    {entry.erkhet ? (
-                      <ErkhetDocument
-                        erkhet={entry.erkhet}
-                        number={entry.docNumber}
-                        link={entry.erkhet.key ? erkhetLinks.get(entry.erkhet.key) : undefined}
+              <TableRow className="bg-muted/40 font-medium">
+                <TableCell className="font-mono">{from}</TableCell>
+                <TableCell colSpan={5}>{t('finance.payables.opening')}</TableCell>
+                <TableCell className="text-right font-mono">{formatMnt(opening)}</TableCell>
+              </TableRow>
+              {loading ? <SkeletonRows columns={7} /> : null}
+              {loading
+                ? null
+                : rows.map((row) =>
+                    row.kind === 'line' ? (
+                      <LineRow
+                        key={`l${row.entry.id}`}
+                        entry={row.entry}
+                        erkhetLink={
+                          row.entry.erkhet?.key ? erkhetLinks.get(row.entry.erkhet.key) : undefined
+                        }
                       />
                     ) : (
-                      <DocumentLink entry={entry} />
-                    )}
-                  </TableCell>
-                  <TruncateCell text={entry.confirmedBy ?? ''}>
-                    {entry.confirmedBy ?? ''}
-                  </TruncateCell>
-                  <TableCell className="text-right font-mono">
-                    {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {entry.credit === '0.00' ? '' : formatMnt(entry.credit)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatMnt(entry.balanceAfter)}
+                      <PendingRow key={`p${row.receipt.id}`} receipt={row.receipt} />
+                    ),
+                  )}
+              {!loading && rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    {t('finance.payables.ledgerEmpty')}
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : null}
+              <TableRow className="bg-muted/40 font-semibold">
+                <TableCell className="font-mono">{to}</TableCell>
+                <TableCell colSpan={3}>{t('finance.payables.closing')}</TableCell>
+                <TableCell className="text-right font-mono">{formatMnt(totals.debit)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMnt(totals.credit)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMnt(totals.closing)}</TableCell>
+              </TableRow>
             </TableBody>
           </ListTable>
-          {!ledger.isPending && rows.length === 0 ? (
-            <EmptyState title={t('finance.payables.ledgerEmpty')} />
-          ) : null}
-          <LoadMore query={ledger} />
         </ListCard>
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.8125rem] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="size-3 rounded-sm bg-success-soft ring-1 ring-success/40"
+            />
+            {t('finance.payables.legendConfirmed')}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="size-3 rounded-sm bg-warning-soft ring-1 ring-warning/40"
+            />
+            {t('finance.payables.legendPending')}
+          </span>
+          <span>{t('finance.payables.howToPayDirect')}</span>
+        </p>
       </section>
     </div>
   );
 }
 
-/** What the company owes the supplier, its newest bill, and how a bill and a payment are made. */
-function PayableCard({ balance }: { balance: SupplierBalance }) {
-  const { t } = useTranslation();
-  const titleId = useId();
-  const prepaid = balance.balance.startsWith('-');
+/** A figure of the period: the opening, the turnover of each side, the closing. */
+function Figure(props: { label: string; value: string; strong?: boolean }) {
   return (
-    <Card role="region" aria-labelledby={titleId}>
-      <CardHeader>
-        <CardTitle id={titleId}>{t('finance.payables.card')}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <div className="min-w-0 rounded-lg border border-border px-3 py-2">
-            <dt className="text-xs text-muted-foreground">{t('finance.payables.owed')}</dt>
-            <dd className="truncate font-mono text-[0.9375rem] font-semibold">
-              {formatTugrik(balance.balance)}
-            </dd>
-            {prepaid ? (
-              <dd className="text-xs text-muted-foreground">{t('finance.payables.prepaid')}</dd>
-            ) : null}
-          </div>
-          <div className="min-w-0 rounded-lg border border-border px-3 py-2">
-            <dt className="text-xs text-muted-foreground">{t('finance.payables.latestBill')}</dt>
-            <dd className="truncate font-mono text-[0.9375rem] font-semibold">
-              {balance.latestBillDate ?? '—'}
-            </dd>
-          </div>
-        </dl>
-        <p className="text-sm text-muted-foreground">{t('finance.payables.howToPayDirect')}</p>
-      </CardContent>
-    </Card>
+    <div className="min-w-0 rounded-lg border border-border bg-card px-3 py-2">
+      <dt className="text-xs text-muted-foreground">{props.label}</dt>
+      <dd
+        className={cn(
+          'truncate font-mono text-[0.9375rem]',
+          props.strong ? 'font-semibold' : 'font-medium',
+        )}
+      >
+        {formatTugrik(props.value)}
+      </dd>
+    </div>
+  );
+}
+
+/** A ledger line; a receipt whose prices an accountant confirmed is green with that name. */
+function LineRow(props: {
+  entry: PayableEntry;
+  erkhetLink: Parameters<typeof ErkhetDocument>[0]['link'];
+}) {
+  const { t } = useTranslation();
+  const { entry } = props;
+  const confirmed = entry.docType === 'RECEIPT' && entry.confirmedBy !== null;
+  return (
+    <TableRow
+      data-confirmed={confirmed ? 'true' : undefined}
+      className={cn(confirmed && 'bg-success-soft/60 hover:bg-success-soft')}
+    >
+      <TableCell className="font-mono">{entry.entryDate}</TableCell>
+      <TruncateCell text={entry.erkhet ? '' : t(`finance.apKinds.${entry.kind}`)}>
+        {entry.erkhet ? (
+          <ErkhetKind erkhet={entry.erkhet} reversal={entry.kind === 'VOID'} />
+        ) : (
+          t(`finance.apKinds.${entry.kind}`)
+        )}
+      </TruncateCell>
+      <TableCell className="font-mono">
+        {entry.erkhet ? (
+          <ErkhetDocument erkhet={entry.erkhet} number={entry.docNumber} link={props.erkhetLink} />
+        ) : (
+          <DocumentLink entry={entry} />
+        )}
+      </TableCell>
+      <TruncateCell text={entry.confirmedBy ?? ''}>
+        {confirmed ? (
+          <span className="inline-flex items-center gap-1 text-success">
+            <CircleCheck aria-hidden className="size-3.5" />
+            {entry.confirmedBy}
+          </span>
+        ) : (
+          (entry.confirmedBy ?? '')
+        )}
+      </TruncateCell>
+      <TableCell className="text-right font-mono">
+        {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}
+      </TableCell>
+      <TableCell className="text-right font-mono">
+        {entry.credit === '0.00' ? '' : formatMnt(entry.credit)}
+      </TableCell>
+      <TableCell className="text-right font-mono">{formatMnt(entry.balanceAfter)}</TableCell>
+    </TableRow>
+  );
+}
+
+/** A posted receipt waiting for the accountant's price check: no payable yet. */
+function PendingRow({ receipt }: { receipt: ReceiptSummary }) {
+  const { t } = useTranslation();
+  return (
+    <TableRow data-pending="true" className="bg-warning-soft/50 text-muted-foreground">
+      <TableCell className="font-mono">
+        {receipt.supplierDocDate ?? receipt.effectiveDate ?? ''}
+      </TableCell>
+      <TableCell>{t('finance.apKinds.BILL')}</TableCell>
+      <TableCell className="font-mono">
+        <Link
+          className="text-link underline-offset-2 hover:underline"
+          to={`/inventory/receipts/${receipt.id}`}
+        >
+          {receipt.number ?? ''}
+        </Link>
+      </TableCell>
+      <TableCell className="text-warning">{t('finance.payables.notConfirmed')}</TableCell>
+      <TableCell />
+      <TableCell className="text-right font-mono italic">
+        {receipt.netAmount ? formatMnt(receipt.netAmount) : ''}
+      </TableCell>
+      <TableCell />
+    </TableRow>
   );
 }
 
