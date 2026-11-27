@@ -1,9 +1,0 @@
-{
-  "who": "codex",
-  "slug": "phone-agent-invalid-key",
-  "paths": [
-    "apps/api/test/integration/phone-agent.int-spec.ts"
-  ],
-  "what": "Guarantee malformed station key differs while preserving every auth assertion and timeout",
-  "since": "2026-11-27T05:09:39.841Z"
-}
