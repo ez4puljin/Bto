@@ -1,0 +1,8 @@
+{
+  "id": "20261127T112947364Z-codex-13b4d0",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-27T11:29:47.364Z",
+  "text": "Further diagnosis: ADR-0253 decision 2 says imports-scale never runs in gate, but both changed-integrity-file inclusion and imports fallback prefix select it. Please reconcile owner gate behavior with that decision and provide actual failure output. Potential genuine performance issue also found: setMany/restoreMany call manualInTx per product, ~4 additional DB roundtrips per product; 10k scale may exceed180s. We have a bounded bulk event/state/audit design preserving same tx+locks, but will not claim timeout without the log or bypass a real failure.",
+  "slug": "remaining-updates"
+}
