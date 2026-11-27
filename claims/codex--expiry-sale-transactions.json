@@ -25,6 +25,7 @@
     "apps/api/src/modules/finance/finance.module.ts",
     "apps/api/src/modules/finance/services/credit-notes.service.ts",
     "apps/api/src/modules/finance/services/invoicing.service.ts",
+    "apps/api/src/modules/identity/services/org.service.ts",
     "apps/api/src/modules/identity/services/user-names.service.ts",
     "apps/api/src/modules/inventory/services/receipts.service.ts",
     "apps/api/src/modules/inventory/services/stock-posting.service.ts",
@@ -45,6 +46,8 @@
     "apps/api/src/modules/pricing/services/price-quote.service.ts",
     "apps/api/src/modules/sales/controllers/sales-orders.controller.ts",
     "apps/api/src/modules/sales/dto/sales-orders.dto.ts",
+    "apps/api/src/modules/sales/hooks.ts",
+    "apps/api/src/modules/sales/index.ts",
     "apps/api/src/modules/sales/sales.module.ts",
     "apps/api/src/modules/sales/services/order-changes.ts",
     "apps/api/src/modules/sales/services/sales-order-query.service.ts",
@@ -63,6 +66,6 @@
     "packages/shared/src/pricing/cart.test.ts",
     "packages/shared/src/pricing/cart.ts"
   ],
-  "what": "Wire expiry sale/return posting with same-tx ports, POS savepoint diagnostics and offline replay; add news",
+  "what": "Same-tx warehouse lookup plus required canonical invoice-facts contract;63totalnear60",
   "since": "2026-11-27T05:50:31.559Z"
 }
