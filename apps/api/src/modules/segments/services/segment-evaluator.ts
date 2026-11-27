@@ -9,7 +9,7 @@ import {
   segmentIssue,
 } from '@tugeel/shared/segments';
 import { businessDate } from '@tugeel/shared/time';
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
@@ -71,6 +71,27 @@ export class SegmentEvaluator implements ProductSetResolver, PartnerSetResolver 
   /** The customer or supplier list's narrowing to a saved segment. */
   ids(ctx: AuthContext, entity: PartnerSetEntity, segmentId: number): Promise<number[]> {
     return this.ofSegment(ctx, entity, segmentId);
+  }
+
+  /** Every live segment of the entity by name, with the ids it keeps (a list's «Сегмент» column). */
+  async memberships(
+    ctx: AuthContext,
+    entity: PartnerSetEntity,
+  ): Promise<{ id: number; name: string; ids: number[] }[]> {
+    const rows = await this.db
+      .select()
+      .from(segments)
+      .where(and(eq(segments.entity, entity), isNull(segments.archivedAt)))
+      .orderBy(asc(segments.name), asc(segments.id));
+    const result: { id: number; name: string; ids: number[] }[] = [];
+    for (const row of rows) {
+      const ids =
+        row.kind === 'LIST'
+          ? await this.members(row.id)
+          : await this.evaluate(ctx, entity, storedDefinition(row));
+      result.push({ id: row.id, name: row.name, ids });
+    }
+    return result;
   }
 
   /**

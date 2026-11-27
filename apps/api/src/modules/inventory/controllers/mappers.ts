@@ -189,6 +189,8 @@ export function toReceiptDetailDto(receipt: ReceiptDetail, withCosts = false): R
       confirmedBy: confirmation.confirmedBy,
       confirmedAt: confirmation.confirmedAt.toISOString(),
     })),
+    costedBy: receipt.costedBy,
+    costedAt: receipt.costedAt?.toISOString() ?? null,
     ...(withCosts
       ? {
           discounts: receipt.discounts.map(toReceiptDiscountDto),

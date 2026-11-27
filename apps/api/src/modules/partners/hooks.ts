@@ -15,6 +15,11 @@ export type PartnerSetEntity = 'CUSTOMER' | 'SUPPLIER';
 export interface PartnerSetResolver {
   /** Ascending ids of the customers or suppliers the segment keeps. */
   ids(ctx: AuthContext, entity: PartnerSetEntity, segmentId: number): Promise<number[]>;
+  /** Every live segment of the entity, by name, with the ascending ids it keeps. */
+  memberships(
+    ctx: AuthContext,
+    entity: PartnerSetEntity,
+  ): Promise<{ id: number; name: string; ids: number[] }[]>;
 }
 
 export const PARTNER_SET_RESOLVER = Symbol('PARTNER_SET_RESOLVER');

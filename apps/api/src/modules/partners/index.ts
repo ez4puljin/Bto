@@ -15,6 +15,7 @@ export {
   type PartnerSetResolver,
 } from './hooks';
 export { PartnersHttpModule, PartnersModule } from './partners.module';
+export { PartnerSegmentsService } from './services/partner-segments.service';
 export {
   type ContactInput,
   CustomerContactsService,

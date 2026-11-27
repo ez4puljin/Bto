@@ -16005,6 +16005,10 @@ export interface components {
             originRef: string | null;
             /** @description Warehouses whose keepers confirmed their lines */
             confirmations: components["schemas"]["ReceiptConfirmation"][];
+            /** @description The accountant who last confirmed the prices; null while they wait */
+            costedBy: string | null;
+            /** Format: date-time */
+            costedAt: string | null;
             /** @description Cost holders only */
             discounts?: components["schemas"]["ReceiptDiscount"][];
             /** @description Cost holders only */
@@ -23523,6 +23527,40 @@ export interface components {
         BankLineReverseRequest: {
             reason: string;
         };
+        SupplierBalanceSegment: {
+            id: number;
+            name: string;
+        };
+        SupplierBalanceListItem: {
+            supplierId: number;
+            /** @example 0012 */
+            code: string;
+            name: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE";
+            /**
+             * @description What the company owes; negative = paid ahead
+             * @example 150000.00
+             */
+            balance: string;
+            /** @example 2026-10-20 */
+            oldestBillDate: string | null;
+            /**
+             * @description The newest bill's date, paid or not
+             * @example 2026-11-20
+             */
+            latestBillDate: string | null;
+            /** Format: date-time */
+            updatedAt: string | null;
+            /** @description The supplier's category path */
+            categoryPath: string | null;
+            /** @description Live segments it is in */
+            segments: components["schemas"]["SupplierBalanceSegment"][];
+        };
+        SupplierBalancesPage: {
+            data: components["schemas"]["SupplierBalanceListItem"][];
+            nextCursor: string | null;
+        };
         SupplierBalance: {
             supplierId: number;
             /** @example 0012 */
@@ -23537,12 +23575,13 @@ export interface components {
             balance: string;
             /** @example 2026-10-20 */
             oldestBillDate: string | null;
+            /**
+             * @description The newest bill's date, paid or not
+             * @example 2026-11-20
+             */
+            latestBillDate: string | null;
             /** Format: date-time */
             updatedAt: string | null;
-        };
-        SupplierBalancesPage: {
-            data: components["schemas"]["SupplierBalance"][];
-            nextCursor: string | null;
         };
         PayableEntry: {
             id: number;
@@ -23569,6 +23608,8 @@ export interface components {
             balanceAfter: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description A receipt's line: the accountant who confirmed its prices */
+            confirmedBy: string | null;
             /** @description Set when the line is a copy of Erkhet's books (ADR-0219); always sent */
             erkhet?: components["schemas"]["LedgerErkhetEntry"] | null;
         };
@@ -50541,6 +50582,10 @@ export interface operations {
                 limit?: number;
                 /** @description Part of a supplier's name or code */
                 q?: string;
+                /** @description The supplier category and everything below it */
+                categoryId?: number;
+                /** @description A saved SUPPLIER segment */
+                segmentId?: number;
             };
             header?: never;
             path?: never;

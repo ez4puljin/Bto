@@ -280,6 +280,9 @@ export interface ReceiptDetail {
   originRef: string | null;
   /** The warehouses whose keepers confirmed their lines (a draft's; the last one posts). */
   confirmations: ReceiptConfirmation[];
+  /** The accountant who confirmed the prices last («Баталсан нягтлан»), and when; null while pending. */
+  costedBy: string | null;
+  costedAt: Date | null;
   effectiveDate: string | null;
   postedAt: Date | null;
   createdAt: Date;
@@ -1643,6 +1646,12 @@ export class ReceiptsService implements OnModuleInit {
       origin: header.origin,
       originRef: header.originRef,
       confirmations: await this.confirmationViews(executor, id),
+      costedBy:
+        header.costedBy === null
+          ? null
+          : ((await this.userNames.namesOf([header.costedBy], executor)).get(header.costedBy) ??
+            null),
+      costedAt: header.costedAt,
       effectiveDate: header.effectiveDate,
       postedAt: header.postedAt,
       createdAt: header.createdAt,
@@ -1955,6 +1964,24 @@ export class ReceiptsService implements OnModuleInit {
     receiptRate: Decimal,
   ): Promise<Map<number, Decimal>> {
     return this.purchases.lineRates(executor, lines, receiptRate);
+  }
+
+  /** Who last confirmed each receipt's prices («Баталсан нягтлан»), by full name; absent when nobody. */
+  async costedByOf(ids: readonly number[]): Promise<Map<number, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: goodsReceipts.id, costedBy: goodsReceipts.costedBy })
+      .from(goodsReceipts)
+      .where(inArray(goodsReceipts.id, [...new Set(ids)]));
+    const names = await this.userNames.namesOf(
+      rows.flatMap((row) => (row.costedBy === null ? [] : [row.costedBy])),
+    );
+    const result = new Map<number, string>();
+    for (const row of rows) {
+      const name = row.costedBy === null ? undefined : names.get(row.costedBy);
+      if (name !== undefined) result.set(row.id, name);
+    }
+    return result;
   }
 
   /** The posted, costed receipts, oldest first (the development re-post of their bills, F3). */

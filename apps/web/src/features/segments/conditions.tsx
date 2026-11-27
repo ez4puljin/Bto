@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { useCategories } from '@/features/catalog/api';
 import { categoryPaths } from '@/features/catalog/category-tree';
 import { useWarehouses } from '@/features/identity/api';
-import { useSuppliers, useSuppliersByIds } from '@/features/partners/api';
+import { useSupplierCategories, useSuppliers, useSuppliersByIds } from '@/features/partners/api';
 import { usePriceProfileChoices } from '@/features/pricing/api';
 import { formatMnt } from '@/lib/money';
 import { fieldLabel, NO_IDS, SELLING_KINDS, useIdNames, valueLabel } from './condition-labels';
@@ -606,6 +606,9 @@ function Choices(props: {
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
   const supplierField = props.field === 'supplier';
+  const supplierCategories = useSupplierCategories({
+    enabled: props.field === 'supplierCategory',
+  });
   const found = useSuppliers({ q }, { limit: 20, enabled: supplierField });
   const chosen = useSuppliersByIds(supplierField ? props.initial : NO_IDS);
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
@@ -614,6 +617,11 @@ function Choices(props: {
     case 'category':
       options = categories.data
         ?.map((row) => ({ value: row.id, label: paths.get(row.id) ?? row.name }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'mn'));
+      break;
+    case 'supplierCategory':
+      options = supplierCategories.data
+        ?.map((row) => ({ value: row.id, label: row.path }))
         .sort((a, b) => a.label.localeCompare(b.label, 'mn'));
       break;
     case 'homeWarehouse':

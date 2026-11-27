@@ -378,6 +378,33 @@ export class SuppliersService implements OnModuleInit {
     return where ? this.idsOf(where, executor) : Promise.resolve([]);
   }
 
+  /**
+   * Every supplier a search and a category keep, within `within` when given (the payables list's
+   * filters, which page over the Finance Core's balances, not over suppliers).
+   */
+  async idsMatching(
+    query: { q?: string; categoryId?: number },
+    within: readonly number[] | null = null,
+  ): Promise<number[]> {
+    if (within?.length === 0) return [];
+    const filters: SQL[] = [];
+    if (within) filters.push(idIn(suppliers.id, within));
+    if (query.categoryId) filters.push(inCategoryTree([query.categoryId]));
+    const searched = partnerSearch(suppliers, query.q);
+    if (searched) filters.push(searched.match);
+    return this.idsOf(and(...filters) ?? sql`TRUE`, this.db);
+  }
+
+  /** Each supplier's own category id (null = none). */
+  async categoryIdsOf(ids: readonly number[]): Promise<Map<number, number | null>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: suppliers.id, categoryId: suppliers.categoryId })
+      .from(suppliers)
+      .where(inArray(suppliers.id, [...new Set(ids)]));
+    return new Map(rows.map((row) => [row.id, row.categoryId]));
+  }
+
   private async idsOf(where: SQL, executor: Db | Tx): Promise<number[]> {
     const rows = await executor
       .select({ id: suppliers.id })
@@ -401,15 +428,7 @@ export class SuppliersService implements OnModuleInit {
         WHERE ps.supplier_id = suppliers.id AND ${idIn(sql`ps.product_id`, linkedTo)})`);
     }
     if (query.status) filters.push(eq(suppliers.status, query.status));
-    if (query.categoryId) {
-      filters.push(sql`${suppliers.categoryId} IN (
-        WITH RECURSIVE down(id) AS (
-          SELECT id FROM supplier_categories WHERE id = ${query.categoryId}
-          UNION ALL
-          SELECT c.id FROM supplier_categories c JOIN down ON c.parent_id = down.id
-        )
-        SELECT id FROM down)`);
-    }
+    if (query.categoryId) filters.push(inCategoryTree([query.categoryId]));
     const searched = partnerSearch(suppliers, query.q);
     if (searched) filters.push(searched.match);
     // Without a search every row ranks 0; a bare 0 in ORDER BY would mean "column 0".
@@ -535,6 +554,17 @@ function validated(input: SupplierInput) {
 }
 
 /** One positive segment condition on suppliers as SQL; null keeps none (ADR-0049 #3). */
+/** Suppliers of these categories or anything below them (ADR-0161). */
+function inCategoryTree(categoryIds: readonly number[]): SQL {
+  return sql`${suppliers.categoryId} IN (
+    WITH RECURSIVE down(id) AS (
+      SELECT id FROM supplier_categories WHERE ${idIn(sql`id`, categoryIds)}
+      UNION
+      SELECT c.id FROM supplier_categories c JOIN down ON c.parent_id = down.id
+    )
+    SELECT id FROM down)`;
+}
+
 function supplierCondition(condition: SegmentCondition): SQL | null {
   switch (condition.field) {
     case 'search':
@@ -548,6 +578,11 @@ function supplierCondition(condition: SegmentCondition): SQL | null {
         : null;
     case 'products':
       return sql`EXISTS (SELECT 1 FROM product_suppliers ps WHERE ps.supplier_id = suppliers.id)`;
+    case 'supplier':
+      return condition.ids?.length ? idIn(suppliers.id, condition.ids) : null;
+    case 'supplierCategory':
+      if (condition.op === 'ANY') return sql`${suppliers.categoryId} IS NOT NULL`;
+      return condition.ids?.length ? inCategoryTree(condition.ids) : null;
     case 'createdAt':
       return onBusinessDays(suppliers.createdAt, conditionDays(condition, businessDate()));
     default:

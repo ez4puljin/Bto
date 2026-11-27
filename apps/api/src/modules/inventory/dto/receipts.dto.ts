@@ -243,6 +243,13 @@ export class ReceiptDetailDto {
     description: 'Warehouses whose keepers confirmed their lines',
   })
   confirmations: ReceiptConfirmationDto[];
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'The accountant who last confirmed the prices; null while they wait',
+  })
+  costedBy: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) costedAt: string | null;
   // Cost data: present only for holders of inventory.costs.manage.
   @ApiPropertyOptional({ type: [ReceiptDiscountDto], description: 'Cost holders only' })
   discounts?: ReceiptDiscountDto[];

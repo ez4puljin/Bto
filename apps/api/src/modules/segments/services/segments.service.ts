@@ -22,7 +22,7 @@ import {
   type ProductSegmentEntry,
 } from '../../catalog';
 import { actorUserId, type AuthContext, AuditService, OrgService } from '../../identity';
-import { SuppliersService } from '../../partners';
+import { SupplierCategoriesService, SuppliersService } from '../../partners';
 import { PriceProfilesService } from '../../pricing';
 import { segments } from '../schema';
 import { checkedDefinition, SegmentEvaluator, type SegmentRow } from './segment-evaluator';
@@ -73,6 +73,7 @@ export class SegmentsService implements ProductSegmentDirectory {
     private readonly evaluator: SegmentEvaluator,
     private readonly categories: CategoriesService,
     private readonly suppliers: SuppliersService,
+    private readonly supplierCategories: SupplierCategoriesService,
     private readonly org: OrgService,
     private readonly profiles: PriceProfilesService,
   ) {}
@@ -395,7 +396,7 @@ export class SegmentsService implements ProductSegmentDirectory {
     entity: SegmentEntity,
     definition: SegmentDefinition,
   ): Promise<void> {
-    if (entity !== 'PRODUCT') return;
+    if (entity === 'CUSTOMER') return;
     let categories: Set<number> | null = null;
     let warehouses: Set<number> | null = null;
     for (const [g, group] of definition.groups.entries()) {
@@ -408,6 +409,8 @@ export class SegmentsService implements ProductSegmentDirectory {
           known = categories;
         } else if (condition.field === 'supplier' && ids.length) {
           known = new Set((await this.suppliers.getMany(ids)).map((supplier) => supplier.id));
+        } else if (condition.field === 'supplierCategory' && ids.length) {
+          known = new Set((await this.supplierCategories.list()).map((category) => category.id));
         } else if (condition.field === 'priceProfile' && ids.length) {
           known = new Set((await this.profiles.namesOf(ids)).keys());
         } else if (condition.field === 'homeWarehouse' || condition.warehouseId !== undefined) {

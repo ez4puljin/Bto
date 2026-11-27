@@ -154,6 +154,10 @@ export const SEGMENT_FIELDS: Record<SegmentEntity, Readonly<Record<string, Segme
     createdAt: { owner: 'partners', ...DATES },
   },
   SUPPLIER: {
+    /** Hand-picked suppliers: a segment of exactly these, or all but these (owner 2026-11-27). */
+    supplier: { owner: 'partners', input: 'ids', ops: ['IN', 'NOT_IN'] },
+    /** The supplier's own category (ADR-0161), with everything below it. */
+    supplierCategory: { owner: 'partners', input: 'ids', ops: ['IN', 'NOT_IN', 'ANY', 'NONE'] },
     search: { owner: 'partners', input: 'text', ops: ['CONTAINS'] },
     status: { owner: 'partners', input: 'values', values: PARTNER_STATUSES, ops: ['IN'] },
     products: { owner: 'partners', input: 'flag', ops: ['ANY', 'NONE'] },

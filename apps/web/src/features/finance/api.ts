@@ -503,7 +503,11 @@ export function useOpenItems(customerId: number, enabled = true) {
 }
 
 /** The suppliers' payables, largest first (F3, ADR-0091). */
-export function useSupplierBalances(filter: { q?: string }) {
+export function useSupplierBalances(filter: {
+  q?: string;
+  categoryId?: number | undefined;
+  segmentId?: number | undefined;
+}) {
   const api = useApiClient();
   return useInfiniteQuery({
     queryKey: [...KEYS.supplierBalances, 'list', filter],
@@ -511,7 +515,15 @@ export function useSupplierBalances(filter: { q?: string }) {
     queryFn: async ({ pageParam, signal }) =>
       unwrap(
         await api.GET('/api/v1/supplier-balances', {
-          params: { query: { q: filter.q || undefined, cursor: pageParam, limit: 50 } },
+          params: {
+            query: {
+              q: filter.q || undefined,
+              categoryId: filter.categoryId,
+              segmentId: filter.segmentId,
+              cursor: pageParam,
+              limit: 50,
+            },
+          },
           signal,
         }),
       ),

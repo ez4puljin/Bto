@@ -1,6 +1,6 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { RequirePermission } from '../../identity';
+import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import {
   DateRangeQueryDto,
   PayableOpenItemListDto,
@@ -32,9 +32,19 @@ export class SupplierBalancesController {
   @Get()
   @RequirePermission(READ)
   @ApiOkResponse({ type: SupplierBalancesPageDto })
-  async list(@Query() query: SupplierBalancesQueryDto): Promise<SupplierBalancesPageDto> {
-    const page = await this.ledger.balances(query);
-    return { data: page.data.map(supplierBalanceDto), nextCursor: page.nextCursor };
+  async list(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: SupplierBalancesQueryDto,
+  ): Promise<SupplierBalancesPageDto> {
+    const page = await this.ledger.balances(ctx, query);
+    return {
+      data: page.data.map((row) => ({
+        ...supplierBalanceDto(row),
+        categoryPath: row.categoryPath,
+        segments: row.segments,
+      })),
+      nextCursor: page.nextCursor,
+    };
   }
 
   @Get(':supplierId')

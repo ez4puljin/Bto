@@ -5,7 +5,13 @@ import { notFound } from '../../../common/errors/app-error';
 import { DEFAULT_PAGE_LIMIT, decodeCursor, encodeCursor } from '../../../common/pagination/page';
 import { type FinOpenItemRow, type FinPartyLedgerRow, FinReader } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
-import { SuppliersService } from '../../partners';
+import type { AuthContext } from '../../identity';
+import { ReceiptsService } from '../../inventory';
+import {
+  PartnerSegmentsService,
+  SupplierCategoriesService,
+  SuppliersService,
+} from '../../partners';
 import { type ErkhetEntry, erkhetOf, type LedgerQuery } from './ar-ledger.service';
 import { FinBooks } from './fin-books';
 
@@ -16,6 +22,8 @@ export interface SupplierBalance {
   balance: Decimal;
   /** The oldest open bill's date (bills are due on their date, owner 2026-10-20). */
   oldestBillDate: string | null;
+  /** The newest bill's date, paid or not: when the supplier last delivered on credit. */
+  latestBillDate: string | null;
   updatedAt: Date | null;
 }
 
@@ -23,6 +31,12 @@ export interface SupplierBalanceRow extends SupplierBalance {
   code: string;
   name: string;
   status: string;
+}
+
+/** A row of «Нийлүүлэгчийн тооцоо»: the supplier's category path and the segments it is in. */
+export interface SupplierBalanceListRow extends SupplierBalanceRow {
+  categoryPath: string | null;
+  segments: { id: number; name: string }[];
 }
 
 export interface PayableEntry {
@@ -38,6 +52,8 @@ export interface PayableEntry {
   /** What the company owes after this line, oldest first. */
   balanceAfter: Decimal;
   createdAt: Date;
+  /** A receipt's line: the accountant who confirmed its prices («Баталсан нягтлан»). */
+  confirmedBy: string | null;
   /** Set when the line is a copy of Erkhet's books (ADR-0219); null for Bto's own documents. */
   erkhet: ErkhetEntry | null;
 }
@@ -65,6 +81,10 @@ export interface PayableOpenItem {
 
 export interface SupplierBalancesQuery {
   q?: string;
+  /** The supplier's category and everything below it. */
+  categoryId?: number;
+  /** A saved SUPPLIER segment. */
+  segmentId?: number;
   cursor?: string;
   limit?: number;
 }
@@ -91,6 +111,9 @@ export class ApLedgerService {
     private readonly reader: FinReader,
     private readonly books: FinBooks,
     private readonly parties: FinPartiesBridge,
+    private readonly categories: SupplierCategoriesService,
+    private readonly segments: PartnerSegmentsService,
+    private readonly receipts: ReceiptsService,
   ) {}
 
   /** One supplier's payable (zeros for a supplier without payable lines). */
@@ -112,20 +135,25 @@ export class ApLedgerService {
       status: supplier.status,
       balance: row?.net ?? new Decimal(0),
       oldestBillDate: row?.oldestDueDate ?? null,
+      latestBillDate: row?.latestItemDate ?? null,
       updatedAt: row?.updatedAt ?? null,
     };
   }
 
-  /** The suppliers with payables, largest balance first. */
+  /** The suppliers with payables, largest balance first, narrowed by search, category and segment. */
   async balances(
+    ctx: AuthContext,
     query: SupplierBalancesQuery,
-  ): Promise<{ data: SupplierBalanceRow[]; nextCursor: string | null }> {
+  ): Promise<{ data: SupplierBalanceListRow[]; nextCursor: string | null }> {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const after = decodeCursor(query.cursor);
     let partyIds: number[] | undefined;
-    if (query.q?.trim()) {
-      const ids = (await this.suppliers.list({ q: query.q.trim(), limit: 200 })).data.map(
-        (supplier) => supplier.id,
+    const q = query.q?.trim();
+    const within = await this.segments.within(ctx, 'SUPPLIER', query.segmentId);
+    if (q || query.categoryId !== undefined || within) {
+      const ids = await this.suppliers.idsMatching(
+        { ...(q ? { q } : {}), ...(query.categoryId ? { categoryId: query.categoryId } : {}) },
+        within,
       );
       if (ids.length === 0) return { data: [], nextCursor: null };
       partyIds = [...(await this.parties.partiesOfSuppliers(ids)).values()].map((id) =>
@@ -147,17 +175,21 @@ export class ApLedgerService {
     const supplierOf = await this.parties.suppliersOfParties(
       page.map((row) => String(row.partyId)),
     );
+    const supplierIds = [...new Set(supplierOf.values())];
     const suppliers = new Map(
-      (await this.suppliers.getMany([...new Set(supplierOf.values())])).map((supplier) => [
-        supplier.id,
-        supplier,
-      ]),
+      (await this.suppliers.getMany(supplierIds)).map((supplier) => [supplier.id, supplier]),
     );
+    const categoryOf = await this.suppliers.categoryIdsOf(supplierIds);
+    const paths = [...categoryOf.values()].some((id) => id !== null)
+      ? await this.categories.pathsOf()
+      : new Map<number, string>();
+    const segmentsOf = await this.segments.namesOf(ctx, 'SUPPLIER', supplierIds);
     return {
       data: page.flatMap((row) => {
         const supplierId = supplierOf.get(String(row.partyId));
         if (supplierId === undefined) return [];
         const supplier = suppliers.get(supplierId);
+        const categoryId = categoryOf.get(supplierId) ?? null;
         return [
           {
             supplierId,
@@ -166,7 +198,10 @@ export class ApLedgerService {
             status: supplier?.status ?? 'ACTIVE',
             balance: row.net,
             oldestBillDate: row.oldestDueDate,
+            latestBillDate: row.latestItemDate,
             updatedAt: row.updatedAt,
+            categoryPath: categoryId === null ? null : (paths.get(categoryId) ?? null),
+            segments: segmentsOf.get(supplierId) ?? [],
           },
         ];
       }),
@@ -195,17 +230,25 @@ export class ApLedgerService {
     });
     const page = rows.slice(0, limit);
     const last = page.at(-1);
+    const documents = page.map(documentOf);
+    const confirmedBy = await this.receipts.costedByOf(
+      documents.flatMap((doc) => (doc.docType === 'RECEIPT' ? [doc.docId] : [])),
+    );
     return {
-      data: page.map((row) => ({
-        id: row.lineId,
-        entryDate: row.entryDate,
-        ...documentOf(row),
-        debit: row.debit,
-        credit: row.credit,
-        balanceAfter: row.balanceAfter.negated(),
-        createdAt: row.postedAt,
-        erkhet: erkhetOf(row),
-      })),
+      data: page.map((row, index) => {
+        const doc = documents[index] ?? documentOf(row);
+        return {
+          id: row.lineId,
+          entryDate: row.entryDate,
+          ...doc,
+          debit: row.debit,
+          credit: row.credit,
+          balanceAfter: row.balanceAfter.negated(),
+          createdAt: row.postedAt,
+          confirmedBy: doc.docType === 'RECEIPT' ? (confirmedBy.get(doc.docId) ?? null) : null,
+          erkhet: erkhetOf(row),
+        };
+      }),
       nextCursor: rows.length > limit && last ? encodeCursor({ id: last.lineId }) : null,
       opening: opening.negated(),
     };

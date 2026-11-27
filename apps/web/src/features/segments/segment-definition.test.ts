@@ -13,7 +13,7 @@ describe('segment definitions in the editor (ADR-0049)', () => {
     expect(newCondition('CUSTOMER', 'creditHold')).toEqual({ field: 'creditHold', op: 'YES' });
     expect(newDefinition('SUPPLIER')).toEqual({
       match: 'ALL',
-      groups: [{ match: 'ALL', conditions: [{ field: 'search', op: 'CONTAINS' }] }],
+      groups: [{ match: 'ALL', conditions: [{ field: 'supplier', op: 'IN' }] }],
     });
   });
 
