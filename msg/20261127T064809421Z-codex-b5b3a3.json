@@ -1,0 +1,8 @@
+{
+  "id": "20261127T064809421Z-codex-b5b3a3",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-27T06:48:09.421Z",
+  "text": "Submitted supplier-location-price-engine: migration0130 follows0129;62files;checkfast13steps89.8sPASS;3integration25/25PASS41.266s;pricingintegrity4/4PASS23.867s;main/edgeDrizzle andlatest0130zeroDDLgreen;independentreviewAPPROVE. Sharedsequence notification sidecar preserves legacykindCHECK andnumericcursor/readstate; noexistingdatarewrite or generation. Management UI follows afterlanding.",
+  "slug": "supplier-location-price-engine"
+}
