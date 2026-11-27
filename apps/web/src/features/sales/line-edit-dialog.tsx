@@ -3,6 +3,7 @@ import { LINE_EDIT_STATUSES } from '@tugeel/shared/sales';
 import { ArrowRight, Lock, Minus, Plus, RotateCcw } from 'lucide-react';
 import { Fragment, type ReactNode, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useApiClient } from '@/app/api-client-context';
 import { useHasPermission } from '@/app/auth-context';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -20,11 +21,17 @@ import { ProductSearch } from '@/features/inventory/shared';
 import { useLinesQuote } from '@/features/pricing/api';
 import { UnitSelect } from '@/features/pricing/quote-table';
 import { formatQty, formatTugrik } from '@/lib/money';
-import { problemFromError } from '@/lib/problem';
+import { problemFromError, unwrap } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { randomUuid } from '@/lib/uuid';
-import { type SalesOrder, useProductOrderInfo, useSalesOrder, useSalesOrderMutations } from './api';
+import {
+  type SalesOrder,
+  type SalesOrderLine,
+  useProductOrderInfo,
+  useSalesOrder,
+  useSalesOrderMutations,
+} from './api';
 import { usePickerSelf } from './use-picker-self';
 
 /**
@@ -73,6 +80,8 @@ interface Row {
   qty: string;
   /** Taken off when saved: a stored line marked, or a taken-off one not put back. */
   off: boolean;
+  /** A stored line in a pack (a box of several pieces): the loose pieces can be added beside it. */
+  pack?: SalesOrderLine;
   changed: boolean;
   storedTotal: string | null;
   locked: 'other' | 'done' | 'status' | null;
@@ -115,6 +124,7 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
   const office = manage || boards;
   const lead = office || self.lead;
   const { editLines } = useSalesOrderMutations();
+  const api = useApiClient();
 
   const [qty, setQty] = useState<Record<number, string>>({});
   const [off, setOff] = useState<Set<number>>(new Set());
@@ -173,6 +183,7 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
         storedTotal: line.total,
         locked: lockOf(line.warehouseId),
         excludedBy: null,
+        pack: new Decimal(line.factorSnapshot).gt(1) ? line : undefined,
       };
     }),
     ...order.excludedLines.map((line): Row => {
@@ -325,6 +336,42 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
   }, []);
+
+  // «49 хайрцаг 5 ш»: the loose pieces of a boxed line go in as a new line of the same product
+  // in its base unit, beside the boxes (the line itself keeps its unit, ADR-0175).
+  const [loadingPieces, setLoadingPieces] = useState<number | null>(null);
+  const addPieces = async (line: SalesOrderLine) => {
+    setLoadingPieces(line.id);
+    try {
+      const product = unwrap(
+        await api.GET('/api/v1/products/{id}', { params: { path: { id: line.productId } } }),
+      );
+      const base = product.units.find((unit) => unit.isBase && unit.supersededAt === null);
+      if (!base) {
+        toast.warning(t('sales.lineEdit.noBaseUnit'));
+        return;
+      }
+      setAdded((all) =>
+        all.some((entry) => entry.productId === line.productId && entry.unitId === base.id)
+          ? all
+          : [
+              ...all,
+              {
+                key: randomUuid(),
+                productId: line.productId,
+                sku: line.productSku,
+                name: line.productName,
+                unitId: base.id,
+                qty: '1',
+              },
+            ],
+      );
+    } catch {
+      toast.warning(t('sales.lineEdit.piecesFailed'));
+    } finally {
+      setLoadingPieces(null);
+    }
+  };
 
   const setRowQty = (row: Row, value: string) => {
     if (row.kind === 'line') setQty((all) => ({ ...all, [row.id]: value }));
@@ -529,6 +576,14 @@ function Editor({ order, onClose }: { order: SalesOrder; onClose: () => void }) 
                       onStep={(by) => step(row, by)}
                       onToggle={() => toggleOff(row)}
                       onRevert={() => revert(row)}
+                      onPieces={
+                        row.pack && row.locked === null && !row.off
+                          ? () => {
+                              if (row.pack) void addPieces(row.pack);
+                            }
+                          : undefined
+                      }
+                      piecesBusy={loadingPieces === row.id}
                     />
                   ))}
                 </Fragment>
@@ -642,6 +697,8 @@ function LineRow({
   onStep,
   onToggle,
   onRevert,
+  onPieces,
+  piecesBusy = false,
 }: {
   row: Row;
   total: Decimal | null;
@@ -651,6 +708,9 @@ function LineRow({
   onStep: (by: number) => void;
   onToggle: () => void;
   onRevert: () => void;
+  /** A boxed line: add its loose pieces as a line of the base unit. */
+  onPieces?: () => void;
+  piecesBusy?: boolean;
 }) {
   const { t } = useTranslation();
   const locked = row.locked !== null;
@@ -753,6 +813,17 @@ function LineRow({
         </div>
         <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-1 text-xs text-muted-foreground">
           {unit ?? <span>{row.unitName}</span>}
+          {onPieces ? (
+            <button
+              type="button"
+              className="rounded px-1 font-medium text-link underline-offset-2 hover:underline touch:min-h-11"
+              title={t('sales.lineEdit.addPiecesHint')}
+              disabled={piecesBusy}
+              onClick={onPieces}
+            >
+              {t('sales.lineEdit.addPieces')}
+            </button>
+          ) : null}
           {row.storedQty !== null &&
           row.changed &&
           !row.off &&
