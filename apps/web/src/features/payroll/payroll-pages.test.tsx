@@ -92,6 +92,7 @@ const line = (scored: boolean): Schemas['PayrollLine'] => ({
     },
   ],
   adjustments: [],
+  sourceDeductions: [],
   advances: [],
   unscoredCount: scored ? 0 : 1,
   kpiTotal: '273800.00',
@@ -154,6 +155,7 @@ const SCORING: Schemas['PayrollScoring'] = {
 };
 
 const routes = (scored: boolean) => ({
+  'GET /api/v1/payroll/source-deductions': () => json([]),
   'GET /api/v1/payroll/runs': () => json([]),
   'GET /api/v1/payroll/runs/3': () => json(run(scored)),
   'GET /api/v1/payroll/scoring/runs': () =>
@@ -436,4 +438,61 @@ describe('payroll pages (ADR-0235)', () => {
       scores: [{ itemId: 12, scorePercent: '50', note: null }],
     });
   });
+});
+
+it('shows pending sale losses and return credits and explicitly assigns a payroll month', async () => {
+  const source = {
+    id: 8,
+    name: mn.payroll.web.sourceDeductions.title,
+    sourceKind: 'EXPIRY_SALE',
+    sourceKey: 'expiry:POS:sale:line:7',
+    sourceReference: 'expiry:1/markdown:7',
+    userId: 5,
+    amount: '1200.00',
+    requestedMonth: null,
+    assignedMonth: null,
+    reversesId: null,
+    state: 'NEEDS_MONTH',
+    createdAt: STAMP,
+    settlements: [],
+  };
+  const refund = {
+    ...source,
+    id: 9,
+    sourceKind: 'EXPIRY_RETURN',
+    amount: '-300.00',
+    reversesId: 8,
+  };
+  const fetchMock = signedIn(HR, {
+    ...routes(true),
+    'GET /api/v1/payroll/terms': () => json([payTerms()]),
+    'GET /api/v1/payroll/source-deductions': () => json([source, refund]),
+    'PUT /api/v1/payroll/source-deductions/8/month': () => json([source, refund]),
+  });
+  renderApp('/hr/payroll/runs', fetchMock);
+  await screen.findByText(mn.payroll.web.sourceDeductions.refund);
+  expect(screen.getAllByText(mn.payroll.web.sourceDeductions.states.NEEDS_MONTH)).toHaveLength(2);
+  expect(
+    screen.getAllByRole('link', {
+      name: mn.payroll.web.sourceDeductions.sourceLabel
+        .replace('{{item}}', '1')
+        .replace('{{markdown}}', '7'),
+    })[0],
+  ).toHaveAttribute('href', '/inventory/expiry?item=1');
+  const user = userEvent.setup();
+  await user.click(
+    screen.getAllByRole('button', { name: mn.payroll.web.sourceDeductions.assign })[0]!,
+  );
+  const dialog = within(await screen.findByRole('dialog'));
+  const month = dialog.getByLabelText<HTMLInputElement>(mn.payroll.web.sourceDeductions.month);
+  await user.clear(month);
+  await user.type(month, '2026-01');
+  const chosen = month.value;
+  await user.click(dialog.getByRole('button', { name: mn.common.save }));
+  await waitFor(() =>
+    expect(calls(fetchMock, 'PUT', '/api/v1/payroll/source-deductions/8/month')).toHaveLength(1),
+  );
+  expect(
+    await bodyOf(calls(fetchMock, 'PUT', '/api/v1/payroll/source-deductions/8/month')[0]),
+  ).toEqual({ month: chosen });
 });

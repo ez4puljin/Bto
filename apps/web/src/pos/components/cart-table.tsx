@@ -9,18 +9,26 @@ import { Button } from '@/components/ui/button';
 import { formatMnt, formatQty, formatTugrik } from '@/lib/money';
 import { useScanGuard } from '@/lib/scan/use-wedge-scanner';
 import { parseQty } from '../amounts';
-import { type CartLine, canDecrease, freeQty, paidEntryOf, shownQty } from '../cart';
+import {
+  type CartLine,
+  type CartKey,
+  cartKey,
+  canDecrease,
+  freeQty,
+  paidEntryOf,
+  shownQty,
+} from '../cart';
 import { keepFocus, typeDigits } from '../keys';
 
 interface CartTableProps {
   lines: readonly CartLine[];
   /** The edge's latest prices by unit (possibly of the cart before the last change). */
-  quoted: ReadonlyMap<number, EdgeQuotedLine>;
-  selected: number | null;
-  onSelect: (unitId: number) => void;
-  onStep: (unitId: number, delta: 1 | -1) => void;
-  onSetQty: (unitId: number, qty: string) => void;
-  onRemove: (unitId: number) => void;
+  quoted: ReadonlyMap<CartKey, EdgeQuotedLine>;
+  selected: CartKey | null;
+  onSelect: (unitId: CartKey) => void;
+  onStep: (unitId: CartKey, delta: 1 | -1) => void;
+  onSetQty: (unitId: CartKey, qty: string) => void;
+  onRemove: (unitId: CartKey) => void;
   /** A scan that lands in a quantity field. */
   onScan: (code: string) => void;
   /** Gives the focus back to the scan box after a quantity was typed. */
@@ -56,7 +64,10 @@ export function CartTable(props: CartTableProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-card ring-1 ring-black/[0.06]">
       <div className="min-h-0 flex-1 overflow-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]">
-        <table className="w-full table-fixed text-sm" aria-label={t('posKiosk.sale.cart')}>
+        <table
+          className="w-full min-w-[36rem] table-fixed text-sm"
+          aria-label={t('posKiosk.sale.cart')}
+        >
           <thead className="sticky top-0 z-10 bg-card">
             <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
               <th scope="col" className="h-8 w-8 pl-3 font-medium xl:w-10">
@@ -86,22 +97,22 @@ export function CartTable(props: CartTableProps) {
           <tbody>
             {props.lines.map((line, index) => (
               <CartRow
-                key={line.productUnitId}
+                key={cartKey(line)}
                 onSelect={props.onSelect}
                 onSetQty={props.onSetQty}
                 onScan={props.onScan}
                 onDone={props.onDone}
                 index={index}
                 line={line}
-                quoted={props.quoted.get(line.productUnitId)}
-                selected={props.selected === line.productUnitId}
+                quoted={props.quoted.get(cartKey(line))}
+                selected={props.selected === cartKey(line)}
               />
             ))}
           </tbody>
         </table>
       </div>
       <LineActions
-        line={props.lines.find((line) => line.productUnitId === props.selected)}
+        line={props.lines.find((line) => cartKey(line) === props.selected)}
         quoted={props.selected === null ? undefined : props.quoted.get(props.selected)}
         onStep={props.onStep}
         onRemove={props.onRemove}
@@ -114,8 +125,8 @@ export function CartTable(props: CartTableProps) {
 function LineActions(props: {
   line: CartLine | undefined;
   quoted: EdgeQuotedLine | undefined;
-  onStep: (unitId: number, delta: 1 | -1) => void;
-  onRemove: (unitId: number) => void;
+  onStep: (unitId: CartKey, delta: 1 | -1) => void;
+  onRemove: (unitId: CartKey) => void;
 }) {
   const { t } = useTranslation();
   const { line } = props;
@@ -142,7 +153,7 @@ function LineActions(props: {
         title={t('posKiosk.sale.decrease', { name: label })}
         disabled={!line || !canDecrease(shownQty(line.qty, paidEntryOf(props.quoted)))}
         onMouseDown={keepFocus}
-        onClick={() => line && props.onStep(line.productUnitId, -1)}
+        onClick={() => line && props.onStep(cartKey(line), -1)}
       >
         <Minus />
       </Button>
@@ -155,7 +166,7 @@ function LineActions(props: {
         title={t('posKiosk.sale.increase', { name: label })}
         disabled={!line}
         onMouseDown={keepFocus}
-        onClick={() => line && props.onStep(line.productUnitId, 1)}
+        onClick={() => line && props.onStep(cartKey(line), 1)}
       >
         <Plus />
       </Button>
@@ -168,7 +179,7 @@ function LineActions(props: {
         title={t('posKiosk.sale.remove', { name: label })}
         disabled={!line}
         onMouseDown={keepFocus}
-        onClick={() => line && props.onRemove(line.productUnitId)}
+        onClick={() => line && props.onRemove(cartKey(line))}
       >
         <Trash2 />
       </Button>
@@ -177,7 +188,7 @@ function LineActions(props: {
 }
 
 function labelOf(line: CartLine): string {
-  return `${line.name} (${line.uomName})`;
+  return `${line.name} (${line.uomName})${line.expiryBarcode ? ` · ${line.expiryBarcode}` : ''}`;
 }
 
 function CartRow(
@@ -192,7 +203,7 @@ function CartRow(
   const { line, quoted } = props;
   const [draft, setDraft] = useState<string | null>(null);
   const row = useRef<HTMLTableRowElement>(null);
-  const guard = useScanGuard(props.onScan);
+  const guard = useScanGuard(props.onScan, { letters: true });
   const label = labelOf(line);
   // An answer for another quantity (the cart changed since) shows dimmed until the next one.
   const current = quoted !== undefined && new Decimal(quoted.qty).eq(line.qty);
@@ -203,7 +214,7 @@ function CartRow(
   const from = offer ? { qty: formatQty(offer.fromQtyBase), uom: offer.baseUom } : null;
   // The N+M (owner 2026-11-17): a paid-entry line counts its own free units at once; another
   // line takes them from the edge's answer for its quantity.
-  const bonus = quoted?.bonus ?? null;
+  const bonus = line.expiryBarcode ? null : (quoted?.bonus ?? null);
   const entry = paidEntryOf(quoted);
   const shown = shownQty(line.qty, entry);
   const free = entry ? freeQty(line.qty, entry) : current && bonus ? bonus.freeQty : '0';
@@ -228,7 +239,7 @@ function CartRow(
   const commit = () => {
     if (draft === null) return;
     const qty = parseQty(draft);
-    if (qty !== null && qty !== shown) props.onSetQty(line.productUnitId, qty);
+    if (qty !== null && qty !== shown) props.onSetQty(cartKey(line), qty);
     setDraft(null);
   };
 
@@ -237,7 +248,7 @@ function CartRow(
       ref={row}
       aria-selected={props.selected}
       data-state={props.selected ? 'selected' : undefined}
-      onClick={() => props.onSelect(line.productUnitId)}
+      onClick={() => props.onSelect(cartKey(line))}
       className={cn(
         'border-b border-border/80 transition-colors last:border-0',
         props.selected
@@ -260,6 +271,11 @@ function CartRow(
             {line.uomName}
           </span>
         </div>
+        {line.expiryBarcode ? (
+          <span className="block text-xs font-medium text-warning">
+            {t('expiry.commerce.variant')} · {line.expiryBarcode}
+          </span>
+        ) : null}
         {deal && new Decimal(free).gt(0) ? (
           <span className="block truncate text-xs leading-3.5 font-medium text-success">
             {t('posKiosk.sale.bonusFree', { free: formatQty(free), uom: line.uomName, deal })}
@@ -275,7 +291,7 @@ function CartRow(
           value={draft ?? formatQty(shown)}
           onFocus={(event) => {
             setDraft(shown);
-            props.onSelect(line.productUnitId);
+            props.onSelect(cartKey(line));
             event.currentTarget.select();
           }}
           onChange={(event) => setDraft(event.target.value)}

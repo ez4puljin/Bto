@@ -4,6 +4,7 @@ import { ScanBarcode } from 'lucide-react';
 import { type KeyboardEvent, type RefObject, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatQty, formatTugrik } from '@/lib/money';
+import { WEDGE_DEFAULTS, WedgeDetector } from '@/lib/scan/wedge-detector';
 import { useDebounced } from '@/lib/use-debounced';
 import { useProblemText } from '../messages';
 import { useProductSearch } from '../queries';
@@ -49,6 +50,7 @@ export function ProductFinder(props: {
   const list = useRef<HTMLUListElement>(null);
   const [active, setActive] = useState(-1);
   const text = props.value.trim();
+  const expiryScan = useRef(new WedgeDetector({ ...WEDGE_DEFAULTS, letters: true }));
   const q = useDebounced(text, 200);
   const searching = q.length >= 2 && q === text;
   const search = useProductSearch(searching ? q : '');
@@ -70,6 +72,13 @@ export function ProductFinder(props: {
     clear();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    const scanned = expiryScan.current.feed(event);
+    if (scanned && /^BTOEXP-[1-9]\d*$/.test(scanned)) {
+      event.preventDefault();
+      clear();
+      props.onScan(scanned);
+      return;
+    }
     if (open && event.key === 'ArrowDown') {
       event.preventDefault();
       setActive(Math.min(index + 1, options.length - 1));

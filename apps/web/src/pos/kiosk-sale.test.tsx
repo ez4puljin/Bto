@@ -533,3 +533,95 @@ describe('kiosk: the sale screen', () => {
     expect(await screen.findByRole('status', { name: /3 хүлээгдэж буй/ })).toBeInTheDocument();
   });
 });
+
+it('keeps a scanned expiry label distinct from fresh goods through the actual sale request', async () => {
+  const barcode = 'BTOEXP-7';
+  const edge = await openSale({
+    [`GET /products/barcode/${barcode}`]: () =>
+      json({ product: MILK, unitId: 11, expiryBarcode: barcode }),
+    'POST /quote': (call) => {
+      const request = call.body as EdgeQuoteRequest;
+      const quoted = quoteOf(request);
+      quoted.lines = quoted.lines.map((line, index) => {
+        const expiryBarcode = request.lines[index]?.expiryBarcode;
+        return expiryBarcode
+          ? {
+              ...line,
+              expiryBarcode,
+              unitPrice: '500.00',
+              total: new Decimal(500).times(line.qty).toFixed(2),
+            }
+          : line;
+      });
+      quoted.total = quoted.lines
+        .reduce((sum, line) => sum.plus(line.total ?? 0), new Decimal(0))
+        .toFixed(2);
+      quoted.subtotal = quoted.total;
+      return json(quoted);
+    },
+  });
+  await wedgeScan(MILK_BARCODE);
+  screen.getByLabelText<HTMLInputElement>(k.sale.scanLabel).blur();
+  await wedgeScan(barcode);
+  await wedgeScan(barcode);
+  await waitFor(() =>
+    expect(lastQuote(edge)).toEqual({
+      lines: [
+        { productUnitId: 11, qty: '1' },
+        { productUnitId: 11, qty: '2', expiryBarcode: barcode },
+      ],
+    }),
+  );
+  expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(3);
+  expect(edge.callsTo('POST /voids')).toHaveLength(0);
+  expect(screen.getByText(new RegExp(barcode))).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('4,500'));
+  const user = userEvent.setup();
+  const markedName = `Сүү 1л (ш) · ${barcode}`;
+  await user.click(
+    screen.getByRole('button', { name: k.sale.increase.replace('{{name}}', markedName) }),
+  );
+  await waitFor(() => expect(qtyField(markedName)).toHaveValue('3'));
+  expect(qtyField('Сүү 1л (ш)')).toHaveValue('1');
+  await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('5,000'));
+  await user.click(qtyField(markedName));
+  await user.keyboard('{Control>}a{/Control}4{Enter}');
+  await waitFor(() => expect(qtyField(markedName)).toHaveValue('4'));
+  expect(qtyField('Сүү 1л (ш)')).toHaveValue('1');
+  await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('5,500'));
+  await user.click(
+    screen.getByRole('button', { name: k.sale.remove.replace('{{name}}', markedName) }),
+  );
+  const approval = await screen.findByRole('dialog', { name: k.approval.titles.LINE_REMOVED });
+  const pin = within(approval).getByLabelText(k.approval.pin);
+  await waitFor(() => expect(pin).toHaveFocus());
+  await user.type(pin, '654321');
+  await user.click(within(approval).getByRole('button', { name: k.approval.approve }));
+  await waitFor(() =>
+    expect(screen.queryByLabelText(k.sale.qtyFor.replace('{{name}}', markedName))).toBeNull(),
+  );
+  expect(qtyField('Сүү 1л (ш)')).toHaveValue('1');
+  await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('3,500'));
+  expect(edge.callsTo('POST /voids')[0]?.body).toEqual(
+    expect.objectContaining({
+      reason: 'LINE_REMOVED',
+      lines: [{ productUnitId: 11, qty: '4', expiryBarcode: barcode }],
+    }),
+  );
+  await wedgeScan(barcode);
+  await wedgeScan(barcode);
+  await waitFor(() => expect(qtyField(markedName)).toHaveValue('2'));
+  await waitFor(() => expect(screen.getByTestId('sale-total')).toHaveTextContent('4,500'));
+  await user.keyboard('{F12}');
+  await screen.findByRole('dialog', { name: k.pay.title });
+  await user.keyboard('1');
+  await user.keyboard('{Enter}');
+  await user.keyboard('{Enter}');
+  await waitFor(() => expect(edge.callsTo('POST /sales')).toHaveLength(1));
+  const sale = edge.callsTo('POST /sales')[0]?.body as EdgeSaleRequest;
+  expect(sale.lines).toEqual([
+    { productUnitId: 11, qty: '1' },
+    { productUnitId: 11, qty: '2', expiryBarcode: barcode },
+  ]);
+  expect(JSON.stringify(sale.lines)).not.toMatch(/cost|liable|payrollMonth/i);
+});
