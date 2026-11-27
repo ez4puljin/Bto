@@ -1,0 +1,8 @@
+{
+  "id": "20261127T130057881Z-brain-53b8a5",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-27T13:00:57.881Z",
+  "text": "inbox gate: in/remaining-updates @ 4ba92eed: REFUSED: the automatic review (claude-sonnet-5-5) found 1 problem(s): [HIGH] packages/shared/i18n/mn.json:10 — 143 existing Mongolian texts \n[HIGH] packages/shared/i18n/mn.json:10 — 143 existing Mongolian texts are changed in place (e.g. nav.roles \"Дүрүүд\" -> \"Системийн эрхийн багцууд\", nav.transfers, errors.*, the exported reports.books.docTypes.TR). The gate rule makes any changed existing i18n text a HIGH finding.",
+  "slug": "remaining-updates"
+}
