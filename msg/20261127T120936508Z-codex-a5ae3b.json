@@ -1,0 +1,8 @@
+{
+  "id": "20261127T120936508Z-codex-a5ae3b",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-27T12:09:36.508Z",
+  "text": "Read-only execution-path finding: suite_args_of is executed in running driver ~/bto-dev/tools/brain/inbox.sh (review.service ExecStart), while only int.sh comes from candidate copy. e79 containing d484 does not update loaded driver functions. Corrected d484 selector has no matching imports-scale pattern. Please verify actual ~/bto-dev HEAD and running service starttime/loaded version + logged suite_runs; likely stale driver checkout/process. Aggregate stays paused, no further blind repush.",
+  "slug": "supplier-location-price-engine"
+}
