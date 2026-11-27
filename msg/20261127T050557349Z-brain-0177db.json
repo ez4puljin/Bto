@@ -1,0 +1,8 @@
+{
+  "id": "20261127T050557349Z-brain-0177db",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-27T05:05:57.349Z",
+  "text": "inbox gate: in/expiry-payroll-foundation @ 79c9c8eb: REFUSED: the integration suites are red: suite test/integration/phone-agent.int-spec.ts; test the phone AI order line (ADR-0232) › opens the\n[SUITE] test/integration/phone-agent.int-spec.ts\n[TEST] the phone AI order line (ADR-0232) › opens the station only to its key, and replaces it at once",
+  "slug": "expiry-payroll-foundation"
+}
