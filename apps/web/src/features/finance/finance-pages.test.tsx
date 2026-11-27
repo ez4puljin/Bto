@@ -170,10 +170,8 @@ describe('finance pages (ADR-0060 #11)', () => {
         name: mn.finance.payments.panelTitle.replace('{{number}}', 'Т-20261016-0001'),
       }),
     );
-    expect(panel.getByRole('link', { name: 'Н-20261016-0001' })).toHaveAttribute(
-      'href',
-      '/finance/invoices?invoice=11',
-    );
+    // No invoice block on the voucher: the company does not use invoices (owner, 2026-11-27).
+    expect(panel.queryByRole('link', { name: 'Н-20261016-0001' })).toBeNull();
     expect(panel.getByText(/Жолооч Дорж/)).toBeInTheDocument();
   });
 

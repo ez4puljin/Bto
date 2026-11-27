@@ -33,6 +33,58 @@ export const PAYROLL_KEYS = {
   scoring: ['payroll', 'scoring'] as const,
 };
 
+export interface PayrollSourceDeduction {
+  id: number;
+  name: string;
+  sourceKind: 'EXPIRY_SALE' | 'EXPIRY_RETURN';
+  sourceKey: string;
+  sourceReference: string;
+  userId: number;
+  amount: string;
+  requestedMonth: string | null;
+  assignedMonth: string | null;
+  reversesId: number | null;
+  state: 'NEEDS_MONTH' | 'WAITING_RUN' | 'MONTH_CLOSED' | 'MISSING_LINE' | 'READY' | 'SETTLED';
+  createdAt: string;
+  settlements: {
+    id: number;
+    runId: number;
+    amount: string;
+    createdAt: string;
+    releasedAt: string | null;
+  }[];
+}
+
+export function useSourceDeductions(
+  filter: { sourceReference?: string; pendingOnly?: boolean },
+  enabled = true,
+) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...PAYROLL_KEYS.all, 'source-deductions', filter],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/payroll/source-deductions', { params: { query: filter }, signal }),
+      ) as PayrollSourceDeduction[],
+  });
+}
+
+export function useAssignSourceMonth() {
+  const api = useApiClient();
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, month }: { id: number; month: string }) =>
+      unwrap(
+        await api.PUT('/api/v1/payroll/source-deductions/{id}/month', {
+          params: { path: { id } },
+          body: { month },
+        }),
+      ) as PayrollSourceDeduction[],
+    onSuccess: () => cache.invalidateQueries({ queryKey: PAYROLL_KEYS.all }),
+  });
+}
+
 export function usePayrollSettings() {
   const api = useApiClient();
   return useQuery({
@@ -55,10 +107,11 @@ export function useTemplates(includeArchived = false) {
   });
 }
 
-export function useAllTerms() {
+export function useAllTerms(enabled = true) {
   const api = useApiClient();
   return useQuery({
     queryKey: PAYROLL_KEYS.terms,
+    enabled,
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/v1/payroll/terms', { signal })),
   });
 }

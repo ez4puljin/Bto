@@ -1,3 +1,4 @@
+import { ExpiryCommerceExceptions } from './commerce-exceptions';
 import type { ExpiryView } from '@tugeel/shared/expiry';
 import type { TFunction } from 'i18next';
 import {
@@ -196,6 +197,7 @@ export function ExpiryPage() {
           </>
         }
       />
+      <ExpiryCommerceExceptions />
       <ExpiryTiles summary={summary.data} view={filter.view} onView={setView} />
       <div className="flex items-start gap-4">
         <ExpiryFilterPanel

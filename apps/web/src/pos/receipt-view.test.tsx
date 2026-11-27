@@ -247,3 +247,14 @@ describe('the N+M on the receipt (owner 2026-11-17)', () => {
     expect(screen.queryByText(r.grandTotal)).toBeNull();
   });
 });
+
+it.each([true, false])('prints the expiry identity on a compact=%s receipt', (compact) => {
+  const base = defaultReceiptLayout();
+  draw({ ...base, blocks: [{ type: 'LINES', compact }] }, false, (receipt) => ({
+    ...receipt,
+    lines: receipt.lines.map((line, index) =>
+      index === 0 ? { ...line, expiryBarcode: 'BTOEXP-7' } : line,
+    ),
+  }));
+  expect(screen.getByText(/BTOEXP-7/)).toHaveTextContent(mn.expiry.commerce.variant);
+});

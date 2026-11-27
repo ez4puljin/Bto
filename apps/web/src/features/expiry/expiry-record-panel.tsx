@@ -36,6 +36,7 @@ import {
   useExpiryMutations,
 } from './api';
 import { ExpiryLiabilityDialog } from './expiry-liability-dialog';
+import { ExpiryCommerceSection } from './expiry-commerce-section';
 import {
   changedFields,
   draftProblems,
@@ -145,7 +146,7 @@ export function ExpiryRecordPanel(props: {
               key={`${item.id}:${formRound}`}
               item={item}
               today={props.today}
-              onReload={() => void query.refetch()}
+              onReload={async () => (await query.refetch()).data}
               onDirty={props.onDirty}
             />
           ) : null}
@@ -256,19 +257,20 @@ function useRecordDraft(item: ExpiryItem) {
 function RecordBody(props: {
   item: ExpiryItem;
   today: string | undefined;
-  onReload: () => void;
+  onReload: () => Promise<ExpiryItem | undefined>;
   onDirty: (dirty: boolean) => void;
 }) {
   const { t } = useTranslation();
   const { item, onDirty } = props;
   const archived = item.status === 'ARCHIVED';
   const form = useRecordDraft(item);
+  const [commerceDirty, setCommerceDirty] = useState(false);
   // An archive that arrives takes the form away, not what was typed: that still counts as work.
   const dirty = !isSameDraft(form.draft, form.read.values);
   useEffect(() => {
-    onDirty(dirty);
+    onDirty(dirty || commerceDirty);
     return () => onDirty(false);
-  }, [dirty, onDirty]);
+  }, [dirty, commerceDirty, onDirty]);
 
   return (
     // The facts run across the panel (two rows on a till PC, not four beside the history), and the
@@ -291,11 +293,18 @@ function RecordBody(props: {
                 today={props.today}
                 form={form}
                 dirty={dirty}
-                onReload={props.onReload}
+                onReload={() => void props.onReload()}
               />
             )}
           </PanelSection>
           <LiabilitySection item={item} />
+          <ExpiryCommerceSection
+            item={item}
+            today={props.today}
+            recordDirty={dirty}
+            onDirty={setCommerceDirty}
+            reloadItem={props.onReload}
+          />
         </div>
         <PanelSection title={t('expiry.history.title')}>
           <HistoryTimeline itemId={item.id} />

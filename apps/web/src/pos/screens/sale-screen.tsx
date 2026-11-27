@@ -54,9 +54,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatMnt, formatTugrik } from '@/lib/money';
+import { scanChar } from '@/lib/barcode-keys';
 import { isTextField, useWedgeScanner } from '@/lib/scan/use-wedge-scanner';
+import { WEDGE_DEFAULTS } from '@/lib/scan/wedge-detector';
 import { randomUuid } from '@/lib/uuid';
-import { type Cart, type CartLine, canDecrease, heldQty, paidEntryOf, shownQty } from '../cart';
+import {
+  type Cart,
+  type CartLine,
+  type CartKey,
+  cartKey as cartLineKey,
+  canDecrease,
+  heldQty,
+  paidEntryOf,
+  shownQty,
+} from '../cart';
 import { type ApprovalRequest, ApprovalDialog } from '../components/approval-dialog';
 import { CartTable } from '../components/cart-table';
 import { CardHistoryDialog } from '../components/card-history-dialog';
@@ -160,8 +171,8 @@ export function SaleScreen(props: {
   }, [empty]);
   const quoted = useMemo(
     () =>
-      new Map<number, EdgeQuotedLine>(
-        (quote.data?.lines ?? []).map((line) => [line.productUnitId, line]),
+      new Map<CartKey, EdgeQuotedLine>(
+        (quote.data?.lines ?? []).map((line) => [cartLineKey(line), line]),
       ),
     [quote.data],
   );
@@ -195,17 +206,22 @@ export function SaleScreen(props: {
   useEffect(() => {
     if (!fresh) return;
     for (const line of cartLines) {
-      const answer = quoted.get(line.productUnitId);
+      const answer = quoted.get(cartLineKey(line));
       const entry = paidEntryOf(answer);
       if (!entry || !answer || !new Decimal(answer.qty).eq(line.qty)) continue;
       const held = heldQty(shownQty(line.qty, entry), entry);
-      if (!new Decimal(held).eq(line.qty)) setCartQty(line.productUnitId, held);
+      if (!new Decimal(held).eq(line.qty)) setCartQty(cartLineKey(line), held);
     }
   }, [fresh, quoted, cartLines, setCartQty]);
 
   const addProduct = useCallback(
-    (product: EdgeProductHit, unitId: number) => {
-      cart.add(product, unitId, paidEntryOf(quoted.get(unitId)));
+    (product: EdgeProductHit, unitId: number, expiryBarcode?: string) => {
+      cart.add(
+        product,
+        unitId,
+        expiryBarcode ? null : paidEntryOf(quoted.get(unitId)),
+        expiryBarcode,
+      );
       setScanError(null);
     },
     [cart, quoted],
@@ -239,7 +255,7 @@ export function SaleScreen(props: {
       if (!code) return;
       try {
         const hit = await client.barcode(code);
-        addProduct(hit.product, hit.unitId);
+        addProduct(hit.product, hit.unitId, hit.expiryBarcode);
       } catch (error) {
         const problem = edgeProblemOf(error);
         setScanError(
@@ -252,7 +268,7 @@ export function SaleScreen(props: {
   const onScan = useCallback((code: string) => void scan(code), [scan]);
 
   // A scan while focus is outside the scan box (a button, the page) still reaches the cart.
-  useWedgeScanner(onScan, dialog === null, { root });
+  useWedgeScanner(onScan, dialog === null, { root, letters: true });
   // A scan over the receipt closes it and starts the next sale with that product.
   useWedgeScanner(
     (code) => {
@@ -260,7 +276,7 @@ export function SaleScreen(props: {
       onScan(code);
     },
     dialog === 'receipt',
-    { root: receiptContent },
+    { root: receiptContent, letters: true },
   );
 
   const startPayment = useCallback(
@@ -341,7 +357,11 @@ export function SaleScreen(props: {
         await client.void({
           clientId,
           reason,
-          lines: items.map((item) => ({ productUnitId: item.line.productUnitId, qty: item.qty })),
+          lines: items.map((item) => ({
+            productUnitId: item.line.productUnitId,
+            qty: item.qty,
+            ...(item.line.expiryBarcode ? { expiryBarcode: item.line.expiryBarcode } : {}),
+          })),
           approval: given,
         });
         apply();
@@ -367,12 +387,12 @@ export function SaleScreen(props: {
   );
 
   const lineOf = useCallback(
-    (unitId: number) => cart.lines.find((line) => line.productUnitId === unitId),
+    (unitId: CartKey) => cart.lines.find((line) => cartLineKey(line) === unitId),
     [cart.lines],
   );
 
   const removeLine = useCallback(
-    (unitId: number) => {
+    (unitId: CartKey) => {
       const line = lineOf(unitId);
       if (line) voidLines('LINE_REMOVED', [{ line, qty: line.qty }], () => cart.remove(unitId));
     },
@@ -381,7 +401,7 @@ export function SaleScreen(props: {
 
   // + and − change a paid-entry line by one paid unit; the void logs the goods taken off.
   const stepLine = useCallback(
-    (unitId: number, delta: 1 | -1) => {
+    (unitId: CartKey, delta: 1 | -1) => {
       const line = lineOf(unitId);
       if (!line) return;
       const entry = paidEntryOf(quoted.get(unitId));
@@ -405,7 +425,7 @@ export function SaleScreen(props: {
 
   /** A typed quantity: on a paid-entry line the paid one, sent with its free units. */
   const setLineQty = useCallback(
-    (unitId: number, typed: string) => {
+    (unitId: CartKey, typed: string) => {
       const line = lineOf(unitId);
       if (!line) return;
       const qty = heldQty(typed, paidEntryOf(quoted.get(unitId)));
@@ -476,6 +496,7 @@ export function SaleScreen(props: {
           name: line.name,
           uomName: line.uomName,
           qty: line.qty,
+          ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
         })),
       );
       setNotice(t('posKiosk.sale.resumedToast'));
@@ -549,8 +570,14 @@ export function SaleScreen(props: {
     keys.current = { dialog, openPayment, cartKey, park, cartEmpty: empty };
   });
   useEffect(() => {
+    let scannedPrefix = '';
+    let lastCharacterAt = Number.NEGATIVE_INFINITY;
     const listener = (event: KeyboardEvent) => {
       const current = keys.current;
+      if (event.key === 'Enter') {
+        scannedPrefix = '';
+        lastCharacterAt = Number.NEGATIVE_INFINITY;
+      }
       if (TOOL_KEYS.has(event.key)) {
         event.preventDefault();
         if (current.dialog !== null) return;
@@ -575,6 +602,15 @@ export function SaleScreen(props: {
       const target = event.target;
       if (target instanceof Node && target !== document.body && !root.current?.contains(target)) {
         return;
+      }
+      const character = scanChar(event);
+      if (character !== null) {
+        const fast = event.timeStamp - lastCharacterAt <= WEDGE_DEFAULTS.maxGapMs;
+        const labelHyphen = fast && scannedPrefix === 'BTOEXP' && character === '-';
+        scannedPrefix = (fast ? `${scannedPrefix}${character}` : character).slice(-6);
+        lastCharacterAt = event.timeStamp;
+        // The separator of a scanned label must not decrease the selected basket line.
+        if (labelHyphen) return;
       }
       current.cartKey(event, true);
     };
@@ -603,7 +639,11 @@ export function SaleScreen(props: {
                 addProduct(product, unitId);
                 setNotice(null);
               }}
-              isCode={(text) => /^[0-9]+$/.test(text) || parseVoucherCode(text) !== null}
+              isCode={(text) =>
+                /^[0-9]+$/.test(text) ||
+                /^BTOEXP-[1-9]\d*$/i.test(text) ||
+                parseVoucherCode(text) !== null
+              }
               onCartKey={(event, empty) => cartKey(event, empty)}
               onTypeKey={(event) => typeDigits(event, draft, setDraft)}
             />

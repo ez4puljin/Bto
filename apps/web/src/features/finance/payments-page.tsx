@@ -1,5 +1,4 @@
 import { PAYMENT_KINDS, PAYMENT_STATUSES } from '@tugeel/shared/finance';
-import { Decimal } from '@tugeel/shared/money';
 import { Coins, Ellipsis, Plus, Printer } from 'lucide-react';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +17,7 @@ import {
   TruncateCell,
 } from '@/components/list';
 import { NativeSelect } from '@/components/native-select';
+import { FieldList, type Field } from '@/components/detail';
 import { PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
@@ -27,19 +27,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { printFormatParam, usePrintFormat } from '@/lib/print-format';
 import { PrintFormatToggle } from '@/components/print-format-toggle';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatUbDateTime } from '@/lib/dayjs';
-import { formatMnt, formatTugrik } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { hrefWithParam, useSetParam } from '@/lib/search-params';
 import { toast } from '@/lib/toast';
@@ -57,7 +50,7 @@ import {
   usePayments,
 } from './api';
 import { PaymentKindBadge, PaymentStatusBadge } from './badges';
-import { FactChips, PanelSection, RecordSheet } from './panel';
+import { RecordSheet } from './panel';
 import { PaymentDialog } from './payment-dialog';
 import { VoidDialog } from './void-dialog';
 
@@ -371,24 +364,20 @@ function PaymentActions({ payment }: { payment: PaymentDetail }) {
 
 function PaymentBody({ payment }: { payment: PaymentDetail }) {
   const { t } = useTranslation();
-  const facts = [
-    { label: t('finance.fields.date'), value: payment.paidOn },
-    {
-      label: t('finance.fields.moneyAccount'),
-      value: `${payment.moneyAccountName} · ${payment.moneyAccountCode}`,
-    },
+  const linkClass = 'text-link underline-offset-2 hover:underline';
+  // Who and where: the money's side of the voucher, read top to bottom.
+  const details: Field[] = [
+    { label: t('finance.fields.date'), value: <span className="font-mono">{payment.paidOn}</span> },
     ...(payment.customerId
       ? [
           {
             label: t('finance.fields.customer'),
             value: (
-              <Link
-                className="text-link underline-offset-2 hover:underline"
-                to={`/finance/customers/${payment.customerId}`}
-              >
-                {payment.customerName} · {payment.customerCode}
+              <Link className={linkClass} to={`/finance/customers/${payment.customerId}`}>
+                {payment.customerName}
               </Link>
             ),
+            hint: payment.customerCode,
           },
         ]
       : []),
@@ -396,24 +385,42 @@ function PaymentBody({ payment }: { payment: PaymentDetail }) {
       ? [
           {
             label: t('finance.fields.account'),
-            value: `${payment.glAccountCode} · ${payment.glAccountName}`,
+            value: payment.glAccountName,
+            hint: payment.glAccountCode,
           },
         ]
       : []),
     ...(payment.counterpartyName
       ? [{ label: t('finance.fields.counterparty'), value: payment.counterpartyName }]
       : []),
+    {
+      label: t('finance.fields.moneyAccount'),
+      value: payment.moneyAccountName,
+      hint: payment.moneyAccountCode,
+    },
     ...(payment.reference
-      ? [{ label: t('finance.fields.reference'), value: payment.reference }]
+      ? [
+          {
+            label: t('finance.fields.reference'),
+            value: <span className="font-mono">{payment.reference}</span>,
+          },
+        ]
       : []),
     ...(payment.collectedByName
       ? [{ label: t('finance.fields.collectedBy'), value: payment.collectedByName }]
       : []),
+    ...(payment.description
+      ? [{ label: t('finance.fields.description'), value: payment.description }]
+      : []),
+  ];
+  // The bookkeeping side: who entered it and the journal entry it made.
+  const record: Field[] = [
     ...(payment.createdByName
       ? [
           {
             label: t('finance.fields.createdBy'),
-            value: `${payment.createdByName} · ${formatUbDateTime(Date.parse(payment.createdAt))}`,
+            value: payment.createdByName,
+            hint: formatUbDateTime(Date.parse(payment.createdAt)),
           },
         ]
       : []),
@@ -423,7 +430,7 @@ function PaymentBody({ payment }: { payment: PaymentDetail }) {
             label: t('finance.fields.journalEntry'),
             value: (
               <Link
-                className="font-mono text-link underline-offset-2 hover:underline"
+                className={`font-mono ${linkClass}`}
                 to={`/finance/journal?entry=${payment.journalEntryId}`}
               >
                 {payment.journalNumber}
@@ -433,72 +440,28 @@ function PaymentBody({ payment }: { payment: PaymentDetail }) {
         ]
       : []),
   ];
-  const advance = new Decimal(payment.amount).minus(payment.allocatedAmount);
   return (
-    <div className="flex flex-col gap-5">
+    <div className="@container flex flex-col gap-5">
       {payment.status === 'VOID' ? (
         <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-destructive">
           {t('finance.invoices.voidedBy', { name: payment.voidedByName ?? '' })}
           {payment.voidReason ? ` — ${payment.voidReason}` : ''}
         </p>
       ) : null}
-      <div className="flex items-baseline gap-2">
-        <span className="font-mono text-2xl font-semibold">
-          {payment.direction === 'OUT' ? '−' : ''}
-          {formatTugrik(payment.amount)}
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {t(`finance.directions.${payment.direction}`)}
-        </span>
+      <div className="rounded-xl border border-border bg-fill/60 px-4 py-3">
+        <div className="flex flex-wrap items-baseline gap-2">
+          <span className="font-mono text-2xl font-semibold">
+            {payment.direction === 'OUT' ? '−' : ''}
+            {formatTugrik(payment.amount)}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {t(`finance.directions.${payment.direction}`)}
+          </span>
+        </div>
       </div>
-      <FactChips facts={facts} />
-      {payment.description ? <p className="text-sm">{payment.description}</p> : null}
-      {payment.kind === 'CUSTOMER_PAYMENT' ? (
-        <PanelSection title={t('finance.payments.allocations')}>
-          {payment.allocations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('finance.payments.noAllocations')}</p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('finance.fields.number')}</TableHead>
-                    <TableHead>{t('finance.fields.dueDate')}</TableHead>
-                    <TableHead className="text-right">{t('finance.fields.amount')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payment.allocations.map((allocation) => (
-                    <TableRow
-                      key={allocation.id}
-                      className={
-                        allocation.voidedAt ? 'text-muted-foreground line-through' : undefined
-                      }
-                    >
-                      <TableCell className="font-mono">
-                        <Link
-                          className="text-link underline-offset-2 hover:underline"
-                          to={`/finance/invoices?invoice=${allocation.invoiceId}`}
-                        >
-                          {allocation.invoiceNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="font-mono">{allocation.invoiceDueDate}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatTugrik(allocation.amount)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          {payment.status === 'POSTED' && advance.gt(0) ? (
-            <p className="text-sm text-muted-foreground">
-              {t('finance.payments.advance', { amount: formatMnt(advance.toFixed(2)) })}
-            </p>
-          ) : null}
-        </PanelSection>
+      <FieldList title={t('finance.payments.sectionDetails')} items={details} columns={2} />
+      {record.length > 0 ? (
+        <FieldList title={t('finance.payments.sectionRecord')} items={record} columns={2} />
       ) : null}
     </div>
   );

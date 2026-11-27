@@ -178,6 +178,11 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
                 <p className="flex justify-between gap-3">
                   <span className="min-w-0 font-sans font-medium">
                     {lineNo(index, line)} {line.name}
+                    {line.expiryBarcode ? (
+                      <span className="block text-xs">
+                        {t('expiry.commerce.variant')} · {line.expiryBarcode}
+                      </span>
+                    ) : null}
                     <span className="block font-mono font-normal text-muted-foreground">
                       {t('posKiosk.receipt.lineQty', {
                         qty: formatQty(paidQty(line)),
@@ -216,7 +221,14 @@ function BlockView({ block, info }: { block: ReceiptBlock; info: Facts }) {
             {receipt.lines.map((line, index) => (
               <Fragment key={index}>
                 <span data-line-no>{lineNo(index, line)}</span>
-                <span className="min-w-0 font-sans font-medium break-words">{line.name}</span>
+                <span className="min-w-0 font-sans font-medium break-words">
+                  {line.name}
+                  {line.expiryBarcode ? (
+                    <span className="block text-xs">
+                      {t('expiry.commerce.variant')} · {line.expiryBarcode}
+                    </span>
+                  ) : null}
+                </span>
                 <span className="text-right">{formatQty(paidQty(line))}</span>
                 <span className="text-right">{formatMnt(line.unitPrice)}</span>
                 <span className="text-right">{formatMnt(line.total)}</span>

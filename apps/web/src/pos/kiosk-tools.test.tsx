@@ -265,3 +265,25 @@ describe('kiosk: the till tools (ADR-0104)', () => {
     expect(edge.callsTo('GET /products/barcode/' + code)).toHaveLength(0);
   });
 });
+
+it('selects the original expiry sale line when fresh and expiry goods share a product name', async () => {
+  const expiry = { ...RETURN_SALE.lines[0]!, lineNo: 2, expiryBarcode: 'BTOEXP-7' };
+  const edge = await openSale({
+    'GET /returns/sale': () => json({ ...RETURN_SALE, lines: [RETURN_SALE.lines[0], expiry] }),
+    'POST /returns': (call) => json(printable(refundOf(call.body as EdgeReturnRequest))),
+  });
+  const user = userEvent.setup();
+  await user.keyboard('{F4}');
+  const dialog = await screen.findByRole('dialog', { name: k.returns.title });
+  await user.type(within(dialog).getByLabelText(k.returns.number), 'K1-261017-0002{Enter}');
+  const qty = await within(dialog).findByLabelText(
+    k.returns.qty.replace('{{name}}', `${MILK.name} · BTOEXP-7`),
+  );
+  expect(within(dialog).getByText(/BTOEXP-7/)).toBeInTheDocument();
+  await user.type(qty, '1');
+  await user.click(within(dialog).getByRole('button', { name: k.returns.submit }));
+  await approve(user);
+  await waitFor(() => expect(edge.callsTo('POST /returns')).toHaveLength(1));
+  const request = edge.callsTo('POST /returns')[0]?.body as EdgeReturnRequest;
+  expect(request.lines).toEqual([{ refundsLineNo: 2, qty: '1', damaged: false }]);
+});
