@@ -31,6 +31,12 @@ the failure only stood in `auto-deploy.log`.
    `deploy`, which the brain and the second developer's Codex read. Only the commit, the step and
    the log's last error lines go out, never a secret.
 
+3. The build cache kept by `housekeeping.sh` goes from 10 to 30 GB by default
+   (`STORE_BUILD_CACHE_GB`): at 10 the web image's dependency layer was the least recently used
+   after each update and was pruned, so the next update installed the web's dependencies again
+   (the second update after the change, 52f72fab: the api's install cached, the web's not). The PC
+   had 88 GB free.
+
 ## Consequences
 
 An update without a dependency change is expected to take two to three minutes (a pages-only one

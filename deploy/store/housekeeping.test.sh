@@ -36,10 +36,10 @@ tidy() {
 }
 
 tidy --quiet
-expect "an update removes untagged images and the cache above 10 GB" \
-  "$REMOVED" "image prune -f|builder prune -f --max-used-space 10gb"
+expect "an update removes untagged images and the cache above 30 GB" \
+  "$REMOVED" "image prune -f|builder prune -f --max-used-space 30gb"
 expect "and says it in one line" "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" "1"
-contains "with the limit" "$OUT" "10 GB"
+contains "with the limit" "$OUT" "30 GB"
 
 printf 'STORE_BUILD_CACHE_GB=25\n' >"$WORK/repo/deploy/store/.env"
 tidy --quiet
@@ -48,7 +48,7 @@ expect "the limit comes from deploy/store/.env" \
 printf 'STORE_BUILD_CACHE_GB=lots\n' >"$WORK/repo/deploy/store/.env"
 tidy --quiet
 expect "a limit that is not a number is the default" \
-  "$REMOVED" "image prune -f|builder prune -f --max-used-space 10gb"
+  "$REMOVED" "image prune -f|builder prune -f --max-used-space 30gb"
 rm -f "$WORK/repo/deploy/store/.env"
 
 tidy --quiet --all

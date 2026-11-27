@@ -5,7 +5,7 @@
 #
 #   - images without a tag that no container uses. The images of the running stacks and
 #     `:store-previous` (rollback.sh, ADR-0196) carry tags and stay: never `image prune -a` here.
-#   - build cache above STORE_BUILD_CACHE_GB (deploy/store/.env, default 10), the least recently
+#   - build cache above STORE_BUILD_CACHE_GB (deploy/store/.env, default 30), the least recently
 #     used first. The base images and pnpm's store are used by every build, so they stay and the
 #     next build is as fast as the last. Not by age: a quiet week would empty the cache.
 #   - never a volume: the databases and the uploaded files stay.
@@ -34,8 +34,8 @@ for arg in "$@"; do
   esac
 done
 
-CACHE_GB=$(store_setting STORE_BUILD_CACHE_GB 10)
-case "$CACHE_GB" in *[!0-9]* | "") CACHE_GB=10 ;; esac
+CACHE_GB=$(store_setting STORE_BUILD_CACHE_GB 30)
+case "$CACHE_GB" in *[!0-9]* | "") CACHE_GB=30 ;; esac
 
 DOCKER=(docker)
 if ! docker info >/dev/null 2>&1; then
