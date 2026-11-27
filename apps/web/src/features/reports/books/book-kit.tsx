@@ -772,10 +772,14 @@ export function DrillRow(props: {
       data-slot="table-row"
       tabIndex={0}
       aria-expanded={props.expanded}
-      onClick={props.onToggle}
+      // The second click of a double click (the old way to open) leaves the row open.
+      onClick={(event) => {
+        if (event.detail <= 1) props.onToggle();
+      }}
       onPointerEnter={startRest}
       onPointerLeave={stopRest}
       onFocus={startRest}
+      onBlur={stopRest}
       onKeyDown={onKeyDown}
       className={cn(
         ITEM_ROW,
