@@ -174,6 +174,49 @@ export class MyNotificationSummaryDto {
   notices: MyNoticeDto[];
 }
 
+@ApiSchema({ name: 'PriceChangeNotificationLine' })
+export class PriceChangeNotificationLineDto {
+  @ApiProperty() eventId: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() sku: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ type: String, nullable: true }) oldBasePrice: string | null;
+  @ApiProperty() newBasePrice: string;
+  @ApiProperty() overrodeManual: boolean;
+}
+@ApiSchema({ name: 'PriceChangeNotificationWarning' })
+export class PriceChangeNotificationWarningDto {
+  @ApiProperty() eventId: number;
+  @ApiProperty() productId: number;
+  @ApiProperty() sku: string;
+  @ApiProperty() name: string;
+  @ApiProperty({
+    enum: [
+      'PRINTED_PRICE_MISSING',
+      'PRINTED_PRICE_ZERO',
+      'PRINTED_PRICE_CONFLICT',
+      'PRICE_OUT_OF_RANGE',
+    ],
+  })
+  reason:
+    | 'PRINTED_PRICE_MISSING'
+    | 'PRINTED_PRICE_ZERO'
+    | 'PRINTED_PRICE_CONFLICT'
+    | 'PRICE_OUT_OF_RANGE';
+}
+@ApiSchema({ name: 'PriceChangeSummary' })
+export class PriceChangeSummaryDto {
+  @ApiProperty() receiptId: number;
+  @ApiProperty() receiptNumber: string;
+  @ApiProperty() changeCount: number;
+  @ApiProperty() warningCount: number;
+  @ApiProperty() overwrittenManualCount: number;
+  @ApiProperty({ type: [PriceChangeNotificationLineDto] })
+  changes: readonly PriceChangeNotificationLineDto[];
+  @ApiProperty({ type: [PriceChangeNotificationWarningDto] })
+  warnings: readonly PriceChangeNotificationWarningDto[];
+}
+
 @ApiSchema({ name: 'MyNotification' })
 export class MyNotificationDto {
   @ApiProperty() id: number;
@@ -183,6 +226,8 @@ export class MyNotificationDto {
       'ORDER_SOLD: the rep’s order was sold; PHONE_ORDER, PHONE_CALLBACK: the phone AI line took an order or left a callback task (ADR-0232)',
   })
   kind: UserNotificationKind;
+  @ApiPropertyOptional({ type: PriceChangeSummaryDto, nullable: true })
+  priceChange?: PriceChangeSummaryDto | null;
   @ApiProperty({ type: Number, nullable: true }) orderId: number | null;
   @ApiProperty({ description: 'Empty for a PHONE_CALLBACK' }) orderNumber: string;
   @ApiProperty() customerName: string;

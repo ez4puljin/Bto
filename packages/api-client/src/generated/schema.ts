@@ -3893,6 +3893,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pricing/supplier-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierPricing_supplierRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pricing/supplier-rules/{supplierId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["SupplierPricing_setSupplier"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pricing/location-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierPricing_locationRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pricing/location-rules/{warehouseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["SupplierPricing_setLocation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pricing/base-prices/{productId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierPricing_base"];
+        put: operations["SupplierPricing_manual"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pricing/receipt-price-changes/{receiptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupplierPricing_receipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/product-prices": {
         parameters: {
             query?: never;
@@ -15892,6 +15988,8 @@ export interface components {
             salePrice: string | null;
             /** @description Delivery-note price per unit */
             docUnitPrice?: string | null;
+            /** @description Preserved printed supplier amount; divide by printedPriceFactor for the exact base-unit source */
+            printedUnitPrice?: string | null;
             /** @description Delivery-note amount, VAT in */
             docAmount?: string | null;
             freeGoods?: boolean;
@@ -15911,6 +16009,8 @@ export interface components {
             checkedAt: string | null;
             /** @description The keeper’s note on a difference (ADR-0118) */
             note: string | null;
+            /** @description Base units represented by the preserved printed reference amount */
+            printedPriceFactor?: string | null;
         };
         ReceiptConfirmation: {
             warehouseId: number;
@@ -16025,6 +16125,8 @@ export interface components {
             warehouseId?: number | null;
             /** @description Delivery-note price per unit */
             docUnitPrice?: string | null;
+            /** @description Printed supplier reference per entered unit, independent of free-goods cost */
+            printedUnitPrice?: string | null;
             /** @description Or the line amount, VAT in */
             docAmount?: string | null;
             /** @description Free goods (бонус) */
@@ -16116,6 +16218,10 @@ export interface components {
             /** Format: date */
             previousDate: string | null;
             previousSupplierName: string | null;
+            /** @description Preserved printed supplier amount; divide by printedPriceFactor for the exact base-unit source */
+            printedUnitPrice?: string | null;
+            /** @description Base units represented by the preserved printed reference amount */
+            printedPriceFactor?: string | null;
         };
         ReceiptCosting: {
             receiptId: number;
@@ -16156,6 +16262,8 @@ export interface components {
             unitPrice?: string;
             /** @description Free bonus goods (amount 0) */
             freeGoods?: boolean;
+            /** @description Printed reference per entered unit, first costing only */
+            printedUnitPrice?: string | null;
         };
         ReceiptCostRequest: {
             /** @description Given, replaces the receipt’s discounts (ADR-0103) */
@@ -16181,6 +16289,8 @@ export interface components {
             note?: string | null;
             /** @description null clears the price */
             docUnitPrice?: string | null;
+            /** @description Printed supplier reference per entered unit, independent of free-goods cost */
+            printedUnitPrice?: string | null;
             /** @description null clears the price */
             docAmount?: string | null;
             freeGoods?: boolean;
@@ -17893,6 +18003,85 @@ export interface components {
             /** @description Required for FIN_OPENING */
             openingOptions?: components["schemas"]["FinOpeningImportOptions"];
         };
+        SupplierPriceRule: {
+            supplierId: number;
+            supplierName: string;
+            enabled: boolean;
+            markupPct: string;
+            markupAmount: string;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            version: number;
+            updatedAt: string;
+        };
+        SupplierPriceRuleInputDto: {
+            expectedVersion: number;
+            enabled: boolean;
+            markupPct: string;
+            markupAmount: string;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+        };
+        LocationPriceRule: {
+            warehouseId: number;
+            warehouseName: string;
+            enabled: boolean;
+            /** @enum {string} */
+            priceType: "BASE" | "ADDITIONAL";
+            markupPct: string;
+            markupAmount: string;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            version: number;
+            updatedAt: string;
+        };
+        LocationPriceRuleInputDto: {
+            expectedVersion: number;
+            enabled: boolean;
+            markupPct: string;
+            markupAmount: string;
+            /** @enum {string} */
+            rounding: "WHOLE" | "UP_10" | "UP_50" | "UP_100" | "DOWN_10" | "DOWN_50" | "DOWN_100";
+            /** @enum {string} */
+            priceType: "BASE" | "ADDITIONAL";
+        };
+        BasePriceEvent: {
+            validFrom?: string;
+            id: number;
+            productId: number;
+            sku: string;
+            name: string;
+            /** @enum {string} */
+            kind: "RECEIPT" | "MANUAL" | "SKIPPED";
+            reason: string | null;
+            oldBasePrice: string | null;
+            newBasePrice: string | null;
+            overrodeManual: boolean;
+            receiptId: number | null;
+            receiptNumber: string | null;
+            createdAt: string;
+            createdBy: number | null;
+            printedUnitPriceBase?: string | null;
+        };
+        BasePriceView: {
+            productId: number;
+            sku: string;
+            name: string;
+            baseUomName: string;
+            basePrice: string | null;
+            /** @enum {string|null} */
+            source: "RECEIPT" | "MANUAL" | "LEGACY" | null;
+            lastEventId: number | null;
+            receiptId: number | null;
+            receiptNumber: string | null;
+            history: components["schemas"]["BasePriceEvent"][];
+        };
+        ManualBasePriceInputDto: {
+            expectedPrice: string | null;
+            expectedEventId: number | null;
+            price: string;
+            reason: string;
+        };
         PricedUnit: {
             productUnitId: number;
             uomId: number;
@@ -17986,6 +18175,7 @@ export interface components {
             wholeUomId: number | null;
         };
         PriceLabelsRequest: {
+            warehouseId?: number;
             productIds: number[];
         };
         PriceLabel: {
@@ -18390,6 +18580,7 @@ export interface components {
             alreadyComplete: number[];
         };
         QuoteLineRequest: {
+            warehouseId?: number;
             expiryBarcode?: string | null;
             productUnitId: number;
             /**
@@ -18399,6 +18590,7 @@ export interface components {
             qty: string;
         };
         QuoteRequest: {
+            warehouseId?: number;
             /**
              * @default WHOLESALE
              * @enum {string}
@@ -25523,13 +25715,40 @@ export interface components {
             /** @description The running notices, newest first (at most 50) */
             notices: components["schemas"]["MyNotice"][];
         };
+        PriceChangeNotificationLine: {
+            eventId: number;
+            productId: number;
+            sku: string;
+            name: string;
+            oldBasePrice: string | null;
+            newBasePrice: string;
+            overrodeManual: boolean;
+        };
+        PriceChangeNotificationWarning: {
+            eventId: number;
+            productId: number;
+            sku: string;
+            name: string;
+            /** @enum {string} */
+            reason: "PRINTED_PRICE_MISSING" | "PRINTED_PRICE_ZERO" | "PRINTED_PRICE_CONFLICT" | "PRICE_OUT_OF_RANGE";
+        };
+        PriceChangeSummary: {
+            receiptId: number;
+            receiptNumber: string;
+            changeCount: number;
+            warningCount: number;
+            overwrittenManualCount: number;
+            changes: components["schemas"]["PriceChangeNotificationLine"][];
+            warnings: components["schemas"]["PriceChangeNotificationWarning"][];
+        };
         MyNotification: {
             id: number;
             /**
              * @description ORDER_SOLD: the rep’s order was sold; PHONE_ORDER, PHONE_CALLBACK: the phone AI line took an order or left a callback task (ADR-0232)
              * @enum {string}
              */
-            kind: "ORDER_SOLD" | "PHONE_ORDER" | "PHONE_CALLBACK";
+            kind: "ORDER_SOLD" | "PHONE_ORDER" | "PHONE_CALLBACK" | "PRICE_CHANGED";
+            priceChange?: components["schemas"]["PriceChangeSummary"] | null;
             orderId: number | null;
             /** @description Empty for a PHONE_CALLBACK */
             orderNumber: string;
@@ -39711,6 +39930,233 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportJob"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierPricing_supplierRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierPriceRule"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierPricing_setSupplier: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                supplierId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierPriceRuleInputDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierPriceRule"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierPricing_locationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationPriceRule"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierPricing_setLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                warehouseId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationPriceRuleInputDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationPriceRule"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierPricing_base: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasePriceView"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierPricing_manual: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                productId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualBasePriceInputDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasePriceView"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SupplierPricing_receipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                receiptId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasePriceEvent"][];
                 };
             };
             /** @description RFC 9457 problem details */

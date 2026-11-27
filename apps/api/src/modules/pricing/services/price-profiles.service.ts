@@ -221,6 +221,59 @@ export class PriceProfilesService {
     return this.get(id);
   }
 
+  /** A neutral profile lets a receipt establish a new product's base without inventing uplifts. */
+  async ensureNeutralInTx(tx: Tx, actor: Actor, date: string): Promise<number> {
+    for (let suffix = 0; suffix < 1000; suffix += 1) {
+      const name = suffix === 0 ? 'BASE' : `BASE ${suffix}`;
+      const [existing] = await tx
+        .select()
+        .from(priceProfiles)
+        .where(and(eq(priceProfiles.nameKey, nameKey(name)), isNull(priceProfiles.archivedAt)));
+      if (existing) {
+        const value = (await this.versionsInForce([existing.id], date, tx)).get(existing.id);
+        if (
+          value?.looseMarkupPct.isZero() &&
+          value.retailMarkupPct.isZero() &&
+          (value.retailMarkupAmount ?? new Decimal(0)).isZero() &&
+          value.retailBulkMinQty === null &&
+          value.rounding === 'WHOLE' &&
+          (value.retailRounding ?? value.rounding) === 'WHOLE'
+        )
+          return existing.id;
+        continue;
+      }
+      const [created] = await tx
+        .insert(priceProfiles)
+        .values({ name, nameKey: nameKey(name), createdBy: actorUserId(actor) })
+        .onConflictDoNothing()
+        .returning();
+      if (!created) continue;
+      await tx.insert(priceProfileVersions).values({
+        profileId: created.id,
+        looseMarkupPct: new Decimal(0),
+        retailMarkupPct: new Decimal(0),
+        retailMarkupAmount: new Decimal(0),
+        retailBulkMinQty: null,
+        retailBulkMarkupPct: null,
+        rounding: 'WHOLE',
+        validFrom: date,
+        createdBy: actorUserId(actor),
+      });
+      await this.audit.record(tx, actor, {
+        action: 'CREATE',
+        entity: 'price_profiles',
+        entityId: created.id,
+        after: { name, validFrom: date, source: 'SUPPLIER_BASE' },
+      });
+      return created.id;
+    }
+    throw invalid(
+      'profileId',
+      'neutralProfile',
+      'a neutral base-price profile could not be created',
+    );
+  }
+
   async rename(actor: Actor, id: number, rawName: string): Promise<PriceProfile> {
     const name = checkedName(rawName);
     await inTransaction(this.db, async (tx) => {

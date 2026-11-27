@@ -98,6 +98,11 @@ export {
   discountPrograms,
   discountSteps,
   priceProfiles,
+  supplierPriceRules,
+  locationPriceRules,
+  locationPriceRuleVersions,
+  basePriceEvents,
+  basePriceStates,
   priceProfileVersions,
   productPrices,
 } from '../modules/pricing/schema';
@@ -194,6 +199,7 @@ export {
   smsMessages,
   smsSettings,
   userNotifications,
+  userPriceNotifications,
 } from '../modules/notifications/schema';
 export { appBanners, companyContacts, customerFavourites } from '../modules/customer/schema';
 export {

@@ -3,7 +3,6 @@ import {
   NOTICE_AUDIENCES,
   NOTICE_KINDS,
   NOTICE_LIMITS,
-  USER_NOTIFICATION_KINDS,
   SMS_BATCH_STATUSES,
   SMS_MESSAGE_STATUSES,
   SMS_PURPOSES,
@@ -198,7 +197,7 @@ export const userNotifications = pgTable(
   {
     id: id(),
     userId: userRef('user_id').notNull(),
-    kind: text('kind', { enum: USER_NOTIFICATION_KINDS }).notNull(),
+    kind: text('kind', { enum: ['ORDER_SOLD', 'PHONE_ORDER', 'PHONE_CALLBACK'] }).notNull(),
     orderId: ref('order_id').references(() => salesOrders.id),
     /** The callback task a PHONE_CALLBACK tells of (ADR-0232 #9). */
     callbackId: ref('callback_id').references(() => phoneCallbacks.id),
@@ -222,7 +221,10 @@ export const userNotifications = pgTable(
     index('user_notifications_unread_idx')
       .on(t.userId)
       .where(sql`${t.readAt} IS NULL`),
-    check('user_notifications_kind', inList(t.kind, USER_NOTIFICATION_KINDS)),
+    check(
+      'user_notifications_kind',
+      inList(t.kind, ['ORDER_SOLD', 'PHONE_ORDER', 'PHONE_CALLBACK']),
+    ),
     check(
       'user_notifications_phone_order',
       sql`${t.kind} <> 'PHONE_ORDER' OR ${t.orderId} IS NOT NULL`,
@@ -235,6 +237,33 @@ export const userNotifications = pgTable(
       'user_notifications_order_required',
       sql`${t.kind} <> 'ORDER_SOLD' OR ${t.orderId} IS NOT NULL`,
     ),
+  ],
+);
+
+/**
+ * Additive price inbox (ADR-0246). Both inbox tables allocate from the existing positive ID
+ * sequence, so old numeric IDs and cursors remain valid. App may insert only the three payload
+ * columns: SQL grants prevent an explicit ID or a rewritten immutable event/payload.
+ */
+export const userPriceNotifications = pgTable(
+  'user_price_notifications',
+  {
+    id: bigint('id', { mode: 'number' })
+      .primaryKey()
+      .default(sql`nextval('public.user_notifications_id_seq'::regclass)`),
+    userId: userRef('user_id').notNull(),
+    priceChangeKey: text('price_change_key').notNull(),
+    payload: jsonValue('payload').notNull(),
+    createdAt: createdAt(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+  },
+  (t) => [
+    unique('user_price_notifications_event_user').on(t.priceChangeKey, t.userId),
+    index('user_price_notifications_user_idx').on(t.userId, t.id),
+    index('user_price_notifications_unread_idx')
+      .on(t.userId)
+      .where(sql`${t.readAt} IS NULL`),
+    check('user_price_notifications_key', sql`length(${t.priceChangeKey}) BETWEEN 1 AND 128`),
   ],
 );
 

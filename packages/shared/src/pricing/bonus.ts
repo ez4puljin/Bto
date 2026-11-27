@@ -2,6 +2,7 @@ import { Decimal } from '../money';
 import { type QuoteLineInput, type QuoteProduct, type QuoteResult, targetsProduct } from './cart';
 import { dealLabel } from './deals';
 import { allocate, type QuoteProgram } from './discounts';
+import { locationTerms } from './location';
 
 /**
  * N+M at the till by the quantity the customer pays for (owner 2026-11-17). The engine stays as
@@ -102,7 +103,21 @@ export function lineBonuses(
     const step = program?.steps[0];
     if (own.length !== 1 || !program || !step) return null;
     const priced = result.lines[index];
+    if (!priced?.priced) return null;
     const parts = priced?.priced ? priced.parts : [];
+    if (parts.some((part) => part.bonusSuppressed)) return null;
+    const original = products.get(line.productId)?.terms;
+    const terms =
+      original && line.locationPricing ? locationTerms(original, line.locationPricing) : original;
+    if (terms?.minimumBasePrice && priced?.priced && line.qtyBase.gt(0)) {
+      const chargedPerBase = priced.subtotal.div(line.qtyBase);
+      if (
+        chargedPerBase
+          .times(step.threshold)
+          .lt(terms.minimumBasePrice.times(step.threshold.plus(step.value)))
+      )
+        return null;
+    }
     const taken = parts.some((part) =>
       part.applied.some(
         (applied) => applied.programId !== program.id && priority.has(applied.programId),

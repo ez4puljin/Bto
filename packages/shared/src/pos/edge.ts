@@ -6,6 +6,7 @@ import {
   type PriceBasis,
   type PriceAdjust,
   type PriceRounding,
+  type LocationPriceSettings,
   type StepRule,
   type QuoteLineInput,
   type QuoteProduct,
@@ -321,6 +322,8 @@ export interface SnapshotProgram {
 }
 
 export interface SnapshotTill {
+  /** Explicit warehouse pricing; absent on legacy/unconfigured tills. */
+  locationPricing?: LocationPriceSettings | null;
   id: number;
   code: string;
   name: string;

@@ -28,6 +28,8 @@ import {
   type ProductDeal,
   ProductDealsService,
   ProductPricesService,
+  type ShopPrices,
+  type PackPrice,
 } from '../../pricing';
 import { overdueDto } from '../overdue';
 import { AppSettingsService } from './app-settings.service';
@@ -291,7 +293,17 @@ export class SalesRepShopService {
     const own = book ?? (await this.dealBook());
     const ids = rows.map((row) => row.id);
     const deals = await this.deals.dealsOf(own, ids);
-    const packs = await this.deals.packPrices(own, ids);
+    const groups = new Map<number | undefined, number[]>();
+    for (const row of rows) {
+      const warehouseId = row.homeWarehouseId ?? undefined;
+      const ids = groups.get(warehouseId) ?? [];
+      ids.push(row.id);
+      groups.set(warehouseId, ids);
+    }
+    const packs = new Map<number, PackPrice>();
+    for (const [warehouseId, productIds] of groups)
+      for (const [id, price] of await this.deals.packPrices(own, productIds, warehouseId))
+        packs.set(id, price);
     return rows.map((product) => {
       const pack = packs.get(product.id);
       return {
@@ -349,12 +361,18 @@ export class SalesRepShopService {
       );
     }
     const date = after?.date ?? today;
-    const rows = await this.prices.orderedByBasePrice(ids, {
-      direction: sort === 'PRICE_ASC' ? 'ASC' : 'DESC',
-      after: after ? { price: after.price, id: after.id } : null,
-      limit: limit + 1,
-      date,
-    });
+    const homes = await this.locations.homeOf(ids);
+    const rows = await this.prices.orderedByBasePrice(
+      ids,
+      {
+        direction: sort === 'PRICE_ASC' ? 'ASC' : 'DESC',
+        after: after ? { price: after.price, id: after.id } : null,
+        limit: limit + 1,
+        date,
+      },
+      undefined,
+      homes,
+    );
     const page = toPage(rows, limit, (row) => ({
       s: sort,
       ...(row.price === null ? {} : { p: row.price }),
@@ -422,6 +440,21 @@ export class SalesRepShopService {
         { productIds: outside.join(', ') },
       );
     }
+  }
+
+  /** The same trusted source warehouses used when the submitted order freezes its prices. */
+  async withSourceWarehouses<T extends { productUnitId: number; warehouseId?: number | null }>(
+    lines: readonly T[],
+  ): Promise<(T & { warehouseId: number | null })[]> {
+    const units = await this.units.describe(lines.map((line) => line.productUnitId));
+    const homes = await this.locations.homeOf([
+      ...new Set([...units.values()].map((unit) => unit.productId)),
+    ]);
+    return lines.map((line) => ({
+      ...line,
+      warehouseId:
+        line.warehouseId ?? homes.get(units.get(line.productUnitId)?.productId ?? 0) ?? null,
+    }));
   }
 
   /**
@@ -574,9 +607,32 @@ export class SalesRepShopService {
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.id);
     const info = new Map((await this.orders.productInfo(ids)).map((own) => [own.productId, own]));
-    const prices = await this.prices.shopPricesOf(ids, today);
-    const before =
-      priceBefore === undefined ? null : await this.prices.shopPricesOf(ids, priceBefore);
+    const byWarehouse = new Map<number | undefined, number[]>();
+    for (const id of ids) {
+      const warehouseId = info.get(id)?.homeWarehouseId ?? undefined;
+      const productIds = byWarehouse.get(warehouseId) ?? [];
+      productIds.push(id);
+      byWarehouse.set(warehouseId, productIds);
+    }
+    const prices = new Map<number, ShopPrices>();
+    const before = priceBefore === undefined ? null : new Map<number, ShopPrices>();
+    for (const [warehouseId, productIds] of byWarehouse) {
+      for (const [id, price] of await this.prices.shopPricesOf(
+        productIds,
+        today,
+        undefined,
+        warehouseId,
+      ))
+        prices.set(id, price);
+      if (before && priceBefore !== undefined)
+        for (const [id, price] of await this.prices.shopPricesOf(
+          productIds,
+          priceBefore,
+          undefined,
+          warehouseId,
+        ))
+          before.set(id, price);
+    }
     const images = await this.products.imagesOf(ids);
     const flags = await this.products.unitFlagsOf(ids);
     const terms = await this.prices.inForce(ids, today);
@@ -609,8 +665,9 @@ export class SalesRepShopService {
         stockBlocked,
         minLevel: minLevels.get(row.id) ?? null,
         packBase: packBaseOf(row, terms.get(row.id)?.wholeUomId ?? null),
-        basePrice: priced?.basePrice ?? null,
-        basePriceBefore: before?.get(row.id)?.basePrice ?? null,
+        basePrice: priced?.locationPrice ?? priced?.basePrice ?? null,
+        basePriceBefore:
+          before?.get(row.id)?.locationPrice ?? before?.get(row.id)?.basePrice ?? null,
         units: row.units.map((unit) => {
           const unitPrices = table.get(unit.id);
           const flag = flags.get(unit.id);

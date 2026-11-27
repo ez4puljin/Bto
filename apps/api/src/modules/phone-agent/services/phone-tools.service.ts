@@ -340,7 +340,7 @@ export class PhoneToolsService implements OnModuleInit {
       list: 'WHOLESALE',
       date: businessDate(),
       pipelineId: await this.pipelines.channelPipeline('PHONE_AI'),
-      lines,
+      lines: await this.shop.withSourceWarehouses(lines),
     });
     const products = new Map(
       (

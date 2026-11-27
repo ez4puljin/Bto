@@ -305,6 +305,7 @@ export class DiscountProgramQueryDto extends PageQueryDto {
 
 @ApiSchema({ name: 'QuoteLineRequest' })
 export class QuoteLineRequestDto {
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) warehouseId?: number;
   @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
@@ -316,6 +317,7 @@ export class QuoteLineRequestDto {
 
 @ApiSchema({ name: 'QuoteRequest' })
 export class QuoteRequestDto {
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) warehouseId?: number;
   @ApiPropertyOptional({ enum: PRICE_LISTS, default: 'WHOLESALE' })
   @IsOptional()
   @IsIn(PRICE_LISTS)

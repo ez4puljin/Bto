@@ -788,9 +788,7 @@ export class SalesOrdersService implements OnModuleInit {
     priceDate: string,
     today: string,
   ): Promise<void> {
-    const sources = new Map(
-      (await this.linesOf(tx, order.id)).map((line) => [line.id, line.expiryBarcode]),
-    );
+    const sources = new Map((await this.linesOf(tx, order.id)).map((line) => [line.id, line]));
     const groups: [string, typeof lines][] = [
       [priceDate, lines.filter((line) => !line.today)],
       [today, lines.filter((line) => line.today)],
@@ -805,7 +803,8 @@ export class SalesOrdersService implements OnModuleInit {
           lines: group.map((line) => ({
             productUnitId: line.productUnitId,
             qty: line.qty,
-            expiryBarcode: sources.get(line.lineId),
+            expiryBarcode: sources.get(line.lineId)?.expiryBarcode,
+            warehouseId: sources.get(line.lineId)?.warehouseId,
           })),
         },
         tx,
@@ -1183,6 +1182,7 @@ export class SalesOrdersService implements OnModuleInit {
             productUnitId: line.productUnitId,
             qty: line.qty,
             expiryBarcode: line.expiryBarcode,
+            warehouseId: homes.get(line.productId) ?? line.warehouseId,
           })),
         },
         tx,

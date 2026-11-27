@@ -15397,6 +15397,367 @@
         ]
       }
     },
+    "/api/v1/pricing/supplier-rules": {
+      "get": {
+        "operationId": "SupplierPricing_supplierRules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupplierPriceRule"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/pricing/supplier-rules/{supplierId}": {
+      "put": {
+        "operationId": "SupplierPricing_setSupplier",
+        "parameters": [
+          {
+            "name": "supplierId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierPriceRuleInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierPriceRule"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/pricing/location-rules": {
+      "get": {
+        "operationId": "SupplierPricing_locationRules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocationPriceRule"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/pricing/location-rules/{warehouseId}": {
+      "put": {
+        "operationId": "SupplierPricing_setLocation",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationPriceRuleInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationPriceRule"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/pricing/base-prices/{productId}": {
+      "get": {
+        "operationId": "SupplierPricing_base",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasePriceView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "put": {
+        "operationId": "SupplierPricing_manual",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Client-generated UUID, kept until a response arrives",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualBasePriceInputDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasePriceView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/api/v1/pricing/receipt-price-changes/{receiptId}": {
+      "get": {
+        "operationId": "SupplierPricing_receipt",
+        "parameters": [
+          {
+            "name": "receiptId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BasePriceEvent"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
     "/api/v1/product-prices": {
       "get": {
         "operationId": "ProductPrices_view",
@@ -62095,6 +62456,11 @@
             "nullable": true,
             "description": "Delivery-note price per unit"
           },
+          "printedUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Preserved printed supplier amount; divide by printedPriceFactor for the exact base-unit source"
+          },
           "docAmount": {
             "type": "string",
             "nullable": true,
@@ -62137,6 +62503,11 @@
             "type": "string",
             "nullable": true,
             "description": "The keeper’s note on a difference (ADR-0118)"
+          },
+          "printedPriceFactor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units represented by the preserved printed reference amount"
           }
         },
         "required": [
@@ -62525,6 +62896,11 @@
             "nullable": true,
             "description": "Delivery-note price per unit"
           },
+          "printedUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Printed supplier reference per entered unit, independent of free-goods cost"
+          },
           "docAmount": {
             "type": "string",
             "nullable": true,
@@ -62792,6 +63168,16 @@
           "previousSupplierName": {
             "type": "string",
             "nullable": true
+          },
+          "printedUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Preserved printed supplier amount; divide by printedPriceFactor for the exact base-unit source"
+          },
+          "printedPriceFactor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Base units represented by the preserved printed reference amount"
           }
         },
         "required": [
@@ -62930,6 +63316,11 @@
           "freeGoods": {
             "type": "boolean",
             "description": "Free bonus goods (amount 0)"
+          },
+          "printedUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Printed reference per entered unit, first costing only"
           }
         },
         "required": [
@@ -62992,6 +63383,11 @@
             "type": "string",
             "nullable": true,
             "description": "null clears the price"
+          },
+          "printedUnitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Printed supplier reference per entered unit, independent of free-goods cost"
           },
           "docAmount": {
             "type": "string",
@@ -68574,6 +68970,362 @@
           "fileName"
         ]
       },
+      "SupplierPriceRule": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "markupPct": {
+            "type": "string"
+          },
+          "markupAmount": {
+            "type": "string"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "supplierId",
+          "supplierName",
+          "enabled",
+          "markupPct",
+          "markupAmount",
+          "rounding",
+          "version",
+          "updatedAt"
+        ]
+      },
+      "SupplierPriceRuleInputDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "markupPct": {
+            "type": "string",
+            "pattern": "^\\d{1,3}(\\.\\d{1,2})?$"
+          },
+          "markupAmount": {
+            "type": "string",
+            "pattern": "^\\d{1,12}$"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "enabled",
+          "markupPct",
+          "markupAmount",
+          "rounding"
+        ]
+      },
+      "LocationPriceRule": {
+        "type": "object",
+        "properties": {
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "priceType": {
+            "enum": [
+              "BASE",
+              "ADDITIONAL"
+            ],
+            "type": "string"
+          },
+          "markupPct": {
+            "type": "string"
+          },
+          "markupAmount": {
+            "type": "string"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "warehouseId",
+          "warehouseName",
+          "enabled",
+          "priceType",
+          "markupPct",
+          "markupAmount",
+          "rounding",
+          "version",
+          "updatedAt"
+        ]
+      },
+      "LocationPriceRuleInputDto": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "number",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "markupPct": {
+            "type": "string",
+            "pattern": "^\\d{1,3}(\\.\\d{1,2})?$"
+          },
+          "markupAmount": {
+            "type": "string",
+            "pattern": "^\\d{1,12}$"
+          },
+          "rounding": {
+            "enum": [
+              "WHOLE",
+              "UP_10",
+              "UP_50",
+              "UP_100",
+              "DOWN_10",
+              "DOWN_50",
+              "DOWN_100"
+            ],
+            "type": "string"
+          },
+          "priceType": {
+            "enum": [
+              "BASE",
+              "ADDITIONAL"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "enabled",
+          "markupPct",
+          "markupAmount",
+          "rounding",
+          "priceType"
+        ]
+      },
+      "BasePriceEvent": {
+        "type": "object",
+        "properties": {
+          "validFrom": {
+            "type": "string"
+          },
+          "id": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "RECEIPT",
+              "MANUAL",
+              "SKIPPED"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "oldBasePrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "newBasePrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "overrodeManual": {
+            "type": "boolean"
+          },
+          "receiptId": {
+            "type": "number",
+            "nullable": true
+          },
+          "receiptNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "number",
+            "nullable": true
+          },
+          "printedUnitPriceBase": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "sku",
+          "name",
+          "kind",
+          "reason",
+          "oldBasePrice",
+          "newBasePrice",
+          "overrodeManual",
+          "receiptId",
+          "receiptNumber",
+          "createdAt",
+          "createdBy"
+        ]
+      },
+      "BasePriceView": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseUomName": {
+            "type": "string"
+          },
+          "basePrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "nullable": true,
+            "enum": [
+              "RECEIPT",
+              "MANUAL",
+              "LEGACY"
+            ],
+            "type": "string"
+          },
+          "lastEventId": {
+            "type": "number",
+            "nullable": true
+          },
+          "receiptId": {
+            "type": "number",
+            "nullable": true
+          },
+          "receiptNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasePriceEvent"
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "sku",
+          "name",
+          "baseUomName",
+          "basePrice",
+          "source",
+          "lastEventId",
+          "receiptId",
+          "receiptNumber",
+          "history"
+        ]
+      },
+      "ManualBasePriceInputDto": {
+        "type": "object",
+        "properties": {
+          "expectedPrice": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^[1-9]\\d{0,11}$"
+          },
+          "expectedEventId": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^[1-9]\\d{0,11}$"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "expectedPrice",
+          "expectedEventId",
+          "price",
+          "reason"
+        ]
+      },
       "PricedUnit": {
         "type": "object",
         "properties": {
@@ -68916,6 +69668,10 @@
       "PriceLabelsRequest": {
         "type": "object",
         "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
           "productIds": {
             "minItems": 1,
             "maxItems": 5000,
@@ -70120,6 +70876,10 @@
       "QuoteLineRequest": {
         "type": "object",
         "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
           "expiryBarcode": {
             "type": "string",
             "nullable": true,
@@ -70143,6 +70903,10 @@
       "QuoteRequest": {
         "type": "object",
         "properties": {
+          "warehouseId": {
+            "type": "number",
+            "minimum": 1
+          },
           "list": {
             "enum": [
               "WHOLESALE",
@@ -95139,6 +95903,116 @@
           "notices"
         ]
       },
+      "PriceChangeNotificationLine": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "oldBasePrice": {
+            "type": "string",
+            "nullable": true
+          },
+          "newBasePrice": {
+            "type": "string"
+          },
+          "overrodeManual": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "eventId",
+          "productId",
+          "sku",
+          "name",
+          "oldBasePrice",
+          "newBasePrice",
+          "overrodeManual"
+        ]
+      },
+      "PriceChangeNotificationWarning": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "PRINTED_PRICE_MISSING",
+              "PRINTED_PRICE_ZERO",
+              "PRINTED_PRICE_CONFLICT",
+              "PRICE_OUT_OF_RANGE"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "productId",
+          "sku",
+          "name",
+          "reason"
+        ]
+      },
+      "PriceChangeSummary": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "number"
+          },
+          "receiptNumber": {
+            "type": "string"
+          },
+          "changeCount": {
+            "type": "number"
+          },
+          "warningCount": {
+            "type": "number"
+          },
+          "overwrittenManualCount": {
+            "type": "number"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceChangeNotificationLine"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceChangeNotificationWarning"
+            }
+          }
+        },
+        "required": [
+          "receiptId",
+          "receiptNumber",
+          "changeCount",
+          "warningCount",
+          "overwrittenManualCount",
+          "changes",
+          "warnings"
+        ]
+      },
       "MyNotification": {
         "type": "object",
         "properties": {
@@ -95149,10 +96023,20 @@
             "enum": [
               "ORDER_SOLD",
               "PHONE_ORDER",
-              "PHONE_CALLBACK"
+              "PHONE_CALLBACK",
+              "PRICE_CHANGED"
             ],
             "type": "string",
             "description": "ORDER_SOLD: the rep’s order was sold; PHONE_ORDER, PHONE_CALLBACK: the phone AI line took an order or left a callback task (ADR-0232)"
+          },
+          "priceChange": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PriceChangeSummary"
+              }
+            ]
           },
           "orderId": {
             "type": "number",

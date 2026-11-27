@@ -135,6 +135,8 @@ export function toReceiptLineDto(line: ReceiptLine, withCosts = false): ReceiptL
     ...(withCosts
       ? {
           docUnitPrice: line.docUnitPrice?.toFixed(2) ?? null,
+          printedUnitPrice: line.printedUnitPrice?.toFixed(2) ?? null,
+          printedPriceFactor: line.printedPriceFactor?.toString() ?? null,
           docAmount: line.docAmount?.toFixed(2) ?? null,
           freeGoods: line.freeGoods,
           discountAmount: line.discountAmount?.toFixed(2) ?? null,
@@ -270,6 +272,8 @@ export function toReceiptCostingDto(costing: ReceiptCosting): ReceiptCostingDto 
       unitCost: line.unitCost?.toFixed() ?? null,
       freeGoods: line.freeGoods,
       docUnitPrice: line.docUnitPrice?.toFixed(2) ?? null,
+      printedUnitPrice: line.printedUnitPrice?.toFixed(2) ?? null,
+      printedPriceFactor: line.printedPriceFactor?.toString() ?? null,
       previousUnitPrice: line.previousUnitPrice?.toFixed(2) ?? null,
       previousBasePrice: line.previousBasePrice?.toFixed(2) ?? null,
       previousDate: line.previousDate,

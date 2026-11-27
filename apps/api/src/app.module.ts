@@ -6,6 +6,7 @@ import { JobsModule } from './common/jobs/jobs.module';
 import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
 import { ExpiryCommerceModule } from './expiry-commerce.module';
+import { SupplierPricingModule } from './supplier-pricing.module';
 import { HealthModule } from './health/health.module';
 import { EbarimtIntegrationModule } from './integrations/ebarimt';
 import { ElevenLabsIntegrationModule } from './integrations/elevenlabs';
@@ -60,6 +61,7 @@ import { StockProblemsHttpModule } from './modules/stock-problems';
     ElevenLabsIntegrationModule,
     FinanceCoreModule,
     ExpiryCommerceModule,
+    SupplierPricingModule,
     FinBridgeHttpModule,
     IdentityHttpModule,
     CatalogHttpModule,

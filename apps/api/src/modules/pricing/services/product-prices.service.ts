@@ -1,5 +1,6 @@
 import type { SegmentCondition } from '@tugeel/shared/segments';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Decimal } from '@tugeel/shared/money';
 import {
   type PackUnit,
@@ -10,6 +11,7 @@ import {
   type WholeUnitProblem,
   wholeUnitOf,
   wholeUnitProblem,
+  tryLocationTerms,
 } from '@tugeel/shared/pricing';
 import { businessDate } from '@tugeel/shared/time';
 import { type SQL, and, asc, eq, sql } from 'drizzle-orm';
@@ -24,6 +26,7 @@ import { productPrices } from '../schema';
 import { assertLive, PriceProfilesService } from './price-profiles.service';
 import { advisoryLock, applied, assertNotPast, inForceOn, inForceSql, LOCKS } from './support';
 import { planChange } from './timeline';
+import { BASE_PRICE_OBSERVER, type BasePriceObserver } from './base-price-ports';
 
 type TermsRow = typeof productPrices.$inferSelect;
 
@@ -45,6 +48,8 @@ export interface PriceTerms {
 
 /** The rep app's prices of a product (ADR-0068): the unit table and one base unit in whole packs. */
 export interface ShopPrices {
+  /** The configured location's ordinary base-unit selling price, when one was selected. */
+  locationPrice?: Decimal;
   /** The warehouse price per base unit, whole MNT, VAT included. */
   basePrice: Decimal;
   units: UnitPrices[];
@@ -177,14 +182,26 @@ export interface SetTermsInput {
  * them; the other prices come from the profile through @tugeel/shared/pricing.
  */
 @Injectable()
-export class ProductPricesService {
+export class ProductPricesService implements OnModuleInit {
+  private baseObserver: BasePriceObserver | null = null;
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly catalog: CatalogService,
     private readonly units: UnitConversionService,
     private readonly profiles: PriceProfilesService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  onModuleInit(): void {
+    try {
+      this.baseObserver = this.moduleRef.get<BasePriceObserver>(BASE_PRICE_OBSERVER, {
+        strict: false,
+      });
+    } catch {
+      this.baseObserver = null;
+    }
+  }
 
   async view(productId: number, executor: Db | Tx = this.db): Promise<ProductPriceView> {
     const [product] = await this.catalog.getMany([productId], executor);
@@ -294,8 +311,9 @@ export class ProductPricesService {
     productIds: readonly number[],
     date: string = businessDate(),
     executor: Db | Tx = this.db,
+    warehouseId?: number,
   ): Promise<Map<number, UnitPrices[]>> {
-    const prices = await this.shopPricesOf(productIds, date, executor);
+    const prices = await this.shopPricesOf(productIds, date, executor, warehouseId);
     return new Map([...prices].map(([productId, own]) => [productId, own.units]));
   }
 
@@ -308,6 +326,7 @@ export class ProductPricesService {
     productIds: readonly number[],
     date: string = businessDate(),
     executor: Db | Tx = this.db,
+    warehouseId?: number,
   ): Promise<Map<number, ShopPrices>> {
     const terms = await this.inForce(productIds, date, executor);
     if (terms.size === 0) return new Map();
@@ -318,15 +337,24 @@ export class ProductPricesService {
     );
     const units = await this.units.currentUnits([...terms.keys()], executor);
     const result = new Map<number, ShopPrices>();
+    const location =
+      warehouseId === undefined
+        ? null
+        : ((await this.baseObserver?.locationSettings(warehouseId, executor, date)) ?? null);
     for (const [productId, own] of terms) {
       const profile = versions.get(own.profileId);
       if (!profile) continue;
+      const effective = location
+        ? tryLocationTerms(
+            { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile },
+            location,
+          )
+        : { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile };
+      if (!effective) continue;
       result.set(productId, {
         basePrice: own.warehousePrice,
-        units: unitPriceTable(
-          { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile },
-          quoteUnitsOf(units.get(productId) ?? []),
-        ),
+        ...(location ? { locationPrice: effective.warehousePrice } : {}),
+        units: unitPriceTable(effective, quoteUnitsOf(units.get(productId) ?? [])),
       });
     }
     return result;
@@ -340,9 +368,14 @@ export class ProductPricesService {
   async labelsOf(
     productIds: readonly number[],
     date: string = businessDate(),
+    warehouseId?: number,
   ): Promise<PriceLabels> {
     const ids = [...new Set(productIds)];
     const labels = new Map<number, PriceLabel>();
+    const location =
+      warehouseId === undefined
+        ? null
+        : ((await this.baseObserver?.locationSettings(warehouseId, this.db, date)) ?? null);
     for (let at = 0; at < ids.length; at += LABEL_CHUNK) {
       const part = ids.slice(at, at + LABEL_CHUNK);
       const terms = await this.inForce(part, date);
@@ -361,10 +394,16 @@ export class ProductPricesService {
         const product = products.get(productId);
         const base = (units.get(productId) ?? []).find((unit) => unit.isBase);
         if (!profile || !product || !base) continue;
-        const row = unitPriceTable(
-          { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile },
-          quoteUnitsOf(units.get(productId) ?? []),
-        ).find((unit) => unit.unitId === base.unitId);
+        const effective = location
+          ? tryLocationTerms(
+              { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile },
+              location,
+            )
+          : { warehousePrice: own.warehousePrice, wholeUomId: own.wholeUomId, profile };
+        if (!effective) continue;
+        const row = unitPriceTable(effective, quoteUnitsOf(units.get(productId) ?? [])).find(
+          (unit) => unit.unitId === base.unitId,
+        );
         if (!row) continue;
         labels.set(productId, {
           productId,
@@ -399,9 +438,51 @@ export class ProductPricesService {
       date: string;
     },
     executor: Db | Tx = this.db,
+    warehouseByProduct?: ReadonlyMap<number, number | null>,
   ): Promise<{ productId: number; price: string | null }[]> {
     if (productIds.length === 0) return [];
     const { direction, after, limit, date } = options;
+    if (warehouseByProduct) {
+      const groups = new Map<number | null, number[]>();
+      for (const id of new Set(productIds)) {
+        const location = warehouseByProduct.get(id) ?? null;
+        const own = groups.get(location) ?? [];
+        own.push(id);
+        groups.set(location, own);
+      }
+      const prices = new Map<number, string>();
+      for (const [warehouseId, ids] of groups) {
+        for (let offset = 0; offset < ids.length; offset += LABEL_CHUNK) {
+          const values = await this.shopPricesOf(
+            ids.slice(offset, offset + LABEL_CHUNK),
+            date,
+            executor,
+            warehouseId ?? undefined,
+          );
+          for (const [id, value] of values)
+            prices.set(id, (value.locationPrice ?? value.basePrice).toFixed(0));
+        }
+      }
+      const sign = direction === 'ASC' ? 1 : -1;
+      const compare = (
+        a: { productId: number; price: string | null },
+        b: { productId: number; price: string | null },
+      ) => {
+        if (a.price === null && b.price !== null) return 1;
+        if (a.price !== null && b.price === null) return -1;
+        const byPrice =
+          a.price === null || b.price === null ? 0 : new Decimal(a.price).cmp(b.price);
+        return (byPrice || a.productId - b.productId) * sign;
+      };
+      const rows = [...new Set(productIds)]
+        .map((id) => ({ productId: id, price: prices.get(id) ?? null }))
+        .sort(compare);
+      return rows
+        .filter(
+          (row) => after === null || compare(row, { productId: after.id, price: after.price }) > 0,
+        )
+        .slice(0, limit);
+    }
     const price = sql`pp.warehouse_price`;
     const up = direction === 'ASC';
     let keyset: SQL = sql`true`;
@@ -494,7 +575,10 @@ export class ProductPricesService {
    */
   async set(actor: Actor, input: SetTermsInput): Promise<ProductPriceView> {
     await this.assertTerms(input, this.db);
-    await inTransaction(this.db, (tx) => this.writeTermsInTx(tx, actor, input));
+    await inTransaction(this.db, async (tx) => {
+      await this.baseObserver?.lockInTx(tx);
+      await this.writeTermsInTx(tx, actor, input);
+    });
     return this.view(input.productId);
   }
 
@@ -502,9 +586,16 @@ export class ProductPricesService {
    * `set` inside the caller's transaction (ADR-0099 #5: a goods receipt's posting puts its lines'
    * sale prices in force). The same checks and the same lock order.
    */
-  async setInTx(tx: Tx, actor: Actor, input: SetTermsInput): Promise<void> {
+  async setInTx(
+    tx: Tx,
+    actor: Actor,
+    input: SetTermsInput,
+    origin: 'MANUAL' | 'SUPPLIER' = 'MANUAL',
+    forceCurrent = false,
+  ): Promise<void> {
+    await this.baseObserver?.lockInTx(tx);
     await this.assertTerms(input, tx);
-    await this.writeTermsInTx(tx, actor, input);
+    await this.writeTermsInTx(tx, actor, input, origin, forceCurrent);
   }
 
   /** A day not in the past, a known product and, for a product with packs, its whole pack. */
@@ -523,7 +614,13 @@ export class ProductPricesService {
     }
   }
 
-  private async writeTermsInTx(tx: Tx, actor: Actor, input: SetTermsInput): Promise<void> {
+  private async writeTermsInTx(
+    tx: Tx,
+    actor: Actor,
+    input: SetTermsInput,
+    origin: 'MANUAL' | 'SUPPLIER' = 'MANUAL',
+    forceCurrent = false,
+  ): Promise<void> {
     // One lock order everywhere: the product's advisory lock, then its profile (ADR-0048 #2).
     await advisoryLock(tx, LOCKS.productPrices, input.productId);
     const profile = await this.profiles.lockForPricesInTx(tx, input.profileId);
@@ -539,6 +636,7 @@ export class ProductPricesService {
       rows,
       input.validFrom,
       (row) =>
+        !forceCurrent &&
         row.warehousePrice.eq(input.warehousePrice) &&
         row.profileId === input.profileId &&
         row.wholeUomId === input.wholeUomId,
@@ -556,7 +654,7 @@ export class ProductPricesService {
       profileId: input.profileId,
       wholeUomId: input.wholeUomId,
       validFrom: input.validFrom,
-      validTo: plan.validTo,
+      validTo: forceCurrent ? null : plan.validTo,
       createdBy: actorUserId(actor),
     });
     await this.audit.record(tx, actor, {
@@ -571,6 +669,16 @@ export class ProductPricesService {
         wholeUomId: input.wholeUomId,
       },
     });
+    if (origin === 'MANUAL') {
+      await this.baseObserver?.manualInTx(
+        tx,
+        actor,
+        input.productId,
+        plan.close?.warehousePrice ?? null,
+        input.warehousePrice,
+        input.validFrom,
+      );
+    }
   }
 
   /**
@@ -591,6 +699,7 @@ export class ProductPricesService {
     const missing = ids.find((id) => !found.has(id));
     if (missing !== undefined) throw notFound('product', missing);
     return inTransaction(this.db, async (tx) => {
+      await this.baseObserver?.lockInTx(tx);
       for (const id of ids) await advisoryLock(tx, LOCKS.productPrices, id);
       const profile = await this.profiles.lockForPricesInTx(tx, input.profileId);
       assertLive(profile);
@@ -667,6 +776,7 @@ export class ProductPricesService {
     inputs: readonly SetTermsInput[],
   ): Promise<WrittenTerms[]> {
     if (inputs.length === 0) return [];
+    await this.baseObserver?.lockInTx(tx);
     const today = businessDate();
     const byProduct = new Map<number, SetTermsInput>();
     for (const input of inputs) {
@@ -748,6 +858,18 @@ export class ProductPricesService {
     await closeRows(tx, closes);
     const rowIds = await insertRows(tx, inserts);
     await this.audit.recordMany(tx, actor, audits);
+    for (const row of planned) {
+      const next = byProduct.get(row.productId)?.warehousePrice;
+      if (next)
+        await this.baseObserver?.manualInTx(
+          tx,
+          actor,
+          row.productId,
+          row.before ? new Decimal(row.before.warehousePrice) : null,
+          next,
+          row.validFrom,
+        );
+    }
     return planned.flatMap((row) => {
       const rowId = rowIds.get(row.productId);
       return rowId === undefined ? [] : [{ ...row, rowId }];
@@ -763,7 +885,13 @@ export class ProductPricesService {
    */
   async restoreManyInTx(tx: Tx, actor: Actor, entries: readonly TermsRestore[]): Promise<number[]> {
     if (entries.length === 0) return [];
+    await this.baseObserver?.lockInTx(tx);
     const today = businessDate();
+    const baseBefore = await this.inForce(
+      entries.map((e) => e.productId),
+      today,
+      tx,
+    );
     await tx.execute(sql`LOCK TABLE product_prices IN SHARE ROW EXCLUSIVE MODE`);
     const profileIds = [
       ...new Set(entries.flatMap((entry) => (entry.before ? [entry.before.profileId] : []))),
@@ -808,6 +936,15 @@ export class ProductPricesService {
     await closeRows(tx, closes);
     await insertRows(tx, inserts);
     await this.audit.recordMany(tx, actor, audits);
+    const baseAfter = await this.inForce(restored, today, tx);
+    for (const id of restored)
+      await this.baseObserver?.manualInTx(
+        tx,
+        actor,
+        id,
+        baseBefore.get(id)?.warehousePrice ?? null,
+        baseAfter.get(id)?.warehousePrice ?? null,
+      );
     return restored.sort((a, b) => a - b);
   }
 

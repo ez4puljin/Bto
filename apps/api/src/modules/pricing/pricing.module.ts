@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CatalogModule, UNIT_SUPERSEDED_HOOK } from '../catalog';
 import { IdentityModule } from '../identity';
-import { RECEIPT_SALE_PRICES, SALE_PRICE_READER } from '../inventory';
+import { RECEIPT_SALE_PRICES, SALE_PRICE_READER, SUPPLIER_RECEIPT_PRICES } from '../inventory';
 import { PartnersModule } from '../partners';
 import {
   DiscountProgramsController,
@@ -19,8 +19,12 @@ import { ProgramTargetsService } from './services/program-targets.service';
 import { IssueSalePricesHook } from './services/issue-sale-prices.hook';
 import { ReceiptSalePricesHook } from './services/receipt-sale-prices.hook';
 import { SaleReadinessService } from './services/sale-readiness.service';
+import { SupplierPricingService } from './services/supplier-pricing.service';
+import { SupplierPricingController } from './controllers/supplier-pricing.controller';
+import { BASE_PRICE_OBSERVER } from './services/base-price-ports';
 
 const CORE_SERVICES = [
+  SupplierPricingService,
   DiscountProgramsService,
   PriceProfilesService,
   PriceQuoteService,
@@ -41,6 +45,8 @@ const CORE_SERVICES = [
   imports: [IdentityModule, CatalogModule, PartnersModule],
   providers: [
     ...CORE_SERVICES,
+    { provide: BASE_PRICE_OBSERVER, useExisting: SupplierPricingService },
+    { provide: SUPPLIER_RECEIPT_PRICES, useExisting: SupplierPricingService },
     PricingUnitsHook,
     { provide: UNIT_SUPERSEDED_HOOK, useExisting: PricingUnitsHook },
     ReceiptSalePricesHook,
@@ -57,6 +63,7 @@ export class PricingModule {}
 @Module({
   imports: [PricingModule],
   controllers: [
+    SupplierPricingController,
     ProductPricesController,
     PriceProfilesController,
     DiscountProgramsController,

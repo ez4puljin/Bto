@@ -101,6 +101,7 @@ export class ExpiryCommerceContexts implements ExpirySaleContexts, FixedSourcePr
         await this.prices.quote(
           {
             list: context.channel,
+            warehouseId: context.warehouseId,
             date: today,
             pipelineId: context.channel === 'WHOLESALE' ? context.contextId : null,
             tillId: context.channel === 'RETAIL' ? context.contextId : null,

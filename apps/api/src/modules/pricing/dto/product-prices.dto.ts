@@ -117,6 +117,7 @@ export const MAX_LABEL_PRODUCTS = 5000;
 
 @ApiSchema({ name: 'PriceLabelsRequest' })
 export class PriceLabelsRequestDto {
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) warehouseId?: number;
   @ApiProperty({ type: [Number], maxItems: MAX_LABEL_PRODUCTS })
   @IsArray()
   @ArrayMinSize(1)

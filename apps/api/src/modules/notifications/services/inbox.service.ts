@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   NOTICE_LIMITS,
+  priceChangeSummaryOf,
+  type PriceChangeSummary,
   type NoticeAudience,
   type NoticeKind,
   type UserNotificationKind,
@@ -13,7 +15,7 @@ import { idIn } from '../../../common/db/days';
 import { decodeCursor, DEFAULT_PAGE_LIMIT, toPage } from '../../../common/pagination/page';
 import { type AuthContext, StorageService } from '../../identity';
 import { CustomersService } from '../../partners';
-import { appNoticeReads, appNotices, userNotifications } from '../schema';
+import { appNoticeReads, appNotices, userNotifications, userPriceNotifications } from '../schema';
 import { NoticesService, RECIPIENT_PERMISSION } from './notices.service';
 
 export interface MyNotice {
@@ -33,6 +35,7 @@ export interface MyNotice {
 export interface MyNotification {
   id: number;
   kind: UserNotificationKind;
+  priceChange?: PriceChangeSummary | null;
   orderId: number | null;
   /** Empty for a PHONE_CALLBACK. */
   orderNumber: string;
@@ -95,12 +98,25 @@ export class InboxService {
   /** The running notices (newest first, capped) and the unread count over both kinds. */
   async summary(ctx: AuthContext): Promise<{ unread: number; notices: MyNotice[] }> {
     const notices = ctx.permissions.has(RECIPIENT_PERMISSION) ? await this.running(ctx) : [];
-    const [own] = await this.db
+    const own = await this.db
       .select({ unread: count() })
       .from(userNotifications)
-      .where(and(eq(userNotifications.userId, ctx.userId), isNull(userNotifications.readAt)));
+      .where(and(eq(userNotifications.userId, ctx.userId), isNull(userNotifications.readAt)))
+      .unionAll(
+        this.db
+          .select({ unread: count() })
+          .from(userPriceNotifications)
+          .where(
+            and(
+              eq(userPriceNotifications.userId, ctx.userId),
+              isNull(userPriceNotifications.readAt),
+            ),
+          ),
+      );
     return {
-      unread: notices.filter((notice) => !notice.read).length + (own?.unread ?? 0),
+      unread:
+        notices.filter((notice) => !notice.read).length +
+        own.reduce((sum, row) => sum + row.unread, 0),
       notices,
     };
   }
@@ -113,8 +129,17 @@ export class InboxService {
     const limit = query.limit ?? DEFAULT_PAGE_LIMIT;
     const cursor = decodeCursor(query.cursor);
     const after = typeof cursor?.id === 'number' ? cursor.id : null;
+    // One statement/snapshot merges both positive-ID streams before the cursor and page limit.
     const rows = await this.db
-      .select()
+      .select({
+        id: userNotifications.id,
+        kind: sql<UserNotificationKind>`${userNotifications.kind}`.as('kind'),
+        orderId: userNotifications.orderId,
+        callbackId: userNotifications.callbackId,
+        payload: userNotifications.payload,
+        createdAt: userNotifications.createdAt,
+        readAt: userNotifications.readAt,
+      })
       .from(userNotifications)
       .where(
         and(
@@ -122,7 +147,26 @@ export class InboxService {
           after === null ? undefined : lt(userNotifications.id, after),
         ),
       )
-      .orderBy(desc(userNotifications.id))
+      .unionAll(
+        this.db
+          .select({
+            id: userPriceNotifications.id,
+            kind: sql<UserNotificationKind>`'PRICE_CHANGED'`.as('kind'),
+            orderId: sql<number | null>`NULL::bigint`.as('order_id'),
+            callbackId: sql<number | null>`NULL::bigint`.as('callback_id'),
+            payload: userPriceNotifications.payload,
+            createdAt: userPriceNotifications.createdAt,
+            readAt: userPriceNotifications.readAt,
+          })
+          .from(userPriceNotifications)
+          .where(
+            and(
+              eq(userPriceNotifications.userId, ctx.userId),
+              after === null ? undefined : lt(userPriceNotifications.id, after),
+            ),
+          ),
+      )
+      .orderBy(desc(sql`id`))
       .limit(limit + 1);
     const page = toPage(rows, limit, (row) => ({ id: row.id }));
     const payloads = new Map(page.data.map((row) => [row.id, soldPayload(row.payload)]));
@@ -141,6 +185,9 @@ export class InboxService {
         return {
           id: row.id,
           kind: row.kind,
+          ...(row.kind === 'PRICE_CHANGED'
+            ? { priceChange: priceChangeSummaryOf(row.payload) }
+            : {}),
           orderId: row.orderId,
           orderNumber: payload.orderNumber,
           customerName:
@@ -192,6 +239,16 @@ export class InboxService {
             eq(userNotifications.userId, ctx.userId),
             idIn(userNotifications.id, notificationIds),
             isNull(userNotifications.readAt),
+          ),
+        );
+      await this.db
+        .update(userPriceNotifications)
+        .set({ readAt: sql`now()` })
+        .where(
+          and(
+            eq(userPriceNotifications.userId, ctx.userId),
+            idIn(userPriceNotifications.id, notificationIds),
+            isNull(userPriceNotifications.readAt),
           ),
         );
     }

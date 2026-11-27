@@ -39,6 +39,8 @@ import {
   type QuoteLineInput,
   type QuoteProgram,
   type QuoteResult,
+  type QuoteProduct,
+  applyLocationPricing,
   perBasePrices,
   programServes,
   resolveQuote,
@@ -78,6 +80,10 @@ const SEARCH_LIMIT = 30;
  */
 @Injectable()
 export class CheckoutService {
+  private readonly locationQuoteProducts = new WeakMap<
+    LoadedSnapshot,
+    Map<number, ReadonlyMap<number, QuoteProduct>>
+  >();
   constructor(
     @Inject(EDGE_DB) private readonly db: EdgeDb,
     private readonly store: SnapshotStore,
@@ -210,9 +216,14 @@ export class CheckoutService {
     tillCode?: string,
   ): EdgeQuoteResponse {
     const loaded = this.store.get();
-    const { inputs, result, programs } = this.price(loaded, lines, couponsOf(facts), tillCode);
+    const { inputs, result, programs, products } = this.price(
+      loaded,
+      lines,
+      couponsOf(facts),
+      tillCode,
+    );
     const vouchers = codesTaken(facts, result);
-    const bonuses = lineBonuses(inputs, result, programs, loaded.quote.products);
+    const bonuses = lineBonuses(inputs, result, programs, products);
     const vat = inputs.map((input, index) => {
       const line = result.lines[index];
       return line?.priced
@@ -241,11 +252,11 @@ export class CheckoutService {
           discount: priced ? line.discountAmount.toFixed(2) : null,
           bulk:
             priced && input.fixedBaseUnitPrice === undefined
-              ? this.bulkPrices(loaded, input, line.parts)
+              ? this.bulkPrices(loaded, input, line.parts, tillCode)
               : null,
           bulkOffer:
             priced && input.fixedBaseUnitPrice === undefined
-              ? this.bulkOffer(loaded, input.unitId, line.parts)
+              ? this.bulkOffer(loaded, input.unitId, line.parts, tillCode)
               : null,
           bonus: bonusWire(bonuses[index] ?? null),
         };
@@ -291,7 +302,7 @@ export class CheckoutService {
     // ADR-0110: a supervisor's PIN once for the sale's codes (owner 2026-10-27), always.
     const approver = codes.length > 0 ? await this.voucherApprover(request) : null;
     const facts = await this.vouchers.resolve(codes);
-    const { inputs, result, programs } = this.price(
+    const { inputs, result, programs, products } = this.price(
       loaded,
       request.lines,
       couponsOf(facts),
@@ -315,11 +326,13 @@ export class CheckoutService {
     // The quote's bulk offer of each document line (one per priced part, as `saleDocLinesOf`
     // makes them), printed on the receipt only (owner 2026-11-17).
     const offers = result.lines.flatMap((line) =>
-      line.priced ? line.parts.map((part) => this.bulkOffer(loaded, part.unitId, line.parts)) : [],
+      line.priced
+        ? line.parts.map((part) => this.bulkOffer(loaded, part.unitId, line.parts, tillCode))
+        : [],
     );
     // The N+M of each document line (owner 2026-11-17), printed only: a supermarket line is one
     // part, so a line's bonus is its one document line's.
-    const quotedBonuses = lineBonuses(inputs, result, programs, loaded.quote.products);
+    const quotedBonuses = lineBonuses(inputs, result, programs, products);
     const bonuses = result.lines.flatMap((line, index) =>
       line.priced
         ? line.parts.map(() =>
@@ -567,7 +580,12 @@ export class CheckoutService {
     lines: readonly EdgeCartLine[],
     coupons: readonly QuoteCoupon[] = [],
     tillCode?: string,
-  ): { inputs: QuoteLineInput[]; result: QuoteResult; programs: QuoteProgram[] } {
+  ): {
+    inputs: QuoteLineInput[];
+    result: QuoteResult;
+    programs: QuoteProgram[];
+    products: ReadonlyMap<number, QuoteProduct>;
+  } {
     if (lines.length === 0 || lines.length > POS_LIMITS.maxLines) {
       throw new AppError('VALIDATION_FAILED', `a cart has 1 to ${POS_LIMITS.maxLines} lines`);
     }
@@ -608,13 +626,34 @@ export class CheckoutService {
         tillId: tillCode === undefined ? null : (loaded.tills.get(tillCode)?.id ?? null),
       }),
     );
+    const products = this.locationProducts(loaded, tillCode);
     const result = resolveQuote(inputs, {
       list: 'RETAIL',
-      products: loaded.quote.products,
+      products,
       programs,
       coupons,
     });
-    return { inputs, result, programs };
+    return { inputs, result, programs, products };
+  }
+
+  private locationProducts(
+    loaded: LoadedSnapshot,
+    tillCode?: string,
+  ): ReadonlyMap<number, QuoteProduct> {
+    const settings =
+      tillCode === undefined ? null : (loaded.tills.get(tillCode)?.locationPricing ?? null);
+    if (!settings) return loaded.quote.products;
+    let warehouseMaps = this.locationQuoteProducts.get(loaded);
+    if (!warehouseMaps) {
+      warehouseMaps = new Map();
+      this.locationQuoteProducts.set(loaded, warehouseMaps);
+    }
+    let products = warehouseMaps.get(settings.warehouseId);
+    if (!products) {
+      products = applyLocationPricing(loaded.quote.products, settings);
+      warehouseMaps.set(settings.warehouseId, products);
+    }
+    return products;
   }
 
   private expiryOffer(loaded: LoadedSnapshot, barcode: string, tillCode?: string) {
@@ -916,9 +955,10 @@ export class CheckoutService {
     loaded: LoadedSnapshot,
     input: QuoteLineInput,
     parts: readonly PricedPart[],
+    tillCode?: string,
   ): EdgeQuotedLine['bulk'] {
     const part = parts.find((candidate) => candidate.basis === 'RETAIL_BULK');
-    const terms = loaded.quote.products.get(input.productId)?.terms;
+    const terms = this.locationProducts(loaded, tillCode).get(input.productId)?.terms;
     const factor = loaded.units.get(input.unitId)?.unit.factor;
     if (!part || !terms || factor === undefined) return null;
     const retail = perBasePrices(terms.warehousePrice, terms.profile).retail;
@@ -935,12 +975,15 @@ export class CheckoutService {
     loaded: LoadedSnapshot,
     unitId: number,
     parts: readonly PricedPart[],
+    tillCode?: string,
   ): EdgeBulkOffer | null {
     if (!parts.every((part) => part.basis === 'RETAIL' || part.basis === 'RETAIL_BULK')) {
       return null;
     }
     const found = loaded.units.get(unitId);
-    const terms = found ? loaded.quote.products.get(found.product.id)?.terms : undefined;
+    const terms = found
+      ? this.locationProducts(loaded, tillCode).get(found.product.id)?.terms
+      : undefined;
     const base = found?.product.units.find((unit) => unit.isBase);
     if (!found || !terms || !base) return null;
     const offer = retailBulkOffer(terms, new Decimal(found.unit.factor));
@@ -973,7 +1016,9 @@ export class CheckoutService {
           isBase: unit.isBase,
           price: line?.priced ? line.total.toFixed(2) : null,
           barcodes: unit.codes ?? [],
-          bulkOffer: line?.priced ? this.bulkOffer(loaded, unit.unitId, line.parts) : null,
+          bulkOffer: line?.priced
+            ? this.bulkOffer(loaded, unit.unitId, line.parts, tillCode)
+            : null,
         };
       }),
     };

@@ -71,6 +71,15 @@ export class ReceiptLineDto {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
+    description:
+      'Preserved printed supplier amount; divide by printedPriceFactor for the exact base-unit source',
+  })
+  @IsOptional()
+  @Matches(MONEY)
+  printedUnitPrice?: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
     description: 'Delivery-note amount, VAT in',
   })
   docAmount?: string | null;
@@ -101,6 +110,12 @@ export class ReceiptLineDto {
     description: 'The keeper’s note on a difference (ADR-0118)',
   })
   note: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Base units represented by the preserved printed reference amount',
+  })
+  printedPriceFactor?: string | null;
 }
 
 @ApiSchema({ name: 'ReceiptConfirmation' })
@@ -353,6 +368,14 @@ export class ReceiptLineRequestDto {
   @IsOptional()
   @Matches(MONEY)
   docUnitPrice?: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Printed supplier reference per entered unit, independent of free-goods cost',
+  })
+  @IsOptional()
+  @Matches(MONEY)
+  printedUnitPrice?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'Or the line amount, VAT in' })
   @IsOptional()
   @Matches(MONEY)
@@ -490,6 +513,14 @@ export class UpdateReceiptLineDto {
   @IsOptional()
   @Matches(MONEY)
   docUnitPrice?: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Printed supplier reference per entered unit, independent of free-goods cost',
+  })
+  @IsOptional()
+  @Matches(MONEY)
+  printedUnitPrice?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, description: 'null clears the price' })
   @IsOptional()
   @Matches(MONEY)
@@ -526,6 +557,14 @@ export class CostLineRequestDto {
   @IsOptional()
   @IsBoolean()
   freeGoods?: boolean;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Printed reference per entered unit, first costing only',
+  })
+  @IsOptional()
+  @Matches(MONEY)
+  printedUnitPrice?: string | null;
 }
 
 @ApiSchema({ name: 'ReceiptCostRequest' })
@@ -589,6 +628,19 @@ export class CostedReceiptLineDto {
   previousBasePrice: string | null;
   @ApiProperty({ type: String, format: 'date', nullable: true }) previousDate: string | null;
   @ApiProperty({ type: String, nullable: true }) previousSupplierName: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description:
+      'Preserved printed supplier amount; divide by printedPriceFactor for the exact base-unit source',
+  })
+  printedUnitPrice?: string | null;
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Base units represented by the preserved printed reference amount',
+  })
+  printedPriceFactor?: string | null;
 }
 
 /** Costs of a receipt: only for holders of inventory.costs.manage. */

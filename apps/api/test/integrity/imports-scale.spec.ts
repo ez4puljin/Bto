@@ -132,7 +132,8 @@ describe('integrity: imports at scale', () => {
     ]);
     const commitSeconds = (Date.now() - started) / 1000;
     expect(committed.status).toBe('COMMITTED');
-    expect(committed.summary?.advisoryLocks).toBe(1);
+    // One import gate plus one supplier-price gate for all 10,000 products; no per-product locks.
+    expect(committed.summary?.advisoryLocks).toBe(2);
     expect(committed.summary?.applied).toMatchObject({ CREATE: COUNT - 1, UPDATE: 1 });
     const { rows: priced } = await sql.query(
       `SELECT count(DISTINCT product_id)::int AS products, count(*)::int AS rows

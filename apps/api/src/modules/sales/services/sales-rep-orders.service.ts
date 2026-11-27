@@ -603,6 +603,7 @@ export class SalesRepOrdersService {
         productUnitId: salesOrderLines.productUnitId,
         qty: salesOrderLines.qty,
         expiryBarcode: salesOrderLines.expiryBarcode,
+        warehouseId: salesOrderLines.warehouseId,
       })
       .from(salesOrderLines)
       .where(idIn(salesOrderLines.orderId, orderIds))
@@ -642,6 +643,7 @@ export class SalesRepOrdersService {
       productUnitId: number;
       qty: Decimal;
       expiryBarcode?: string | null;
+      warehouseId?: number;
     }[],
     date: string,
     pipelineId: number | null,
@@ -656,6 +658,7 @@ export class SalesRepOrdersService {
           productUnitId: line.productUnitId,
           qty: line.qty,
           expiryBarcode: line.expiryBarcode,
+          warehouseId: line.warehouseId,
         })),
       });
     } catch (error) {

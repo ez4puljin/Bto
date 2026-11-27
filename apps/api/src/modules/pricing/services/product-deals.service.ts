@@ -240,7 +240,11 @@ export class ProductDealsService {
    * first step that always applies — a PRODUCT program from at most one base unit, a CATEGORY
    * percentage from zero), with the price without them; only products that have such a program.
    */
-  async packPrices(book: DealBook, productIds: readonly number[]): Promise<Map<number, PackPrice>> {
+  async packPrices(
+    book: DealBook,
+    productIds: readonly number[],
+    warehouseId?: number,
+  ): Promise<Map<number, PackPrice>> {
     const items = [...new Set(productIds)].flatMap((productId) => {
       const programs = book
         .programsOf(productId)
@@ -248,7 +252,7 @@ export class ProductDealsService {
         .map((program) => book.quoteProgram(program));
       return programs.length ? [{ productId, programs }] : [];
     });
-    return this.quotes.packPrices(book.date, items);
+    return this.quotes.packPrices(book.date, items, warehouseId);
   }
 
   /** The units and prices the badges of these products need, read once. */

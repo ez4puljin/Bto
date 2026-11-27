@@ -4,6 +4,7 @@ import { JobsModule } from './common/jobs/jobs.module';
 import { JobsWorkerModule } from './common/jobs/worker/jobs-worker.module';
 import { CoreModule } from './core.module';
 import { ExpiryCommerceModule } from './expiry-commerce.module';
+import { SupplierPricingModule } from './supplier-pricing.module';
 import { HealthCoreModule } from './health/health.module';
 import { WorkerHealthServer } from './health/worker-health.server';
 import { EbarimtIntegrationModule } from './integrations/ebarimt';
@@ -28,6 +29,7 @@ import { StockProblemsWorkerModule } from './modules/stock-problems';
   imports: [
     CoreModule.forRoot('worker'),
     ExpiryCommerceModule,
+    SupplierPricingModule,
     DbModule,
     JobsModule,
     JobsWorkerModule,

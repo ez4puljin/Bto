@@ -883,6 +883,13 @@
       "when": 1795755090486,
       "tag": "0129_expiry_commerce",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1795761709764,
+      "tag": "0130_supplier_base_location_prices",
+      "breakpoints": true
     }
   ]
 }

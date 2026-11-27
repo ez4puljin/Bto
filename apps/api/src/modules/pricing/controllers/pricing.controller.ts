@@ -108,7 +108,7 @@ export class ProductPricesController {
   @HttpCode(200)
   @ApiOkResponse({ type: PriceLabelsDto })
   async labels(@Body() body: PriceLabelsRequestDto): Promise<PriceLabelsDto> {
-    const result = await this.prices.labelsOf(body.productIds);
+    const result = await this.prices.labelsOf(body.productIds, businessDate(), body.warehouseId);
     return {
       date: result.date,
       labels: result.labels.map((label) => ({
@@ -415,9 +415,11 @@ export class PricingController {
       date,
       pipelineId: body.pipelineId ?? null,
       tillId: body.tillId ?? null,
+      warehouseId: body.warehouseId ?? null,
       lines: body.lines.map((line) => ({
         expiryBarcode: line.expiryBarcode ?? null,
         productUnitId: line.productUnitId,
+        warehouseId: line.warehouseId ?? null,
         qty: new Decimal(line.qty),
       })),
     });

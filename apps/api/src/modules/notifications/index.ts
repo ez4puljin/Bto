@@ -19,3 +19,5 @@ export {
   NoticesService,
   type NoticeView,
 } from './services/notices.service';
+
+export { ReceiptPriceNotifier } from './services/receipt-price-notifier';

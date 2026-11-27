@@ -15,6 +15,7 @@ import {
   PriceProfilesService,
   ProductPricesService,
   ProgramTargetsService,
+  SupplierPricingService,
 } from '../../pricing';
 import { posCashiers, posCashierTills, posTills } from '../schema';
 import type { EdgeNode } from './pos-edge-nodes.service';
@@ -52,6 +53,7 @@ export class PosSnapshotService {
     private readonly receiptTemplates: PosReceiptTemplatesService,
     private readonly hr: HrSettingsService,
     private readonly moduleRef: ModuleRef,
+    private readonly supplierPricing: SupplierPricingService,
   ) {}
 
   private expiry(): PosExpiryOffers {
@@ -111,6 +113,14 @@ export class PosSnapshotService {
     const tillWarehouses = await this.org.warehouseNames([
       ...new Set(tillRows.map((till) => till.warehouseId)),
     ]);
+    const locationPricing = new Map(
+      await Promise.all(
+        [...new Set(tillRows.map((till) => till.warehouseId))].map(
+          async (warehouseId) =>
+            [warehouseId, await this.supplierPricing.locationSettings(warehouseId)] as const,
+        ),
+      ),
+    );
     const accessOf = new Map(
       await Promise.all(
         tillRows.map(async (till) => [till.id, await this.tills.accessOf(till.id)] as const),
@@ -156,6 +166,9 @@ export class PosSnapshotService {
           code: till.code,
           name: till.name,
           warehouseId: till.warehouseId,
+          ...(locationPricing.get(till.warehouseId)
+            ? { locationPricing: locationPricing.get(till.warehouseId) }
+            : {}),
           warehouseName: tillWarehouses.get(till.warehouseId) ?? null,
           cashierUserIds: [...(accessOf.get(till.id)?.cashiers ?? [])],
           supervisorUserIds: [...(accessOf.get(till.id)?.supervisors ?? [])],

@@ -340,7 +340,7 @@ export class CustomerShopService {
       list: 'WHOLESALE',
       date: today,
       pipelineId: await this.pipelines.channelPipeline('CUSTOMER_APP'),
-      lines: [...lines],
+      lines: await this.shop.withSourceWarehouses(lines),
     });
     const products = new Map(
       (await this.listed(quote.lines.map((line) => line.productId))).map((product) => [

@@ -23,6 +23,7 @@ import { InboxService } from './services/inbox.service';
 import { NoticesService } from './services/notices.service';
 import { PhoneNotifier } from './services/phone-notifier';
 import { SaleNotifier } from './services/sale-notifier';
+import { ReceiptPriceNotifier } from './services/receipt-price-notifier';
 import { SettlementSmsService } from './services/settlement-sms.service';
 import { SmsSendFlowService } from './services/sms-send-flow.service';
 import { SmsSettingsFlowService } from './services/sms-settings-flow.service';
@@ -44,6 +45,7 @@ import { SmsSettingsFlowService } from './services/sms-settings-flow.service';
     CustomerNotifier,
     SaleNotifier,
     PhoneNotifier,
+    ReceiptPriceNotifier,
     SmsSettingsFlowService,
     SettlementSmsService,
     { provide: SALE_LISTENER, useExisting: SaleNotifier },
@@ -54,6 +56,7 @@ import { SmsSettingsFlowService } from './services/sms-settings-flow.service';
   ],
   exports: [
     NoticesService,
+    ReceiptPriceNotifier,
     SmsSettingsFlowService,
     SettlementSmsService,
     InboxService,

@@ -55,6 +55,9 @@ const lineInput = (line: ReceiptLineRequestDto) => ({
   enteredQty: new Decimal(line.enteredQty),
   ...(line.warehouseId === undefined ? {} : { warehouseId: line.warehouseId }),
   ...(line.docUnitPrice === undefined ? {} : { docUnitPrice: money(line.docUnitPrice) }),
+  ...(line.printedUnitPrice === undefined
+    ? {}
+    : { printedUnitPrice: money(line.printedUnitPrice) }),
   ...(line.docAmount === undefined ? {} : { docAmount: money(line.docAmount) }),
   ...(line.freeGoods === undefined ? {} : { freeGoods: line.freeGoods }),
   ...(line.salePrice === undefined ? {} : { salePrice: money(line.salePrice) }),
@@ -297,6 +300,9 @@ export class ReceiptsController {
           ...(line.amount === undefined ? {} : { amount: new Decimal(line.amount) }),
           ...(line.unitPrice === undefined ? {} : { unitPrice: new Decimal(line.unitPrice) }),
           ...(line.freeGoods === undefined ? {} : { freeGoods: line.freeGoods }),
+          ...(line.printedUnitPrice === undefined
+            ? {}
+            : { printedUnitPrice: money(line.printedUnitPrice) }),
         })),
       }),
     );
@@ -324,6 +330,9 @@ export class ReceiptLinesController {
           : { arrivedQtyBase: new Decimal(body.arrivedQtyBase) }),
         ...(body.note === undefined ? {} : { note: body.note }),
         ...(body.docUnitPrice === undefined ? {} : { docUnitPrice: money(body.docUnitPrice) }),
+        ...(body.printedUnitPrice === undefined
+          ? {}
+          : { printedUnitPrice: money(body.printedUnitPrice) }),
         ...(body.docAmount === undefined ? {} : { docAmount: money(body.docAmount) }),
         ...(body.freeGoods === undefined ? {} : { freeGoods: body.freeGoods }),
         ...(body.salePrice === undefined ? {} : { salePrice: money(body.salePrice) }),

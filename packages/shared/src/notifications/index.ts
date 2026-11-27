@@ -21,7 +21,12 @@ export const NOTICE_LIMITS = {
  * A staff member's own notifications: a rep's order that was sold (ADR-0062 #4), and the phone AI
  * line's new order and new callback task, told to every holder of `phone.calls.read` (ADR-0232 #9).
  */
-export const USER_NOTIFICATION_KINDS = ['ORDER_SOLD', 'PHONE_ORDER', 'PHONE_CALLBACK'] as const;
+export const USER_NOTIFICATION_KINDS = [
+  'ORDER_SOLD',
+  'PHONE_ORDER',
+  'PHONE_CALLBACK',
+  'PRICE_CHANGED',
+] as const;
 export type UserNotificationKind = (typeof USER_NOTIFICATION_KINDS)[number];
 
 /** Who reads a notice (ADR-0079 #8): the sales reps' app or the customers' «Bto300». */
@@ -102,3 +107,111 @@ export {
   type SmsTemplateValues,
   unknownSmsPlaceholders,
 } from './sms';
+
+/** A bounded public selling-price summary; acquisition prices never enter the inbox. */
+export type PriceChangeWarningReason =
+  'PRINTED_PRICE_MISSING' | 'PRINTED_PRICE_ZERO' | 'PRINTED_PRICE_CONFLICT' | 'PRICE_OUT_OF_RANGE';
+export interface PriceChangeNotificationLine {
+  eventId: number;
+  productId: number;
+  sku: string;
+  name: string;
+  oldBasePrice: string | null;
+  newBasePrice: string;
+  overrodeManual: boolean;
+}
+export interface PriceChangeNotificationWarning {
+  eventId: number;
+  productId: number;
+  sku: string;
+  name: string;
+  reason: PriceChangeWarningReason;
+}
+export interface PriceChangeNoticeFacts {
+  receiptId: number;
+  receiptNumber: string;
+  changes: readonly PriceChangeNotificationLine[];
+  warnings: readonly PriceChangeNotificationWarning[];
+}
+export interface PriceChangeSummary extends PriceChangeNoticeFacts {
+  changeCount: number;
+  warningCount: number;
+  overwrittenManualCount: number;
+}
+
+/** Defensive decoding of the bounded persisted selling-price notification. */
+export function priceChangeSummaryOf(value: unknown): PriceChangeSummary | null {
+  const object = (x: unknown): Record<string, unknown> | null =>
+    typeof x === 'object' && x !== null ? (x as Record<string, unknown>) : null;
+  const r = object(value);
+  if (!r) return null;
+  const id = (x: unknown): x is number => typeof x === 'number' && Number.isSafeInteger(x) && x > 0;
+  const count = (x: unknown, fallback: number) =>
+    typeof x === 'number' && Number.isSafeInteger(x) && x >= 0 ? x : fallback;
+  const money = (x: unknown): x is string =>
+    typeof x === 'string' && /^[1-9][0-9]{0,11}(?:\.0{1,2})?$/.test(x);
+  if (!id(r.receiptId) || typeof r.receiptNumber !== 'string') return null;
+  const changes: PriceChangeNotificationLine[] = [];
+  for (const x of (Array.isArray(r.changes) ? r.changes : []).slice(0, 20)) {
+    const c = object(x);
+    if (
+      !c ||
+      !id(c.eventId) ||
+      !id(c.productId) ||
+      typeof c.sku !== 'string' ||
+      typeof c.name !== 'string' ||
+      !money(c.newBasePrice) ||
+      (c.oldBasePrice !== null && !money(c.oldBasePrice)) ||
+      typeof c.overrodeManual !== 'boolean'
+    )
+      continue;
+    changes.push({
+      eventId: c.eventId,
+      productId: c.productId,
+      sku: c.sku,
+      name: c.name,
+      oldBasePrice: c.oldBasePrice,
+      newBasePrice: c.newBasePrice,
+      overrodeManual: c.overrodeManual,
+    });
+  }
+  const reasons: readonly string[] = [
+    'PRINTED_PRICE_MISSING',
+    'PRINTED_PRICE_ZERO',
+    'PRINTED_PRICE_CONFLICT',
+    'PRICE_OUT_OF_RANGE',
+  ];
+  const warnings: PriceChangeNotificationWarning[] = [];
+  for (const x of (Array.isArray(r.warnings) ? r.warnings : []).slice(0, 20)) {
+    const c = object(x);
+    if (
+      !c ||
+      !id(c.eventId) ||
+      !id(c.productId) ||
+      typeof c.sku !== 'string' ||
+      typeof c.name !== 'string' ||
+      typeof c.reason !== 'string' ||
+      !reasons.includes(c.reason)
+    )
+      continue;
+    warnings.push({
+      eventId: c.eventId,
+      productId: c.productId,
+      sku: c.sku,
+      name: c.name,
+      reason: c.reason as PriceChangeWarningReason,
+    });
+  }
+  return {
+    receiptId: r.receiptId,
+    receiptNumber: r.receiptNumber,
+    changes,
+    warnings,
+    changeCount: count(r.changeCount, changes.length),
+    warningCount: count(r.warningCount, warnings.length),
+    overwrittenManualCount: count(
+      r.overwrittenManualCount,
+      changes.filter((c) => c.overrodeManual).length,
+    ),
+  };
+}

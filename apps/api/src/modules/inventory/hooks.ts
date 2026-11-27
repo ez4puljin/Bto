@@ -85,6 +85,33 @@ export interface ReceiptSalePrices {
 
 export const RECEIPT_SALE_PRICES = Symbol('RECEIPT_SALE_PRICES');
 
+/** Printed supplier prices, kept separate from inventory valuation (ADR-0246). */
+export interface SupplierReceiptPricingFacts {
+  receiptId: number;
+  receiptNumber: string;
+  supplierId: number;
+  postedAt: Date;
+  phase: 'POST' | 'FIRST_PRICED';
+  lines: readonly {
+    receiptLineId: number;
+    productId: number;
+    qtyBase: Decimal;
+    printedUnitPriceBase: Decimal | null;
+    /** Original invoice ratio; pricing rounds only its final derived sale price. */
+    printedPriceAmount?: Decimal | null;
+    printedPriceQtyBase?: Decimal | null;
+  }[];
+}
+
+/** Optional pricing adapter: stock-only workers and tests need no pricing module. */
+export interface SupplierReceiptPrices {
+  lockInTx(tx: Tx): Promise<void>;
+  isEnabledInTx(tx: Tx, supplierId: number): Promise<boolean>;
+  applyInTx(tx: Tx, actor: Actor, facts: SupplierReceiptPricingFacts): Promise<void>;
+}
+
+export const SUPPLIER_RECEIPT_PRICES = Symbol('SUPPLIER_RECEIPT_PRICES');
+
 /**
  * A receipt's figures for the books at one costing version (ADR-0078 #4, F3 ADR-0091): the payable
  * is Σ `doc_amount` less each line's share of the note's discount (VAT included, ADR-0099 #4), the

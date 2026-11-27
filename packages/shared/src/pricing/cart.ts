@@ -11,6 +11,7 @@ import {
   reachedStep,
 } from './discounts';
 import { type PerBasePrices, perBasePrices, type PriceProfileValues, unitPriceOf } from './profile';
+import { type LocationPriceSettings, tryLocationTerms } from './location';
 
 /**
  * The quote (ADR-0041 #3, ADR-0048 #3–#4), pure: the api fetches the price terms, the profile
@@ -29,6 +30,8 @@ export interface QuoteUnit {
 
 /** A product's price terms in force on the quote date. */
 export interface QuoteTerms {
+  /** Explicit location pricing keeps normal discounts above this canonical base. */
+  minimumBasePrice?: Decimal;
   /** Per base unit, whole MNT, VAT included. */
   warehousePrice: Decimal;
   /** The unit of measure counted as a whole pack; null for a product without packs. */
@@ -45,6 +48,8 @@ export interface QuoteProduct {
 }
 
 export interface QuoteLineInput {
+  /** A mixed-source order may name a different configured location on each line. */
+  locationPricing?: LocationPriceSettings | null;
   productId: number;
   unitId: number;
   /** As entered, in the line's unit. */
@@ -92,6 +97,8 @@ export interface LinePart {
 }
 
 export interface PricedPart extends LinePart {
+  /** A full N+M could not fit above the base floor; do not claim free quantities. */
+  bonusSuppressed?: boolean;
   /** The basis' price of one unit, whole MNT. */
   listPrice: Decimal;
   /** After the product's own discounts, whole MNT. */
@@ -197,15 +204,14 @@ export function unitPriceTable(terms: QuoteTerms, units: readonly QuoteUnit[]): 
   if (!base) return [];
   const prices = perBasePrices(terms.warehousePrice, terms.profile);
   const whole = wholeUnitOf(units, terms.wholeUomId);
+  const priceFor = (price: Decimal, factor: Decimal) =>
+    Decimal.max(unitPriceOf(price, factor), terms.minimumBasePrice?.times(factor).ceil() ?? ZERO);
   return units.map((unit) => {
     const parts = splitWholesale({ unit, qty: new Decimal(1), qtyBase: unit.factor }, whole, base);
     const wholesale = parts.reduce((sum, part) => {
       const partUnit = units.find((candidate) => candidate.unitId === part.unitId) ?? base;
       return sum.plus(
-        roundHalfUp(
-          unitPriceOf(basisPrice(prices, part.basis), partUnit.factor).times(part.qty),
-          0,
-        ),
+        roundHalfUp(priceFor(basisPrice(prices, part.basis), partUnit.factor).times(part.qty), 0),
       );
     }, ZERO);
     const bases = new Set(parts.map((part) => part.basis));
@@ -213,8 +219,8 @@ export function unitPriceTable(terms: QuoteTerms, units: readonly QuoteUnit[]): 
       unitId: unit.unitId,
       wholesale,
       wholesaleBasis: bases.size > 1 ? 'MIXED' : bases.has('LOOSE') ? 'LOOSE' : 'WAREHOUSE',
-      retail: unitPriceOf(prices.retail, unit.factor),
-      retailBulk: prices.retailBulk === null ? null : unitPriceOf(prices.retailBulk, unit.factor),
+      retail: priceFor(prices.retail, unit.factor),
+      retailBulk: prices.retailBulk === null ? null : priceFor(prices.retailBulk, unit.factor),
     };
   });
 }
@@ -255,6 +261,8 @@ function basisPrice(prices: PerBasePrices, basis: PriceBasis): Decimal {
 }
 
 interface PartState {
+  minimumAmount: Decimal;
+  bonusSuppressed?: boolean;
   part: LinePart;
   productId: number;
   listPrice: Decimal;
@@ -410,6 +418,7 @@ export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteCon
     if (!parts) return { priced: false, problem: 'PRICE_MISSING' };
     const priced = parts.map((state): PricedPart => ({
       ...state.part,
+      ...(state.bonusSuppressed ? { bonusSuppressed: true } : {}),
       listPrice: state.listPrice,
       unitPrice: state.unitPrice,
       subtotal: state.subtotal,
@@ -446,6 +455,8 @@ function inGroup(program: QuoteProgram, productId: number, context: QuoteContext
 }
 
 interface ListedPart {
+  minimumUnitPrice: Decimal;
+  minimumAmount: Decimal;
   part: LinePart;
   listPrice: Decimal;
   /** The part's unit in base units. */
@@ -462,7 +473,10 @@ function listParts(
   const unit = product?.units.find((candidate) => candidate.unitId === line.unitId);
   const base = product?.units.find((candidate) => candidate.isBase);
   if (!product?.terms || !unit || !base) return null;
-  const { terms } = product;
+  const terms = line.locationPricing
+    ? tryLocationTerms(product.terms, line.locationPricing)
+    : product.terms;
+  if (!terms) return null;
   const prices = perBasePrices(terms.warehousePrice, terms.profile);
   const bulkFrom = terms.profile.retailBulkMinQty;
   const parts =
@@ -487,7 +501,12 @@ function listParts(
     const partUnit = product.units.find((candidate) => candidate.unitId === part.unitId) ?? base;
     return {
       part,
-      listPrice: unitPriceOf(basisPrice(prices, part.basis), partUnit.factor),
+      listPrice: Decimal.max(
+        unitPriceOf(basisPrice(prices, part.basis), partUnit.factor),
+        terms.minimumBasePrice?.times(partUnit.factor).ceil() ?? ZERO,
+      ),
+      minimumUnitPrice: terms.minimumBasePrice?.times(partUnit.factor).ceil() ?? ZERO,
+      minimumAmount: roundHalfUp((terms.minimumBasePrice ?? ZERO).times(part.qtyBase), 0),
       factor: partUnit.factor,
     };
   });
@@ -517,8 +536,9 @@ function priceParts(
   const programs = stageOrder(context.programs, 'PRODUCT').filter((program) =>
     targetsProduct(program, line.productId),
   );
-  return listed.map(({ part, listPrice, factor }) => {
+  return listed.map(({ part, listPrice, factor, minimumUnitPrice, minimumAmount }) => {
     let price = listPrice;
+    let bonusSuppressed = false;
     const applied: AppliedDiscount[] = [];
     const bonuses: PartState['bonuses'] = [];
     const reached = programs.flatMap((program) => {
@@ -531,6 +551,13 @@ function priceParts(
       .sort((a, b) => b.program.id - a.program.id)[0];
     for (const { program, step } of first ? [first] : reached) {
       if (program.effect === 'BONUS') {
+        if (
+          minimumUnitPrice.gt(0) &&
+          price.times(step.threshold).lt(minimumUnitPrice.times(step.threshold.plus(step.value)))
+        ) {
+          bonusSuppressed = true;
+          continue;
+        }
         bonuses.push({ program, step });
         continue;
       }
@@ -551,11 +578,15 @@ function priceParts(
           adjustedPrice(price, program.adjust.kind, program.adjust.factor),
         );
       }
-      applied.push(appliedOf(program, step, null));
+      price = Decimal.max(minimumUnitPrice, price);
+      if (minimumUnitPrice.isZero() || !price.eq(before))
+        applied.push(appliedOf(program, step, null));
     }
     const unitPrice = roundHalfUp(price, 0);
     const subtotal = roundHalfUp(unitPrice.times(part.qty), 0);
     return {
+      minimumAmount,
+      ...(bonusSuppressed ? { bonusSuppressed: true } : {}),
       part,
       productId: line.productId,
       listPrice,
@@ -563,7 +594,7 @@ function priceParts(
       subtotal,
       amount: subtotal,
       applied,
-      alone: first !== undefined,
+      alone: first !== undefined && !(first.program.effect === 'BONUS' && bonusSuppressed),
       bonuses,
     };
   });
@@ -607,6 +638,14 @@ function applyBonuses(
       cut,
       parts.map((state) => state.amount),
     );
+    if (
+      parts.some((state, index) => state.amount.minus(cuts[index] ?? ZERO).lt(state.minimumAmount))
+    ) {
+      parts.forEach((state) => {
+        state.bonusSuppressed = true;
+      });
+      continue;
+    }
     parts.forEach((state, index) => {
       const own = cuts[index] ?? ZERO;
       if (own.isZero()) return;
@@ -629,14 +668,17 @@ function applyToAmounts(
   if (program.effect === 'PERCENT') {
     cuts = priced.map((state) => roundHalfUp(state.amount.times(step.value).div(HUNDRED), 0));
   } else {
-    const available = priced.reduce((sum, state) => sum.plus(state.amount), ZERO);
-    cuts = allocate(
-      Decimal.min(step.value, available),
-      priced.map((state) => state.amount),
+    const headroom = priced.map((state) =>
+      Decimal.max(ZERO, state.amount.minus(state.minimumAmount)),
     );
+    const available = headroom.reduce((sum, amount) => sum.plus(amount), ZERO);
+    cuts = allocate(Decimal.min(step.value, available), headroom);
   }
   for (const [index, state] of priced.entries()) {
-    const cut = cuts[index] ?? ZERO;
+    const cut = Decimal.min(
+      cuts[index] ?? ZERO,
+      Decimal.max(ZERO, state.amount.minus(state.minimumAmount)),
+    );
     if (cut.isZero()) continue;
     state.amount = state.amount.minus(cut);
     const applied = appliedOf(program, step, cut);

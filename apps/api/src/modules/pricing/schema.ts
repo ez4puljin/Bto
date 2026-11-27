@@ -25,9 +25,12 @@ import {
   unique,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { money, percent, qty } from '../../common/db/types';
+import { factor, jsonValue, money, percent, qty } from '../../common/db/types';
 import { categories, products, productUnits, uoms } from '../catalog/schema';
 import { users } from '../identity/schema';
+import { warehouses } from '../identity/schema';
+import { suppliers } from '../partners/schema';
+import { goodsReceipts } from '../inventory/schema';
 
 // Tables owned by the pricing module (docs/modules/pricing.md, ADR-0041, ADR-0048). Migrations
 // 0013_pricing and 0019_price_profiles add by hand the EXCLUDE constraints that keep dated rows
@@ -312,5 +315,176 @@ export const discountSteps = pgTable(
     unique('discount_steps_program_threshold').on(t.programId, t.threshold),
     check('discount_steps_rule', inList(t.rule, STEP_RULES)),
     check('discount_steps_values', sql`${t.threshold} >= 0 AND ${t.value} > 0`),
+  ],
+);
+/** Explicit supplier rules; unconfigured suppliers retain the original receipt-price flow. */
+export const supplierPriceRules = pgTable(
+  'supplier_price_rules',
+  {
+    supplierId: ref('supplier_id')
+      .primaryKey()
+      .references(() => suppliers.id),
+    enabled: boolean('enabled').notNull().default(true),
+    markupPct: percent('markup_pct').notNull(),
+    markupAmount: money('markup_amount').notNull(),
+    rounding: text('rounding', { enum: PRICE_ROUNDINGS }).notNull(),
+    version: integer('version').notNull().default(1),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check(
+      'supplier_price_rules_values',
+      sql`${t.markupPct} >= 0 AND ${t.markupPct} < 'Infinity'::numeric AND ${t.markupAmount} >= 0 AND ${t.markupAmount} < 'Infinity'::numeric AND ${t.markupAmount} = trunc(${t.markupAmount}) AND ${t.version} > 0`,
+    ),
+    check('supplier_price_rules_rounding', inList(t.rounding, PRICE_ROUNDINGS)),
+  ],
+);
+
+export const locationPriceRules = pgTable(
+  'location_price_rules',
+  {
+    warehouseId: ref('warehouse_id')
+      .primaryKey()
+      .references(() => warehouses.id),
+    enabled: boolean('enabled').notNull().default(true),
+    priceType: text('price_type', { enum: ['BASE', 'ADDITIONAL'] }).notNull(),
+    markupPct: percent('markup_pct').notNull(),
+    markupAmount: money('markup_amount').notNull(),
+    rounding: text('rounding', { enum: PRICE_ROUNDINGS }).notNull(),
+    version: integer('version').notNull().default(1),
+    updatedBy: userRef('updated_by'),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check(
+      'location_price_rules_values',
+      sql`${t.markupPct} >= 0 AND ${t.markupPct} < 'Infinity'::numeric AND ${t.markupAmount} >= 0 AND ${t.markupAmount} < 'Infinity'::numeric AND ${t.markupAmount} = trunc(${t.markupAmount}) AND ${t.version} > 0`,
+    ),
+    check(
+      'location_price_rules_type',
+      sql`${t.priceType} IN ('BASE', 'ADDITIONAL') AND (${t.priceType} <> 'BASE' OR (${t.markupPct} = 0 AND ${t.markupAmount} = 0))`,
+    ),
+    check('location_price_rules_rounding', inList(t.rounding, PRICE_ROUNDINGS)),
+  ],
+);
+
+export const basePriceEvents = pgTable(
+  'base_price_events',
+  {
+    id: id(),
+    productId: ref('product_id')
+      .notNull()
+      .references(() => products.id),
+    kind: text('kind', { enum: ['RECEIPT', 'MANUAL', 'SKIPPED'] }).notNull(),
+    phase: text('phase', { enum: ['POST', 'FIRST_PRICED'] }),
+    reason: text('reason'),
+    oldBasePrice: money('old_base_price'),
+    newBasePrice: money('new_base_price'),
+    /** Printed prices normalized to a base unit may be repeating ratios; retain their text. */
+    printedUnitPriceBase: text('printed_unit_price_base'),
+    printedPriceAmount: money('printed_price_amount'),
+    printedPriceQtyBase: factor('printed_price_qty_base'),
+    ruleSnapshot: jsonValue('rule_snapshot'),
+    overrodeManual: boolean('overrode_manual').notNull().default(false),
+    receiptId: ref('receipt_id').references(() => goodsReceipts.id),
+    receiptNumber: text('receipt_number'),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    validFrom: date('valid_from', { mode: 'string' })
+      .notNull()
+      .default(sql`CURRENT_DATE`),
+  },
+  (t) => [
+    index('base_price_events_product_idx').on(t.productId, t.id),
+    uniqueIndex('base_price_events_receipt_phase_product')
+      .on(t.receiptId, t.phase, t.productId)
+      .where(sql`${t.receiptId} IS NOT NULL`),
+    check('base_price_events_kind', sql`${t.kind} IN ('RECEIPT', 'MANUAL', 'SKIPPED')`),
+    check(
+      'base_price_events_shape',
+      sql`(${t.kind} = 'MANUAL' AND ${t.receiptId} IS NULL AND ${t.phase} IS NULL) OR (${t.kind} IN ('RECEIPT', 'SKIPPED') AND ${t.receiptId} IS NOT NULL AND ${t.phase} IS NOT NULL AND ${t.phase} IN ('POST', 'FIRST_PRICED'))`,
+    ),
+    check(
+      'base_price_events_money',
+      sql`(${t.oldBasePrice} IS NULL OR (${t.oldBasePrice} > 0 AND ${t.oldBasePrice} < 'Infinity'::numeric AND ${t.oldBasePrice} = trunc(${t.oldBasePrice}))) AND (${t.newBasePrice} IS NULL OR (${t.newBasePrice} > 0 AND ${t.newBasePrice} < 'Infinity'::numeric AND ${t.newBasePrice} = trunc(${t.newBasePrice}))) AND (${t.kind} <> 'RECEIPT' OR ${t.newBasePrice} IS NOT NULL) AND (${t.kind} <> 'MANUAL' OR ${t.oldBasePrice} IS NOT NULL OR ${t.newBasePrice} IS NOT NULL)`,
+    ),
+    check(
+      'base_price_events_printed',
+      sql`${t.printedUnitPriceBase} IS NULL OR (${t.printedUnitPriceBase} ~ '^[0-9]+([.][0-9]+)?$' AND length(${t.printedUnitPriceBase}) <= 80)`,
+    ),
+    check(
+      'base_price_events_printed_ratio',
+      sql`(${t.printedPriceAmount} IS NULL) = (${t.printedPriceQtyBase} IS NULL) AND (${t.printedPriceAmount} IS NULL OR (${t.printedPriceAmount} >= 0 AND ${t.printedPriceAmount} < 'Infinity'::numeric AND ${t.printedPriceQtyBase} > 0 AND ${t.printedPriceQtyBase} < 'Infinity'::numeric))`,
+    ),
+  ],
+);
+
+/** The latest posted receipt is a watermark even when its printed price was unavailable. */
+export const basePriceStates = pgTable(
+  'base_price_states',
+  {
+    productId: ref('product_id')
+      .primaryKey()
+      .references(() => products.id),
+    lastReceiptId: ref('last_receipt_id').references(() => goodsReceipts.id),
+    lastReceiptPostedAt: timestamp('last_receipt_posted_at', { withTimezone: true }),
+    lastEventId: ref('last_event_id').references(() => basePriceEvents.id),
+    source: text('source', { enum: ['RECEIPT', 'MANUAL', 'LEGACY'] }).notNull(),
+    manualAfterReceipt: boolean('manual_after_receipt').notNull().default(false),
+    receiptApplied: boolean('receipt_applied').notNull().default(false),
+    postingPrice: money('posting_price'),
+    receiptRuleVersion: integer('receipt_rule_version'),
+    receiptMarkupPct: percent('receipt_markup_pct'),
+    receiptMarkupAmount: money('receipt_markup_amount'),
+    receiptRounding: text('receipt_rounding', { enum: PRICE_ROUNDINGS }),
+  },
+  (t) => [
+    check('base_price_states_source', sql`${t.source} IN ('RECEIPT', 'MANUAL', 'LEGACY')`),
+    check(
+      'base_price_states_receipt',
+      sql`(${t.lastReceiptId} IS NULL) = (${t.lastReceiptPostedAt} IS NULL)`,
+    ),
+    check(
+      'base_price_states_posting_price',
+      sql`${t.postingPrice} IS NULL OR (${t.postingPrice} > 0 AND ${t.postingPrice} < 'Infinity'::numeric AND ${t.postingPrice} = trunc(${t.postingPrice}))`,
+    ),
+    check(
+      'base_price_states_rule',
+      sql`(${t.receiptRuleVersion} IS NULL AND ${t.receiptMarkupPct} IS NULL AND ${t.receiptMarkupAmount} IS NULL AND ${t.receiptRounding} IS NULL) OR (${t.receiptRuleVersion} IS NOT NULL AND ${t.receiptRuleVersion} > 0 AND ${t.receiptMarkupPct} IS NOT NULL AND ${t.receiptMarkupPct} >= 0 AND ${t.receiptMarkupPct} < 'Infinity'::numeric AND ${t.receiptMarkupAmount} IS NOT NULL AND ${t.receiptMarkupAmount} >= 0 AND ${t.receiptMarkupAmount} < 'Infinity'::numeric AND ${t.receiptMarkupAmount} = trunc(${t.receiptMarkupAmount}) AND ${t.receiptRounding} IS NOT NULL AND ${inList(t.receiptRounding, PRICE_ROUNDINGS)})`,
+    ),
+  ],
+);
+
+/** Append-only day-effective location settings keep historical quotes deterministic. */
+export const locationPriceRuleVersions = pgTable(
+  'location_price_rule_versions',
+  {
+    id: id(),
+    warehouseId: ref('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    enabled: boolean('enabled').notNull(),
+    priceType: text('price_type', { enum: ['BASE', 'ADDITIONAL'] }).notNull(),
+    markupPct: percent('markup_pct').notNull(),
+    markupAmount: money('markup_amount').notNull(),
+    rounding: text('rounding', { enum: PRICE_ROUNDINGS }).notNull(),
+    version: integer('version').notNull(),
+    validFrom: date('valid_from', { mode: 'string' }).notNull(),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique('location_price_rule_versions_version').on(t.warehouseId, t.version),
+    index('location_price_rule_versions_day').on(t.warehouseId, t.validFrom, t.id),
+    check(
+      'location_price_rule_versions_values',
+      sql`${t.markupPct} >= 0 AND ${t.markupPct} < 'Infinity'::numeric AND ${t.markupAmount} >= 0 AND ${t.markupAmount} < 'Infinity'::numeric AND ${t.markupAmount} = trunc(${t.markupAmount}) AND ${t.version} > 0`,
+    ),
+    check(
+      'location_price_rule_versions_type',
+      sql`${t.priceType} IN ('BASE', 'ADDITIONAL') AND (${t.priceType} <> 'BASE' OR (${t.markupPct} = 0 AND ${t.markupAmount} = 0))`,
+    ),
+    check('location_price_rule_versions_rounding', inList(t.rounding, PRICE_ROUNDINGS)),
   ],
 );

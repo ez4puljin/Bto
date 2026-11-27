@@ -53,3 +53,11 @@ export { ProgramTargetsService } from './services/program-targets.service';
 // The quote's wire shape, reused by the customer app's own quote route (ADR-0082).
 export { toQuoteDto } from './controllers/mappers';
 export { QuoteDto, QuoteLineRequestDto } from './dto/pricing.dto';
+export { SupplierPricingService } from './services/supplier-pricing.service';
+export {
+  PRICE_CHANGE_NOTIFIER,
+  type PriceChangeNotifier,
+  type ReceiptPriceChanges,
+  PRICE_CONTEXT_WAREHOUSE,
+  type PriceContextWarehouse,
+} from './services/base-price-ports';

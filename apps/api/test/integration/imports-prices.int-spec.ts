@@ -197,8 +197,8 @@ describe('imports: prices', () => {
       UNCHANGED: 2,
       COMPLETED: 2,
     });
-    // Only the import lock: no advisory lock per product.
-    expect(committed.summary?.advisoryLocks).toBe(1);
+    // The import lock and the shared supplier-pricing gate; no advisory lock per product.
+    expect(committed.summary?.advisoryLocks).toBe(2);
     expect(await saleReady('8101', '8102', '8103', '8104')).toEqual([
       '8101:true',
       '8102:false',

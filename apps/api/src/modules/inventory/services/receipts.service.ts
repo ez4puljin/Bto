@@ -43,6 +43,8 @@ import {
   RECEIPT_MONEY_ACCOUNTS,
   RECEIPT_PROGRESS,
   RECEIPT_SALE_PRICES,
+  SUPPLIER_RECEIPT_PRICES,
+  type SupplierReceiptPrices,
   RECEIPT_COUNTER_ACCOUNTS,
   type ReceiptCounterAccount,
   type ReceiptCounterAccounts,
@@ -95,6 +97,8 @@ export interface ReceiptLineInput {
   warehouseId?: number | null;
   /** The delivery note's price per entered unit (ADR-0078; cost holders only). */
   docUnitPrice?: Decimal | null;
+  /** Printed reference per entered unit; never changes free-goods accounting. */
+  printedUnitPrice?: Decimal | null;
   /** Or its line amount, VAT included as printed. */
   docAmount?: Decimal | null;
   /** Free goods (бонус), costed at zero. */
@@ -116,6 +120,8 @@ export interface ReceiptLinePatch {
   note?: string | null;
   /** A price per entered unit; null clears the price. */
   docUnitPrice?: Decimal | null;
+  /** Printed reference per entered unit; never changes free-goods accounting. */
+  printedUnitPrice?: Decimal | null;
   /** A line amount; null clears the price. */
   docAmount?: Decimal | null;
   freeGoods?: boolean;
@@ -196,6 +202,8 @@ export interface ReceiptLine {
   salePrice: Decimal | null;
   /** The delivery note's price (ADR-0078): the draft's, else the latest costing's. Cost data. */
   docUnitPrice: Decimal | null;
+  printedUnitPrice: Decimal | null;
+  printedPriceFactor: Decimal | null;
   docAmount: Decimal | null;
   freeGoods: boolean;
   /** The line's share of the receipt's discounts (ADR-0099 #4, ADR-0103). */
@@ -358,6 +366,8 @@ export interface CostLineInput {
   /** Or a price per entered unit (converted with round(price × entered qty, 2)). */
   unitPrice?: Decimal;
   freeGoods?: boolean;
+  /** Printed reference per entered unit on first costing, independent of free-goods cost. */
+  printedUnitPrice?: Decimal | null;
 }
 
 /** The accountant may correct the delivery note's total amount with the price check (ADR-0115). */
@@ -426,6 +436,8 @@ export interface CostedReceiptLine {
   freeGoods: boolean;
   /** The draft's price per entered unit (typed, or the purchase order's last price). */
   docUnitPrice: Decimal | null;
+  printedUnitPrice: Decimal | null;
+  printedPriceFactor: Decimal | null;
   /** The product's price on the receipt posted before this one (ADR-0115), per entered unit. */
   previousUnitPrice: Decimal | null;
   /** The previous price per base unit, its receipt's date and supplier. */
@@ -552,6 +564,7 @@ export class ReceiptsService implements OnModuleInit {
   private moneyAccounts: ReceiptMoneyAccounts | null = null;
   private counterAccountsHook: ReceiptCounterAccounts | null = null;
   private salePrices: ReceiptSalePrices | null = null;
+  private supplierPrices: SupplierReceiptPrices | null = null;
   private progress: ReceiptProgress | null = null;
 
   constructor(
@@ -574,6 +587,13 @@ export class ReceiptsService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    try {
+      this.supplierPrices = this.moduleRef.get<SupplierReceiptPrices>(SUPPLIER_RECEIPT_PRICES, {
+        strict: false,
+      });
+    } catch {
+      this.supplierPrices = null;
+    }
     try {
       this.progress = this.moduleRef.get<ReceiptProgress>(RECEIPT_PROGRESS, { strict: false });
     } catch {
@@ -795,6 +815,7 @@ export class ReceiptsService implements OnModuleInit {
 
   updateLine(ctx: AuthContext, lineId: number, patch: ReceiptLinePatch): Promise<ReceiptDetail> {
     if (
+      patch.printedUnitPrice !== undefined ||
       patch.docUnitPrice !== undefined ||
       patch.docAmount !== undefined ||
       patch.freeGoods !== undefined
@@ -854,6 +875,8 @@ export class ReceiptsService implements OnModuleInit {
       throw invalid('enteredQty', 'positive', 'only a line on the order may arrive empty');
     }
     const converted = await this.convert(unitId, enteredQty, tx);
+    // Unchanged form echoes must not rebind an original BOX ratio to the current PCS unit.
+    const reference = draftPrintedBasis(line, patch, converted.qtyBase);
     const salePrice = patch.salePrice === undefined ? line.salePrice : patch.salePrice;
     if (salePrice !== null) assertSalePrice(salePrice);
     const priced =
@@ -880,6 +903,8 @@ export class ReceiptsService implements OnModuleInit {
         qtyBase: converted.qtyBase,
         expectedQty,
         ...priced,
+        printedUnitPrice: reference.amount,
+        printedPriceFactor: reference.qtyBase,
         salePrice,
         note,
         // A counted quantity is the keeper's check (ADR-0115).
@@ -1033,6 +1058,8 @@ export class ReceiptsService implements OnModuleInit {
     allLines: readonly LineRow[],
   ): Promise<void> {
     const id = header.id;
+    await this.supplierPrices?.lockInTx(tx);
+    const autoPrices = (await this.supplierPrices?.isEnabledInTx(tx, header.supplierId)) ?? false;
     await this.suppliers.assertActive(tx, header.supplierId);
     if (header.paymentMethod !== 'CREDIT') {
       if (header.moneyAccountId === null) {
@@ -1079,7 +1106,7 @@ export class ReceiptsService implements OnModuleInit {
         await tx.update(goodsReceiptLines).set({ binId }).where(eq(goodsReceiptLines.id, line.id));
       }
     }
-    const salePrices = salePricesOf(lines);
+    const salePrices = autoPrices ? [] : salePricesOf(lines);
     // The VAT rate is frozen with the posting, on the delivery note's date.
     const vatRatePct = await this.vatRateOf(tx, header.supplierId, header.supplierDocDate);
     await tx.update(goodsReceipts).set({ vatRatePct }).where(eq(goodsReceipts.id, id));
@@ -1104,13 +1131,41 @@ export class ReceiptsService implements OnModuleInit {
     if (salePrices.length > 0 && this.salePrices) {
       await this.salePrices.applyInTx(tx, ctx, result.effectiveDate, salePrices);
     }
+    if (this.supplierPrices) {
+      const [posted] = await tx
+        .select({ postedAt: goodsReceipts.postedAt })
+        .from(goodsReceipts)
+        .where(eq(goodsReceipts.id, id));
+      if (!posted?.postedAt) throw new Error('posted receipt has no posting timestamp');
+      await this.supplierPrices.applyInTx(tx, ctx, {
+        receiptId: id,
+        receiptNumber: result.numbers.get(id) ?? header.number ?? '',
+        supplierId: header.supplierId,
+        postedAt: posted.postedAt,
+        phase: 'POST',
+        lines: lines.map((line) => ({
+          receiptLineId: line.id,
+          productId: line.productId,
+          qtyBase: line.qtyBase,
+          ...ratioFacts(printedBasisOf(line)),
+        })),
+      });
+    }
     await this.linkSupplierInTx(tx, ctx, header.supplierId, lines);
     await this.audit.record(tx, ctx, {
       action: 'POST',
       entity: 'goods_receipts',
       entityId: id,
       before: header,
-      after: { number: result.numbers.get(id), vatRatePct, lines: allLines },
+      after: {
+        number: result.numbers.get(id),
+        vatRatePct,
+        lines: allLines.map((line) => ({
+          ...line,
+          printedUnitPrice: undefined,
+          printedPriceFactor: undefined,
+        })),
+      },
     });
     await this.progress?.receiptPostedInTx(tx, ctx, id);
   }
@@ -1256,6 +1311,7 @@ export class ReceiptsService implements OnModuleInit {
           });
         }
       }
+      if (header.costingVersion === 0) await this.supplierPrices?.lockInTx(tx);
       // A line that did not arrive has no stock to cost.
       const lines = (await this.linesOf(tx, id)).filter((line) => !line.qtyBase.isZero());
       const given = new Map(input.lines.map((line) => [line.lineId, line]));
@@ -1317,6 +1373,42 @@ export class ReceiptsService implements OnModuleInit {
           payable: payable.toFixed(2),
         });
       }
+      if (version === 1) {
+        for (const line of lines) {
+          const cost = given.get(line.id);
+          if (!cost) throw new Error('missing costing line');
+          if (cost.printedUnitPrice !== undefined && cost.printedUnitPrice !== null)
+            assertPrintedPrice(cost.printedUnitPrice);
+          if (
+            line.printedUnitPrice !== null &&
+            cost.printedUnitPrice !== undefined &&
+            cost.printedUnitPrice !== null &&
+            !line.printedUnitPrice.eq(cost.printedUnitPrice)
+          ) {
+            throw invalid(
+              'printedUnitPrice',
+              'frozen',
+              'an existing posted printed reference is immutable',
+            );
+          }
+          const reference = firstPrintedBasis(line, cost);
+          if (
+            !sameMoney(line.printedUnitPrice, reference.amount) ||
+            !sameMoney(line.printedPriceFactor, reference.qtyBase)
+          ) {
+            await tx
+              .update(goodsReceiptLines)
+              .set({ printedUnitPrice: reference.amount, printedPriceFactor: reference.qtyBase })
+              .where(eq(goodsReceiptLines.id, line.id));
+          }
+        }
+      } else if (input.lines.some((line) => line.printedUnitPrice !== undefined)) {
+        throw invalid(
+          'printedUnitPrice',
+          'frozen',
+          'printed supplier references freeze on the first costing',
+        );
+      }
       await this.posting.revalue(tx, ctx, {
         docId: id,
         version,
@@ -1365,6 +1457,25 @@ export class ReceiptsService implements OnModuleInit {
         },
       });
       await this.purchases.receiptCostedInTx(tx, ctx, await this.bookFacts(id, tx, previous));
+      if (version === 1 && this.supplierPrices && header.postedAt) {
+        await this.supplierPrices.applyInTx(tx, ctx, {
+          receiptId: id,
+          receiptNumber: header.number ?? '',
+          supplierId: header.supplierId,
+          postedAt: header.postedAt,
+          phase: 'FIRST_PRICED',
+          lines: lines.map((line) => {
+            const cost = given.get(line.id);
+            if (!cost) throw new Error('missing costing line');
+            return {
+              receiptLineId: line.id,
+              productId: line.productId,
+              qtyBase: line.qtyBase,
+              ...ratioFacts(firstPrintedBasis(line, cost)),
+            };
+          }),
+        });
+      }
       if (version === 1) await this.progress?.receiptCostedInTx(tx, ctx, id);
       return this.costing(id, tx);
     });
@@ -1513,6 +1624,8 @@ export class ReceiptsService implements OnModuleInit {
         unitCost: valuation ? unitCostOf(valuation.amount, line.qtyBase) : null,
         freeGoods: valuation?.freeGoods ?? line.freeGoods,
         docUnitPrice: line.docUnitPrice,
+        printedUnitPrice: line.printedUnitPrice,
+        printedPriceFactor: line.printedPriceFactor,
         // Per this line's unit: the base price times the line's factor.
         previousUnitPrice: before
           ? before.basePrice.times(line.factorSnapshot).toDecimalPlaces(2)
@@ -2232,6 +2345,7 @@ export class ReceiptsService implements OnModuleInit {
       fixed && !fixed.archivedAt && SHELF_TYPES.includes(fixed.type)
         ? fixed.id
         : (await this.bins.systemBin(warehouseId, 'RECEIVING', tx)).id;
+    const reference = referenceOf(line, converted.factorSnapshot, converted.qtyBase);
     const salePrice = line.salePrice ?? null;
     if (salePrice !== null) assertSalePrice(salePrice);
     const [inserted] = await tx
@@ -2246,6 +2360,8 @@ export class ReceiptsService implements OnModuleInit {
         warehouseId,
         binId,
         ...priceOf(line, enteredQty),
+        printedUnitPrice: reference.amount,
+        printedPriceFactor: reference.qtyBase,
         salePrice,
         expectedQty,
         checkedAt: expectedQty === null ? sql`now()` : null,
@@ -2376,6 +2492,8 @@ export class ReceiptsService implements OnModuleInit {
       weightKg: products.get(line.productId)?.weightKg ?? null,
       salePrice: line.salePrice,
       docUnitPrice: line.docUnitPrice,
+      printedUnitPrice: line.printedUnitPrice,
+      printedPriceFactor: line.printedPriceFactor,
       docAmount: line.docAmount,
       freeGoods: line.freeGoods,
       discountAmount: null,
@@ -2585,6 +2703,7 @@ function salePricesOf(lines: readonly LineRow[]): { productId: number; warehouse
 
 function hasPrice(line: ReceiptLineInput): boolean {
   return (
+    (line.printedUnitPrice !== undefined && line.printedUnitPrice !== null) ||
     (line.docUnitPrice !== undefined && line.docUnitPrice !== null) ||
     (line.docAmount !== undefined && line.docAmount !== null) ||
     line.freeGoods === true
@@ -2598,6 +2717,8 @@ function hasPrice(line: ReceiptLineInput): boolean {
 function priceOf(
   input: {
     docUnitPrice?: Decimal | null;
+    /** Printed reference per entered unit; never changes free-goods accounting. */
+    printedUnitPrice?: Decimal | null;
     docAmount?: Decimal | null;
     freeGoods?: boolean;
   },
@@ -2631,4 +2752,138 @@ function lineAmount(cost: CostLineInput, enteredQty: Decimal): Decimal {
   if (cost.amount) return cost.amount;
   if (cost.unitPrice) return lineAmountOf(cost.unitPrice, enteredQty);
   throw invalid('lines', 'amount', 'an amount or a unit price for every line that is not a bonus');
+}
+
+/** A preserved printed numerator/denominator is never rounded into a unit cost. */
+interface PrintedBasis {
+  amount: Decimal | null;
+  qtyBase: Decimal | null;
+}
+function referenceOf(
+  input: {
+    printedUnitPrice?: Decimal | null;
+    docUnitPrice?: Decimal | null;
+    docAmount?: Decimal | null;
+  },
+  factorSnapshot: Decimal,
+  qtyBase: Decimal,
+): PrintedBasis {
+  const unit = input.printedUnitPrice ?? input.docUnitPrice;
+  if (unit !== undefined && unit !== null) {
+    assertPrintedPrice(unit);
+    return { amount: unit, qtyBase: factorSnapshot };
+  }
+  if (input.docAmount !== undefined && input.docAmount !== null && qtyBase.gt(0)) {
+    assertPrintedPrice(input.docAmount);
+    return { amount: input.docAmount, qtyBase };
+  }
+  return { amount: null, qtyBase: null };
+}
+function printedBasisOf(
+  line: Pick<
+    LineRow,
+    | 'printedUnitPrice'
+    | 'printedPriceFactor'
+    | 'docUnitPrice'
+    | 'docAmount'
+    | 'freeGoods'
+    | 'factorSnapshot'
+    | 'qtyBase'
+  >,
+): PrintedBasis {
+  if (line.printedUnitPrice !== null && line.printedPriceFactor !== null)
+    return { amount: line.printedUnitPrice, qtyBase: line.printedPriceFactor };
+  // Legacy free rows did not preserve a printed reference: accounting zero proves no price.
+  return line.freeGoods
+    ? { amount: null, qtyBase: null }
+    : referenceOf(line, line.factorSnapshot, line.qtyBase);
+}
+function sameMoney(one: Decimal | null, two: Decimal | null): boolean {
+  return one === null ? two === null : two !== null && one.eq(two);
+}
+
+/** Only a changed invoice field replaces the basis, never a full DTO echoed by a later edit. */
+function draftPrintedBasis(line: LineRow, patch: ReceiptLinePatch, qtyBase: Decimal): PrintedBasis {
+  const prior = printedBasisOf(line);
+  if (
+    patch.printedUnitPrice !== undefined &&
+    !sameMoney(patch.printedUnitPrice, line.printedUnitPrice)
+  ) {
+    return referenceOf({ printedUnitPrice: patch.printedUnitPrice }, line.factorSnapshot, qtyBase);
+  }
+  // Unit price is the effective source when both draft monetary fields are supplied (priceOf).
+  if (patch.docUnitPrice !== undefined && patch.docUnitPrice !== null) {
+    return sameMoney(patch.docUnitPrice, line.docUnitPrice)
+      ? prior
+      : referenceOf({ docUnitPrice: patch.docUnitPrice }, line.factorSnapshot, qtyBase);
+  }
+  if (patch.docAmount !== undefined && patch.docAmount !== null) {
+    return sameMoney(patch.docAmount, line.docAmount)
+      ? prior
+      : referenceOf({ docAmount: patch.docAmount }, line.factorSnapshot, qtyBase);
+  }
+  // Explicitly clearing a paid price clears its source; null free-goods fields are ordinary echoes.
+  if (
+    !line.freeGoods &&
+    patch.freeGoods !== true &&
+    (patch.docUnitPrice !== undefined || patch.docAmount !== undefined) &&
+    (line.docUnitPrice !== null || line.docAmount !== null)
+  ) {
+    return { amount: null, qtyBase: null };
+  }
+  return prior;
+}
+
+function firstPrintedBasis(line: LineRow, cost: CostLineInput): PrintedBasis {
+  const prior = printedBasisOf(line);
+  // A known bonus reference is independent from (and cannot be changed by) its zero book cost.
+  if ((line.freeGoods && prior.amount !== null) || cost.freeGoods) {
+    return prior.amount !== null
+      ? prior
+      : referenceOf({ printedUnitPrice: cost.printedUnitPrice }, line.factorSnapshot, line.qtyBase);
+  }
+  // The accountant may correct a paid invoice on the first price check. An unchanged rounded
+  // unit/amount from the form preserves the original exact ratio instead of becoming a new one.
+  // Amount takes precedence when both are supplied, matching lineAmount's actual book amount.
+  if (cost.amount !== undefined) {
+    return sameMoney(cost.amount, line.docAmount)
+      ? prior
+      : referenceOf({ docAmount: cost.amount }, line.factorSnapshot, line.qtyBase);
+  }
+  if (cost.unitPrice !== undefined) {
+    const displayedUnit =
+      line.docUnitPrice ??
+      (line.docAmount !== null && line.enteredQty.gt(0)
+        ? line.docAmount.div(line.enteredQty).toDecimalPlaces(2)
+        : null);
+    return sameMoney(cost.unitPrice, displayedUnit)
+      ? prior
+      : referenceOf({ docUnitPrice: cost.unitPrice }, line.factorSnapshot, line.qtyBase);
+  }
+  return prior.amount !== null
+    ? prior
+    : referenceOf({ printedUnitPrice: cost.printedUnitPrice }, line.factorSnapshot, line.qtyBase);
+}
+function ratioFacts(basis: PrintedBasis) {
+  return {
+    printedUnitPriceBase:
+      basis.amount !== null && basis.qtyBase !== null ? basis.amount.div(basis.qtyBase) : null,
+    printedPriceAmount: basis.amount,
+    printedPriceQtyBase: basis.qtyBase,
+  };
+}
+
+function assertPrintedPrice(value: Decimal): void {
+  if (
+    !value.isFinite() ||
+    value.isNegative() ||
+    value.decimalPlaces() > 2 ||
+    value.gt('999999999999.99')
+  ) {
+    throw invalid(
+      'printedUnitPrice',
+      'money',
+      'a finite non-negative printed price with at most two decimals',
+    );
+  }
 }

@@ -13,6 +13,7 @@ import {
   type QuoteProgram,
   resolveQuote,
   wholeUnitOf,
+  applyLocationPricing,
 } from '@tugeel/shared/pricing';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
@@ -27,6 +28,8 @@ import { DiscountProgramsService } from './discount-programs.service';
 import { PriceProfilesService } from './price-profiles.service';
 import { ProductPricesService, quoteUnitsOf } from './product-prices.service';
 import { ProgramTargetsService } from './program-targets.service';
+import { SupplierPricingService } from './supplier-pricing.service';
+import { PRICE_CONTEXT_WAREHOUSE, type PriceContextWarehouse } from './base-price-ports';
 
 export interface QuoteRequest {
   list: PriceList;
@@ -35,7 +38,13 @@ export interface QuoteRequest {
   /** Where the order is (ADR-0159 #5); unknown: only programs that name no pipeline or till. */
   pipelineId?: number | null;
   tillId?: number | null;
-  lines: { productUnitId: number; qty: Decimal; expiryBarcode?: string | null }[];
+  warehouseId?: number | null;
+  lines: {
+    productUnitId: number;
+    qty: Decimal;
+    expiryBarcode?: string | null;
+    warehouseId?: number | null;
+  }[];
 }
 
 /** The application binds this without adding a pricing -> expiry module dependency. */
@@ -112,6 +121,7 @@ export interface PackPrice {
 @Injectable()
 export class PriceQuoteService implements OnModuleInit {
   private fixedSources: FixedSourcePrices | null = null;
+  private priceContext: PriceContextWarehouse | null = null;
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly catalog: CatalogService,
@@ -122,9 +132,17 @@ export class PriceQuoteService implements OnModuleInit {
     private readonly programs: DiscountProgramsService,
     private readonly targets: ProgramTargetsService,
     private readonly moduleRef: ModuleRef,
+    private readonly supplierPricing: SupplierPricingService,
   ) {}
 
   onModuleInit(): void {
+    try {
+      this.priceContext = this.moduleRef.get<PriceContextWarehouse>(PRICE_CONTEXT_WAREHOUSE, {
+        strict: false,
+      });
+    } catch {
+      this.priceContext = null;
+    }
     try {
       this.fixedSources = this.moduleRef.get<FixedSourcePrices>(FIXED_SOURCE_PRICES, {
         strict: false,
@@ -188,6 +206,28 @@ export class PriceQuoteService implements OnModuleInit {
       qty: line.qty,
       qtyBase: line.qtyBase,
     }));
+    const defaultWarehouseId =
+      request.warehouseId ??
+      (await this.priceContext?.resolve(executor, {
+        list: request.list,
+        pipelineId: request.pipelineId ?? null,
+        tillId: request.tillId ?? null,
+      })) ??
+      null;
+    const settings = new Map<
+      number,
+      Awaited<ReturnType<SupplierPricingService['locationSettings']>>
+    >();
+    for (const [index, input] of inputs.entries()) {
+      const warehouseId = request.lines[index]?.warehouseId ?? defaultWarehouseId;
+      if (warehouseId === null) continue;
+      if (!settings.has(warehouseId))
+        settings.set(
+          warehouseId,
+          await this.supplierPricing.locationSettings(warehouseId, executor, request.date),
+        );
+      input.locationPricing = settings.get(warehouseId) ?? null;
+    }
     const sourceQty = new Map<string, Decimal>();
     request.lines.forEach((line, index) => {
       if (line.expiryBarcode)
@@ -275,19 +315,29 @@ export class PriceQuoteService implements OnModuleInit {
   async packPrices(
     date: string,
     items: readonly { productId: number; programs: readonly QuoteProgram[] }[],
+    warehouseId?: number,
   ): Promise<Map<number, PackPrice>> {
     const result = new Map<number, PackPrice>();
     if (items.length === 0) return result;
-    const { products } = await this.quoteProducts(
+    const fetched = await this.quoteProducts(
       [...new Set(items.map((item) => item.productId))],
       date,
       this.db,
     );
+    const location =
+      warehouseId === undefined
+        ? null
+        : await this.supplierPricing.locationSettings(warehouseId, this.db, date);
+    const products = applyLocationPricing(fetched.products, location);
     for (const item of items) {
       const product = products.get(item.productId);
       const base = product?.units.find((unit) => unit.isBase);
       if (!product?.terms || !base) continue;
-      const unit = wholeUnitOf(product.units, product.terms.wholeUomId) ?? base;
+      const unit =
+        wholeUnitOf(
+          product.units,
+          fetched.products.get(item.productId)?.terms?.wholeUomId ?? null,
+        ) ?? base;
       const line: QuoteLineInput = {
         productId: item.productId,
         unitId: unit.unitId,

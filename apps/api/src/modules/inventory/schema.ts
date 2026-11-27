@@ -414,6 +414,10 @@ export const goodsReceiptLines = pgTable(
       .references(() => bins.id),
     /** The delivery note's price per entered unit, when that is what was typed (ADR-0078). */
     docUnitPrice: money('doc_unit_price'),
+    /** Printed reference for supplier sale pricing, including free goods (ADR-0246). */
+    printedUnitPrice: money('printed_unit_price'),
+    /** Exact base-quantity denominator of the printed reference, preserved across unit changes. */
+    printedPriceFactor: factor('printed_price_factor'),
     /** The delivery note's line amount, VAT included as printed; NULL until a price is typed. */
     docAmount: money('doc_amount'),
     /** Free goods (бонус): costed at zero. */
@@ -448,6 +452,15 @@ export const goodsReceiptLines = pgTable(
       sql`${t.enteredQty} >= 0 AND ${t.qtyBase} >= 0 AND (${t.enteredQty} = 0) = (${t.qtyBase} = 0)
         AND (${t.enteredQty} > 0 OR ${t.expectedQty} IS NOT NULL)
         AND (${t.expectedQty} IS NULL OR ${t.expectedQty} > 0)`,
+    ),
+    check(
+      'goods_receipt_lines_printed_price_basis',
+      sql`(${t.printedUnitPrice} IS NULL) = (${t.printedPriceFactor} IS NULL)
+        AND (${t.printedPriceFactor} IS NULL OR (${t.printedPriceFactor} > 0 AND ${t.printedPriceFactor} < 'Infinity'::numeric))`,
+    ),
+    check(
+      'goods_receipt_lines_printed_price',
+      sql`${t.printedUnitPrice} IS NULL OR (${t.printedUnitPrice} >= 0 AND ${t.printedUnitPrice} < 'Infinity'::numeric)`,
     ),
     check(
       'goods_receipt_lines_price',

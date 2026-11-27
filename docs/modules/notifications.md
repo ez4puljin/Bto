@@ -1,5 +1,7 @@
 # Module `notifications` — contract
 
+Supplier price notifications (ADR-0246, local): `PRICE_CHANGED` is an internal bell notification for active holders of `pricing.prices.manage`, including ADMIN. The root composition binds pricing's `PRICE_CHANGE_NOTIFIER` to `ReceiptPriceNotifier`; both price evidence and inbox rows commit or roll back with receiving. `(kind, price_change_key, user_id)` deduplicates the immutable receipt/event batch, allowing a later first-checked-price batch after a missing-reference warning. `priceChange` on the existing inbox API has the receipt number/id, total change/warning/manual-replacement counts and at most twenty samples of each; the pricing receipt history contains all events. Only public old/new selling base prices and reason codes enter inbox JSON, never acquisition prices. No SMS, email or external push is sent. Existing order/phone notification shapes and ownership checks remain.
+
 Status (notifications v1, built 2026-10-16 with the sales-rep app, ADR-0062):
 - **App notices**: the admin writes a notice in the web (kind, title, text, a picture, up to 20 products, the days it runs, whether it pops up) and every sales rep's app shows it — a popup when the app opens, a count on the bell, a list. A sent notice is never edited; it is withdrawn.
 - **The rep's own notifications**: when a rep's order reaches the sale, the rep is told («… борлуулалт боллоо», with the order's total and the invoice).
@@ -123,3 +125,7 @@ By hand: app may neither update nor delete any of these tables, nor truncate the
 - Push (Expo / FCM) with EAS at go-live, so a notice reaches a closed app (ADR-0061 #2).
 - Housekeeping of old reads and notifications when they grow (none yet).
 - The driver's notifications (delivery 5). The customer's notifications were built 2026-10-19 (ADR-0079 #8); the app's screens come with CA3.
+
+### Receipt-price inbox storage (ADR-0246)
+
+Price changes use `user_price_notifications`; legacy order/phone notifications and their kind constraint remain unchanged. Both allocate IDs from `user_notifications_id_seq`, preserving positive unique IDs and existing numeric cursors. Inbox pages merge the streams before cursor/limit; unread counts and idempotent reads are scoped to the current user across both tables. Only the sidecar read marker can be updated by the app; payloads and event-key/recipient pairs are durable. Receipt notifications are inserted in the same transaction as the price event, with duplicate event/recipient writes ignored.
