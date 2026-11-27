@@ -1,3 +1,4 @@
+import { ExpirySalesSection } from './expiry-sales-section';
 import type { ProblemDetails } from '@tugeel/api-client';
 import {
   EXPIRY_NOTE_MAX,
@@ -309,6 +310,7 @@ function RecordBody(props: {
         <PanelSection title={t('expiry.history.title')}>
           <HistoryTimeline itemId={item.id} />
         </PanelSection>
+        <ExpirySalesSection item={item} />
       </div>
     </div>
   );

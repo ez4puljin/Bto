@@ -1,3 +1,4 @@
+import { ExpirySalesQueryService } from './services/expiry-sales-query.service';
 import { ExpiryPosExceptionsService } from './services/expiry-pos-exceptions.service';
 import { Module } from '@nestjs/common';
 import { CatalogModule } from '../catalog';
@@ -21,6 +22,7 @@ import { ExpiryViewService } from './services/expiry-view.service';
 @Module({
   imports: [IdentityModule, CatalogModule, PartnersModule, InventoryModule],
   providers: [
+    ExpirySalesQueryService,
     ExpiryViewService,
     ExpiryQueryService,
     ExpiryItemsService,
@@ -30,6 +32,7 @@ import { ExpiryViewService } from './services/expiry-view.service';
     ExpiryCommerceGate,
   ],
   exports: [
+    ExpirySalesQueryService,
     ExpiryCommerceService,
     ExpiryPosExceptionsService,
     ExpiryViewService,

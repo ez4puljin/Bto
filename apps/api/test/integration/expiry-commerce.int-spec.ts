@@ -124,6 +124,103 @@ describe('expiry commerce: proven sold units only', () => {
     await app.close();
   });
 
+  it('pages authoritative item sales and returns without leaking costs or inventing refunds', async () => {
+    const f = await fixture();
+    const at = new Date();
+    await record({ ...sale(f, 'history-sale', '2'), soldAt: at });
+    await record({ ...sale(f, 'history-sale-next'), soldAt: at });
+    await inTransaction(db, (tx) =>
+      app.get(ExpiryCommerceService).recordReturnInTx(tx, staffContext(adminId, 'ADMIN'), {
+        sourceKind: 'POS',
+        saleId: 'history-sale',
+        lineId: '1',
+        returnId: 'history-return',
+        returnLineId: '1',
+        qtyBase: new Decimal(1),
+        returnedAt: at,
+      }),
+    );
+    // A different expiry record for exactly the same SKU must not appear here.
+    const other = await approveExpiry(app, admin, {
+      productId: f.product.id,
+      productUnitId: f.markdown.productUnitId,
+      receiptWarehouseId: warehouseId,
+      warehouseId,
+      channel: 'RETAIL',
+      contextId: 456,
+      liableUserIds: people,
+    });
+    await record({ ...sale(f, 'other-item'), barcode: other.commerce.markdowns[0]!.barcode });
+    await record({ ...sale(f, 'history-unallocated', '100'), soldAt: at });
+    const path = `/api/v1/expiry/items/${f.itemId}/sales-history`;
+    await http().get(path).set(bearer(staff)).expect(403);
+    const reader = await customRoleUser(app, admin, ['inventory.costs.manage']);
+    type Row = {
+      id: number;
+      kind: string;
+      qtyBase: string;
+      occurredAt: string;
+      totalAmount: string | null;
+      unitPrice: string | null;
+      saleId: string;
+    };
+    const rows: Row[] = [];
+    let cursor: string | null = null;
+    let firstCursor = '';
+    do {
+      const response = await http()
+        .get(path)
+        .query({ limit: 1, ...(cursor ? { cursor } : {}) })
+        .set(bearer(reader))
+        .expect(200);
+      const page = response.body as { data: Row[]; nextCursor: string | null };
+      rows.push(...page.data);
+      cursor = page.nextCursor;
+      if (!firstCursor && cursor) firstCursor = cursor;
+      expect(rows.length).toBeLessThanOrEqual(3);
+    } while (cursor);
+    expect(rows).toHaveLength(3);
+    expect(new Set(rows.map((row) => `${row.kind}:${row.id}`)).size).toBe(3);
+    expect(
+      rows
+        .filter((row) => row.kind === 'SALE')
+        .map((row) => row.saleId)
+        .sort(),
+    ).toEqual(['history-sale', 'history-sale-next']);
+    expect(rows.find((row) => row.kind === 'RETURN')).toMatchObject({
+      qtyBase: '1.000',
+      occurredAt: at.toISOString(),
+      totalAmount: null,
+      unitPrice: null,
+    });
+    expect(rows.find((row) => row.saleId === 'history-sale' && row.kind === 'SALE')).toMatchObject({
+      qtyBase: '2.000',
+      totalAmount: new Decimal(f.markdown.unitPrice).mul(2).toFixed(2),
+      unitPrice: new Decimal(f.markdown.unitPrice).toFixed(4),
+    });
+    expect(JSON.stringify(rows)).not.toMatch(/accounting|lossAmount|liable|payroll|costAmount/);
+    await http()
+      .get(`/api/v1/expiry/items/${other.itemId}/sales-history`)
+      .query({ cursor: firstCursor })
+      .set(bearer(reader))
+      .expect(422);
+    for (const t of ['1', '2026-02-30T00:00:00.000000Z', '2026-11-27T25:00:00.000000Z']) {
+      const malformed = Buffer.from(
+        JSON.stringify({ item: f.itemId, t, k: 'SALE', i: 1 }),
+      ).toString('base64url');
+      await http().get(path).query({ cursor: malformed }).set(bearer(reader)).expect(422);
+    }
+    const empty = await fixture();
+    expect(
+      (
+        await http()
+          .get(`/api/v1/expiry/items/${empty.itemId}/sales-history`)
+          .set(bearer(reader))
+          .expect(200)
+      ).body,
+    ).toEqual({ data: [], nextCursor: null });
+  });
+
   it('keeps acquisition/payroll data off ordinary shelf and cashier reads', async () => {
     const f = await fixture();
     await http().get(`/api/v1/expiry/items/${f.itemId}/commerce`).set(bearer(staff)).expect(403);

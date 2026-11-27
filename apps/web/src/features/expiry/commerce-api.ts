@@ -161,3 +161,20 @@ export function useAcknowledgeExpiryException() {
     onSuccess: () => cache.invalidateQueries({ queryKey: ['expiry'] }),
   });
 }
+
+export function useExpirySalesHistory(id: number, enabled: boolean) {
+  const api = useApiClient();
+  return useInfiniteQuery({
+    queryKey: ['expiry', 'sales-history', id],
+    enabled,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal }) =>
+      unwrap(
+        await api.GET('/api/v1/expiry/items/{id}/sales-history', {
+          params: { path: { id }, query: { cursor: pageParam, limit: 50 } },
+          signal,
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}

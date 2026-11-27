@@ -96,6 +96,8 @@ const FILTERS: components['schemas']['ExpiryFiltersDto'] = {
 const page = (data: Item[], nextCursor: string | null = null) => json({ data, nextCursor });
 
 const ROUTES = {
+  'GET /api/v1/expiry/items/1/sales-history': () => json({ data: [], nextCursor: null }),
+  'GET /api/v1/expiry/items/2/sales-history': () => json({ data: [], nextCursor: null }),
   'GET /api/v1/expiry/items/1/prices': () => json({ productUnitId: 77, qty: '1', data: [] }),
   'GET /api/v1/expiry/items/2/prices': () => json({ productUnitId: 77, qty: '1', data: [] }),
   'GET /api/v1/expiry/items/1/commerce': () =>
@@ -1816,6 +1818,7 @@ describe('expiry receipt provenance and markdown approval', () => {
     expect(screen.queryByText(mn.expiry.commerce.accountingCost)).toBeNull();
     expect(calls(fetchMock, 'GET', '/api/v1/expiry/items/1/commerce')).toHaveLength(0);
     expect(calls(fetchMock, 'GET', '/api/v1/expiry/items/1/receipt-sources')).toHaveLength(0);
+    expect(calls(fetchMock, 'GET', '/api/v1/expiry/items/1/sales-history')).toHaveLength(0);
   });
 
   it('shows actual zero and free-goods evidence while unknown provenance cannot publish', async () => {
@@ -1830,6 +1833,12 @@ describe('expiry receipt provenance and markdown approval', () => {
     const label = screen.getByText(mn.expiry.commerce.originalUnitGross);
     expect(label.parentElement).toHaveTextContent('0');
     expect(label.parentElement).not.toHaveTextContent(mn.expiry.commerce.unknown);
+    expect(
+      screen.getByText(mn.expiry.commerce.originalReceivedQty).parentElement,
+    ).toHaveTextContent('20');
+    expect(screen.queryByText(mn.expiry.commerce.accountingCost)).toBeNull();
+    expect(screen.queryByText(mn.expiry.commerce.accountingVersion)).toBeNull();
+    expect(screen.queryByText(mn.expiry.commerce.originalGross)).toBeNull();
     cleanup();
     const missing = signedIn(ADMIN_ME, ROUTES);
     renderApp(`${PAGE}?item=1`, missing);
@@ -1928,6 +1937,7 @@ it('pins the approval receipt, date, cost and liable staff through a real backgr
     receiptLineId: 10,
     receiptId: 5,
     receiptNumber: 'IN-0005',
+    first: { ...RECEIPT_SOURCE.first, qtyBase: '40' },
     current: { ...RECEIPT_SOURCE.current, version: 3, accountingAmount: '40000', unitCost: '2000' },
   };
   let record = ITEM;
@@ -1995,15 +2005,15 @@ it('pins the approval receipt, date, cost and liable staff through a real backgr
   expect(frozen.getByText(/IN-0004/)).toBeInTheDocument();
   expect(frozen.getByText('Worker A')).toBeInTheDocument();
   expect(frozen.getByText(ITEM.expiryDate)).toBeInTheDocument();
-  expect(frozen.getByText(mn.expiry.commerce.accountingCost).parentElement).toHaveTextContent(
-    '1,000',
+  expect(frozen.getByText(mn.expiry.commerce.originalReceivedQty).parentElement).toHaveTextContent(
+    '20',
   );
   const current = within(screen.getByRole('region', { name: mn.expiry.commerce.currentBasis }));
   expect(current.getByText(/IN-0005/)).toBeInTheDocument();
   expect(current.getByText('Worker B')).toBeInTheDocument();
   expect(current.getByText('2026-12-15')).toBeInTheDocument();
-  expect(current.getByText(mn.expiry.commerce.accountingCost).parentElement).toHaveTextContent(
-    '2,000',
+  expect(current.getByText(mn.expiry.commerce.originalReceivedQty).parentElement).toHaveTextContent(
+    '40',
   );
   expect(screen.getByLabelText(mn.expiry.commerce.receipt)).toHaveValue('9');
   const publish = screen.getByRole('button', { name: mn.expiry.commerce.publish });
@@ -2095,4 +2105,48 @@ it('guards an unsaved exception note on close and clears only that note on cance
   await user.clear(recordNote);
   await user.type(recordNote, ITEM.note ?? '');
   await waitFor(() => expect(browserAsks()).toBe(false));
+});
+
+it('shows only linked sale facts with paged returns, real times and no invented refund money', async () => {
+  const sold = {
+    id: 1,
+    kind: 'SALE',
+    occurredAt: '2026-11-20T02:15:00.000Z',
+    qtyBase: '2',
+    unitPrice: '125.0000',
+    totalAmount: '250.00',
+    warehouseId: 3,
+    warehouseName: 'History warehouse',
+    channel: 'RETAIL',
+    contextId: 6,
+    contextName: 'History till / History warehouse',
+    saleId: 'actual-sale',
+  };
+  const returned = {
+    ...sold,
+    id: 1,
+    kind: 'RETURN',
+    qtyBase: '1',
+    unitPrice: null,
+    totalAmount: null,
+  };
+  const fetchMock = signedIn(ADMIN_ME, {
+    ...ROUTES,
+    'GET /api/v1/expiry/items/1/sales-history': (request) =>
+      queryOf(request).get('cursor')
+        ? json({ data: [returned], nextCursor: null })
+        : json({ data: [sold], nextCursor: 'next' }),
+  });
+  renderApp(`${PAGE}?item=1`, fetchMock);
+  await screen.findByText(new RegExp('History till'));
+  expect(screen.getByText(/History till \/ History warehouse/)).toBeInTheDocument();
+  expect(screen.getByText('250')).toBeInTheDocument();
+  expect(document.querySelector('time[datetime="2026-11-20T02:15:00.000Z"]')).toHaveTextContent(
+    '10:15',
+  );
+  await userEvent.setup().click(screen.getByRole('button', { name: mn.common.loadMore }));
+  await screen.findByText(mn.expiry.salesHistory.refundUnknown);
+  expect(screen.getAllByText(mn.expiry.salesHistory.unknownMoney)).toHaveLength(2);
+  expect(screen.getAllByText(/History till \/ History warehouse/)).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: mn.common.loadMore })).toBeNull();
 });

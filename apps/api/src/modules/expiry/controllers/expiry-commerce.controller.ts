@@ -1,3 +1,4 @@
+import { ExpirySalesQueryService } from '../services/expiry-sales-query.service';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { ExpiryPosExceptionsService } from '../services/expiry-pos-exceptions.service';
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
@@ -11,6 +12,7 @@ import {
 } from '../../identity';
 import {
   ExpirySourceRequestDto,
+  ExpirySalesPageDto,
   ExpiryExceptionAcknowledgementDto,
   ExpiryExceptionsDto,
   ExpiryMarkdownRequestDto,
@@ -28,6 +30,7 @@ import { ExpiryCommerceService } from '../services/expiry-commerce.service';
 export class ExpiryCommerceController {
   constructor(
     private readonly commerce: ExpiryCommerceService,
+    private readonly sales: ExpirySalesQueryService,
     private readonly exceptions: ExpiryPosExceptionsService,
   ) {}
   @Get('commerce-exceptions')
@@ -58,6 +61,16 @@ export class ExpiryCommerceController {
   @ApiOkResponse({ type: ExpiryCommerceDto })
   detail(@CurrentUser() ctx: AuthContext, @Param('id', ParseIntPipe) id: number) {
     return this.commerce.detailFor(ctx, id);
+  }
+  @Get('items/:id/sales-history')
+  @RequirePermission('inventory.costs.manage')
+  @ApiOkResponse({ type: ExpirySalesPageDto })
+  salesHistory(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: PageQueryDto,
+  ) {
+    return this.sales.list(ctx, id, query);
   }
   @Get('items/:id/receipt-sources')
   @RequirePermission('inventory.costs.manage')

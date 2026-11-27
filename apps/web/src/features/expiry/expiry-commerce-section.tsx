@@ -100,7 +100,7 @@ export function ExpiryCommerceSection(props: {
   );
 }
 
-function SourceEvidence({ source }: { source: ExpiryReceiptSource | null }) {
+function SourceEvidence({ source, unit }: { source: ExpiryReceiptSource | null; unit: string }) {
   const { t } = useTranslation();
   const unknown = t('expiry.commerce.unknown');
   if (!source)
@@ -124,8 +124,11 @@ function SourceEvidence({ source }: { source: ExpiryReceiptSource | null }) {
                 : unknown,
           },
           {
-            label: t('expiry.commerce.originalGross'),
-            value: moneyOrUnknown(source.first?.grossAmount, unknown),
+            label: t('expiry.commerce.originalReceivedQty'),
+            value:
+              source.first?.qtyBase != null
+                ? t('inventory.qtyWithUnit', { qty: formatQty(source.first.qtyBase), unit })
+                : unknown,
           },
           {
             label: t('expiry.commerce.originalDiscount'),
@@ -135,17 +138,9 @@ function SourceEvidence({ source }: { source: ExpiryReceiptSource | null }) {
             label: t('expiry.commerce.promotion'),
             value: t(`expiry.commerce.evidence.${source.promotionEvidence}`),
           },
-          {
-            label: t('expiry.commerce.accountingCost'),
-            value: moneyOrUnknown(source.current?.unitCost, unknown),
-          },
-          {
-            label: t('expiry.commerce.accountingVersion'),
-            value: source.current?.version ?? unknown,
-          },
         ]}
       />
-      <p className="text-xs text-muted-foreground">{t('expiry.commerce.costHint')}</p>
+      <p className="text-xs text-muted-foreground">{t('expiry.commerce.receiptEvidenceHint')}</p>
     </div>
   );
 }
@@ -334,7 +329,10 @@ function CommerceBody(
     <div className="flex flex-col gap-4">
       <ProblemAlert problem={action.problem} />
       <section aria-label={t('expiry.commerce.approvalBasis')} className="flex flex-col gap-2">
-        <SourceEvidence source={markdownDirty ? shownBasis.source : selected} />
+        <SourceEvidence
+          source={markdownDirty ? shownBasis.source : selected}
+          unit={props.item.product.baseUomName}
+        />
         {canPublish ? <ApprovalFacts basis={shownBasis} /> : null}
       </section>
       {canItems && !archived ? (
@@ -403,7 +401,7 @@ function CommerceBody(
               <p role="alert" className="text-sm text-warning">
                 {t('expiry.commerce.approvalChanged')}
               </p>
-              <SourceEvidence source={commerce.source} />
+              <SourceEvidence source={commerce.source} unit={props.item.product.baseUomName} />
               <ApprovalFacts basis={approvalBasisOf(item, commerce)} />
               <Button
                 type="button"

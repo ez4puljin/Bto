@@ -12174,6 +12174,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/expiry/items/{id}/sales-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpiryCommerce_salesHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/expiry/items/{id}/receipt-sources": {
         parameters: {
             query?: never;
@@ -28843,6 +28859,28 @@ export interface components {
             source: components["schemas"]["ExpiryReceiptSourceDto"] | null;
             markdowns: components["schemas"]["ExpiryMarkdownDto"][];
             exceptions: components["schemas"]["ExpirySaleExceptionDto"][];
+        };
+        ExpirySalesRowDto: {
+            id: number;
+            /** @enum {string} */
+            kind: "SALE" | "RETURN";
+            /** Format: date-time */
+            occurredAt: string;
+            qtyBase: string;
+            /** @description Realized gross sale amount per base unit; not a refund quote */
+            unitPrice: string | null;
+            /** @description Persisted gross sale amount; actual refund amount is unavailable */
+            totalAmount: string | null;
+            warehouseId: number;
+            warehouseName: string | null;
+            channel: components["schemas"]["ExpiryChannel"];
+            contextId: number;
+            contextName: string | null;
+            saleId: string;
+        };
+        ExpirySalesPageDto: {
+            data: components["schemas"]["ExpirySalesRowDto"][];
+            nextCursor: string | null;
         };
         ExpiryReceiptSourcesDto: {
             data: components["schemas"]["ExpiryReceiptSourceDto"][];
@@ -59470,6 +59508,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExpiryCommerceDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_salesHistory: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpirySalesPageDto"];
                 };
             };
             /** @description RFC 9457 problem details */

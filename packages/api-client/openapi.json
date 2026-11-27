@@ -49376,6 +49376,71 @@
         ]
       }
     },
+    "/api/v1/expiry/items/{id}/sales-history": {
+      "get": {
+        "operationId": "ExpiryCommerce_salesHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "nextCursor of the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpirySalesPageDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "expiry"
+        ]
+      }
+    },
     "/api/v1/expiry/items/{id}/receipt-sources": {
       "get": {
         "operationId": "ExpiryCommerce_sources",
@@ -107542,6 +107607,95 @@
           "source",
           "markdowns",
           "exceptions"
+        ]
+      },
+      "ExpirySalesRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "enum": [
+              "SALE",
+              "RETURN"
+            ],
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "qtyBase": {
+            "type": "string"
+          },
+          "unitPrice": {
+            "type": "string",
+            "nullable": true,
+            "description": "Realized gross sale amount per base unit; not a refund quote"
+          },
+          "totalAmount": {
+            "type": "string",
+            "nullable": true,
+            "description": "Persisted gross sale amount; actual refund amount is unavailable"
+          },
+          "warehouseId": {
+            "type": "number"
+          },
+          "warehouseName": {
+            "type": "string",
+            "nullable": true
+          },
+          "channel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ExpiryChannel"
+              }
+            ]
+          },
+          "contextId": {
+            "type": "number"
+          },
+          "contextName": {
+            "type": "string",
+            "nullable": true
+          },
+          "saleId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "occurredAt",
+          "qtyBase",
+          "unitPrice",
+          "totalAmount",
+          "warehouseId",
+          "warehouseName",
+          "channel",
+          "contextId",
+          "contextName",
+          "saleId"
+        ]
+      },
+      "ExpirySalesPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpirySalesRowDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
         ]
       },
       "ExpiryReceiptSourcesDto": {

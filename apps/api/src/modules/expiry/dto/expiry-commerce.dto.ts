@@ -201,3 +201,32 @@ export class ExpiryExceptionsDto {
   @ApiProperty({ type: [ExpiryExceptionViewDto] }) data: ExpiryExceptionViewDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
+
+export class ExpirySalesRowDto {
+  @ApiProperty() id: number;
+  @ApiProperty({ enum: ['SALE', 'RETURN'] }) kind: 'SALE' | 'RETURN';
+  @ApiProperty({ format: 'date-time' }) occurredAt: string;
+  @ApiProperty() qtyBase: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Realized gross sale amount per base unit; not a refund quote',
+  })
+  unitPrice: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Persisted gross sale amount; actual refund amount is unavailable',
+  })
+  totalAmount: string | null;
+  @ApiProperty() warehouseId: number;
+  @ApiProperty({ type: String, nullable: true }) warehouseName: string | null;
+  @ApiProperty({ enum: EXPIRY_CHANNELS, enumName: 'ExpiryChannel' }) channel: ExpiryChannel;
+  @ApiProperty() contextId: number;
+  @ApiProperty({ type: String, nullable: true }) contextName: string | null;
+  @ApiProperty() saleId: string;
+}
+export class ExpirySalesPageDto {
+  @ApiProperty({ type: [ExpirySalesRowDto] }) data: ExpirySalesRowDto[];
+  @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
+}
