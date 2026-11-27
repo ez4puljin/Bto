@@ -2852,7 +2852,10 @@ test("review: auto all (ADR-0250) takes the owner's areas with the stricter mode
     const argv = readFileSync(join(inbox.dir, 'claude-argv'), 'utf8').split('\0');
     assert.equal(argv[argv.indexOf('--model') + 1], 'opus');
     assert.match(argv[argv.indexOf('-p') + 1], /ADR-0250/);
-    assert.match(readFileSync(join(inbox.dir, 'suites'), 'utf8'), /--integrity/);
+    // Only the integrity suites the change calls for, anchored at their folder (ADR-0253).
+    const suites = readFileSync(join(inbox.dir, 'suites'), 'utf8');
+    assert.match(suites, /--integrity .*integrity\/append-only-guard .*integrity\/reporting-/);
+    assert.doesNotMatch(suites, /segments|integrity\/sales-/);
     inbox.run('tick');
     assert.equal(inbox.item('schema-add').state, 'LANDED');
     inbox.push('add-test', {

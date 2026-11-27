@@ -382,6 +382,9 @@ run, so the 20-second tick is as fast as before.
    BLOCK on any doubt. A weakened test and an unsure rule test still wait for the brain; the tick's
    guard rails are refused as before. drizzle's `meta/*_snapshot.json` is left out of the patch.
    `inbox.sh auto allowlist` goes back.
+12. **Focused suites (ADR-0253, owner 2026-11-27):** `--integrity` runs only the integrity suites of
+   the modules the head touches (`integrity_prefixes_of`), the ones it changes, and the platform's
+   guards; `segments` and `imports-scale` (20,000 products) never run in the gate. CI runs them all.
 
 **Trust:** the reviewer reads a trusted collaborator's code, but a diff could still talk an AI round.
 The hard rails are the script's: the guard rails, the allow-list and the diff rules, `check:fast` and

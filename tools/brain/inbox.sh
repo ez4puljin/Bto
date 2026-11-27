@@ -148,15 +148,42 @@ suites_of() {
   return 0
 }
 
+# The integrity suites (apps/api/test/integrity/*.spec.ts, ~50, 13 minutes one after another) a
+# module's change calls for, by file-name prefix (ADR-0253): the gate runs these, CI runs them all.
+integrity_prefixes_of() {
+  case "$1" in
+    inventory) echo stock- inventory- adjustments- bulk- transfers- stocktake- issues- ;;
+    procurement) echo procurement- receipts- ;;
+    sales) echo sales- ;;
+    pos) echo pos- ebarimt- ;;
+    finance | fin-bridge | finance-core) echo fin- finance- ;;
+    catalog) echo catalog- ;; # never segments or imports-scale: 20,000-product timings, CI only (owner 2026-11-27)
+    partners) echo partners- registration- ;;
+    customer) echo customer- ;;
+    identity) echo auth- last-admin app-role ;;
+    ai) echo ai-reader ;;
+    *) echo "$1-" ;;
+  esac
+}
+
 # suite_args_of <path>…: the arguments of each int.sh run the paths call for, one run a line.
+# A migration or a module of stock and money runs the integrity suites of the modules touched and
+# the platform's guards (append-only, roles, audit, deadlock retry, idempotency, numbering), not the
+# whole integrity project (ADR-0253); CI's full `pnpm check` still runs every suite after landing.
 suite_args_of() {
-  local path mod integrity=no
-  local -A mods=()
+  local path mod integrity=no name
+  local -A mods=() pats=()
   for path in "$@"; do
     case "$path" in
       apps/api/src/modules/*)
         mod=${path#apps/api/src/modules/}
         mods[${mod%%/*}]=1
+        ;;
+      apps/api/src/finance-core/*) mods[finance-core]=1 ;;
+      apps/api/test/integrity/*.spec.ts)
+        name=${path#apps/api/test/integrity/}
+        pats[${name%.spec.ts}]=1
+        integrity=yes
         ;;
     esac
     case "$path" in
@@ -165,8 +192,20 @@ suite_args_of() {
         apps/api/src/modules/pos/* | apps/api/src/modules/procurement/*) integrity=yes ;;
     esac
   done
-  [ "${#mods[@]}" -eq 0 ] || echo "${!mods[*]}"
-  [ "$integrity" = no ] || echo "--integrity"
+  local -A only=()
+  for mod in "${!mods[@]}"; do [ "$mod" = finance-core ] || only[$mod]=1; done
+  [ "${#only[@]}" -eq 0 ] || echo "${!only[*]}"
+  if [ "$integrity" = yes ]; then
+    for name in append-only-guard app-role audit-log-guard deadlock-retry idempotency numbering; do
+      pats[$name]=1
+    done
+    for mod in "${!mods[@]}"; do
+      for name in $(integrity_prefixes_of "$mod"); do pats[$name]=1; done
+    done
+    # Anchored at the folder: a bare «payroll-» would also match the copy's own path
+    # (~/bto-work/in-…-payroll-…) and so every suite.
+    echo "--integrity $(printf 'integrity/%s\n' "${!pats[@]}" | sort | tr '\n' ' ' | sed 's/ $//')"
+  fi
   return 0
 }
 
