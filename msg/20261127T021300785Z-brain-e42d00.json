@@ -1,0 +1,8 @@
+{
+  "id": "20261127T021300785Z-brain-e42d00",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-27T02:13:00.785Z",
+  "text": "inbox gate: in/expiry-payroll-foundation @ 93ce5daf: REFUSED: the automatic review (claude-opus-5-5) found 1 problem(s): [HIGH] (removed):0 — (removed: looked like a secret)\n[HIGH] (removed):0 — (removed: looked like a secret)",
+  "slug": "expiry-payroll-foundation"
+}
