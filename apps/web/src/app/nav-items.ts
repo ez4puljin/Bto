@@ -497,12 +497,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'nav.groups.finance',
     items: [
-      {
-        to: '/finance/invoices',
-        label: 'nav.invoices',
-        icon: FileText,
-        permission: 'finance.read',
-      },
       { to: '/finance/payments', label: 'nav.payments', icon: Coins, permission: 'finance.read' },
       {
         to: '/finance/collections',

@@ -1,5 +1,5 @@
 import { daysBetween } from '@tugeel/shared/finance';
-import { Ellipsis, Printer } from 'lucide-react';
+import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -22,8 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { printFormatParam, usePrintFormat } from '@/lib/print-format';
-import { PrintFormatToggle } from '@/components/print-format-toggle';
 import { businessDate } from '@tugeel/shared/time';
 import { formatUbDateTime } from '@/lib/dayjs';
 import { formatQty, formatTugrik } from '@/lib/money';
@@ -75,7 +73,6 @@ export function InvoicePanel({
 function PanelActions({ invoice }: { invoice: InvoiceDetail }) {
   const { t } = useTranslation();
   const canManage = useHasPermission('finance.invoices.manage');
-  const [format, choose] = usePrintFormat();
   const [voiding, setVoiding] = useState(false);
   const [crediting, setCrediting] = useState(false);
   const mutations = useFinanceMutations();
@@ -99,16 +96,6 @@ function PanelActions({ invoice }: { invoice: InvoiceDetail }) {
 
   return (
     <>
-      <PrintFormatToggle value={format} onChange={choose} />
-      <Button asChild variant="outline">
-        <Link
-          to={`/finance/invoices/${invoice.id}/print?format=${printFormatParam(format)}`}
-          target="_blank"
-        >
-          <Printer />
-          {t('finance.actions.print')}
-        </Link>
-      </Button>
       {canManage && issued ? (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
