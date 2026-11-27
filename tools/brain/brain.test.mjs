@@ -3467,3 +3467,23 @@ test('board: paths a branch controls are never read as options, and a down board
     rmSync(inbox.dir, { recursive: true, force: true });
   }
 });
+
+test('suites: the 20,000-product timings never run in the gate, even when their spec changed (ADR-0253)', () => {
+  const script = join(dirname(fileURLToPath(import.meta.url)), 'inbox.sh');
+  const out = spawnSync(
+    'bash',
+    [
+      '-c',
+      'source <(sed -n "/^integrity_prefixes_of()/,/^}/p;/^suite_args_of()/,/^}/p" "$0"); suite_args_of "$@"',
+      script,
+      'apps/api/src/modules/imports/x.ts',
+      'apps/api/test/integrity/imports-scale.spec.ts',
+      'apps/api/test/integrity/segments.spec.ts',
+      'apps/api/src/db/migrations/0300_x.sql',
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /--integrity .*integrity\/numbering/);
+  assert.doesNotMatch(out.stdout, /imports-|segments/);
+});

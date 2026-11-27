@@ -168,6 +168,7 @@ integrity_prefixes_of() {
     customer) echo customer- ;;
     identity) echo auth- last-admin app-role ;;
     ai) echo ai-reader ;;
+    imports) ;; # its only integrity suite is imports-scale: CI only (ADR-0253 #2)
     *) echo "$1-" ;;
   esac
 }
@@ -208,6 +209,10 @@ suite_args_of() {
     for mod in "${!mods[@]}"; do
       for name in $(integrity_prefixes_of "$mod"); do pats[$name]=1; done
     done
+    # The 20,000-product timings never run in the gate, even when their own spec changed: they
+    # need a quiet machine and CI runs them after landing (ADR-0253 #2; 2026-11-27 a head that
+    # changed imports-scale.spec.ts was refused on a timing the same suite passed elsewhere).
+    unset 'pats[segments]' 'pats[imports-scale]'
     # Anchored at the folder: a bare «payroll-» would also match the copy's own path
     # (~/bto-work/in-…-payroll-…) and so every suite.
     echo "--integrity $(printf 'integrity/%s\n' "${!pats[@]}" | sort | tr '\n' ' ' | sed 's/ $//')"
