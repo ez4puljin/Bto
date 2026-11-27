@@ -1,4 +1,5 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import { addDays, businessDate as today, businessMonthStart } from '@tugeel/shared/time';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
@@ -230,6 +231,10 @@ describe('supplier payables (F3, ADR-0091)', () => {
     expect(
       await screen.findByRole('button', { name: mn.finance.payables.previousMonth, pressed: true }),
     ).toBeInTheDocument();
+    await waitFor(() => expect(ledgerUrl().searchParams.get('to')).not.toBe(today()));
+    const moved = ledgerUrl().searchParams;
+    expect(moved.get('from')).toMatch(/^\d{4}-\d{2}-01$/);
+    expect(moved.get('to')).toBe(addDays(businessMonthStart(), -1));
     expect(
       screen.getByRole('columnheader', { name: mn.finance.payables.confirmedBy }),
     ).toBeInTheDocument();

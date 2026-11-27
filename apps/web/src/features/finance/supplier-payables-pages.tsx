@@ -245,9 +245,15 @@ export function SupplierLedgerPage() {
   const pending = useReceipts({ supplierId, costingPending: true, from, to });
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = ledger;
   // The report is the whole period: every page is read, oldest first on screen.
+  const failed = Boolean(ledger.error);
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+    if (hasNextPage && !isFetchingNextPage && !failed) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, failed]);
+  const morePending = pending.hasNextPage && !pending.isFetchingNextPage && !pending.error;
+  const fetchMorePending = pending.fetchNextPage;
+  useEffect(() => {
+    if (morePending) void fetchMorePending();
+  }, [morePending, fetchMorePending]);
   const entries = useMemo(
     () => (ledger.data?.pages.flatMap((page) => page.data) ?? []).slice().reverse(),
     [ledger.data],
@@ -291,7 +297,7 @@ export function SupplierLedgerPage() {
       closing: new Decimal(opening).plus(credit).minus(debit).toFixed(2),
     };
   }, [entries, opening]);
-  const loading = ledger.isPending || hasNextPage;
+  const loading = ledger.isPending || (hasNextPage && !failed);
 
   const crumbs = [{ label: t('finance.payables.title'), to: '/finance/suppliers' }];
   const loadProblem = problemFromError(balance.error);
