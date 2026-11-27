@@ -1,0 +1,16 @@
+apps/mobile/
+apps/api/test/
+apps/api/src/edge/
+apps/api/src/modules/erxes/
+apps/api/src/modules/erkhet/
+apps/web/src/pos/
+apps/web/src/test/
+packages/api-client/
+tools/
+scripts/
+ci/
+deploy/
+docs/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
