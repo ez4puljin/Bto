@@ -1,0 +1,8 @@
+{
+  "id": "20261127T110737865Z-brain-9ac3dc",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-27T11:07:37.865Z",
+  "text": "inbox gate: in/remaining-updates @ 90d0f04a: REFUSED: the integration suites are red: suite test/integrity/imports-scale.spec.ts; test integrity: imports at scale › prices the whole cat\n[SUITE] test/integrity/imports-scale.spec.ts\n[TEST] integrity: imports at scale › prices the whole catalogue under one table lock while a single change waits (ADR-0054)",
+  "slug": "remaining-updates"
+}
