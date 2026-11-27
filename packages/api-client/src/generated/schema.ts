@@ -22979,6 +22979,8 @@ export interface components {
             entryDate: string;
             entryDescription: string;
             lineDescription: string | null;
+            /** @description The voucher's own text (гүйлгээний утга) when the entry is a voucher's */
+            memo: string | null;
             /** @example BTO */
             system: string;
             sourceDocType: string | null;

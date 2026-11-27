@@ -8,9 +8,11 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useId,
+  useRef,
   useState,
 } from 'react';
 import { flushSync } from 'react-dom';
@@ -35,7 +37,6 @@ import { Label } from '@/components/ui/label';
 import { TableBody, TableCell } from '@/components/ui/table';
 import { useAuthState } from '@/app/auth-context';
 import { useCompanyName } from '@/features/company/api';
-import { useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 import { DATE } from '../report-helpers';
 import type { RecordPeek } from './book-links';
@@ -725,18 +726,33 @@ export function TotalRow({ labelSpan, children }: { labelSpan: number; children:
 }
 
 /**
- * A row that opens its detail on a click of ▸, a double click or Enter; only an open row is
- * tinted. `drillable={false}` (nothing moved in the period) is a plain row. On a screen worked by a
- * finger one tap anywhere on the row opens it: ▸ alone is too small to aim at (ADR-0201).
+ * A row that opens its detail on one click anywhere on it (owner 2026-11-27: «мөр дээр дарахад
+ * задаргаа нь шууд харагддаг болго»), on ▸ or on Enter; only an open row is tinted.
+ * `drillable={false}` (nothing moved in the period) is a plain row. `onPrefetch` starts loading the
+ * detail when the pointer comes onto the row, so it is there by the time of the click.
  */
 export function DrillRow(props: {
   expanded: boolean;
   onToggle: () => void;
   drillable?: boolean;
+  onPrefetch?: () => void;
   className?: string;
   children: ReactNode;
 }) {
-  const finger = useMediaQuery('(pointer: coarse)');
+  // The pointer must rest on the row a moment: sweeping over a long list loads nothing, so the
+  // reports' gate (ADR-0193) is not filled with rows nobody opens.
+  const rest = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { onPrefetch } = props;
+  const stopRest = useCallback(() => {
+    if (rest.current !== null) clearTimeout(rest.current);
+    rest.current = null;
+  }, []);
+  useEffect(() => stopRest, [stopRest]);
+  const startRest = () => {
+    if (!onPrefetch || props.expanded) return;
+    stopRest();
+    rest.current = setTimeout(onPrefetch, 150);
+  };
   const onKeyDown = (event: KeyboardEvent<HTMLTableRowElement>) => {
     if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter' || event.key === ' ') {
@@ -756,12 +772,18 @@ export function DrillRow(props: {
       data-slot="table-row"
       tabIndex={0}
       aria-expanded={props.expanded}
-      onClick={finger ? props.onToggle : undefined}
-      onDoubleClick={props.onToggle}
+      // The second click of a double click (the old way to open) leaves the row open.
+      onClick={(event) => {
+        if (event.detail <= 1) props.onToggle();
+      }}
+      onPointerEnter={startRest}
+      onPointerLeave={stopRest}
+      onFocus={startRest}
+      onBlur={stopRest}
       onKeyDown={onKeyDown}
       className={cn(
         ITEM_ROW,
-        'cursor-default select-none hover:bg-[color-mix(in_oklab,var(--color-accent)_55%,var(--color-card))] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring aria-expanded:bg-accent',
+        'cursor-pointer select-none hover:bg-[color-mix(in_oklab,var(--color-accent)_55%,var(--color-card))] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring aria-expanded:bg-accent',
         props.className,
       )}
     >
@@ -816,7 +838,6 @@ function DrillMark(props: { expanded: boolean; onToggle: () => void; name: strin
         event.stopPropagation();
         props.onToggle();
       }}
-      onDoubleClick={(event) => event.stopPropagation()}
       className="-my-0.5 mr-1 grid size-5 shrink-0 place-items-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring touch:relative touch:after:absolute touch:after:-inset-x-3 touch:after:-inset-y-2 print:hidden"
     >
       <ChevronRight

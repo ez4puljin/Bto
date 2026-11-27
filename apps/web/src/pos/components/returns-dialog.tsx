@@ -233,6 +233,11 @@ function ReturnsPanel(props: {
                 <li key={line.lineNo} className="flex items-center gap-3 px-4 py-3">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[0.9375rem] font-medium">{line.name}</span>
+                    {line.expiryBarcode ? (
+                      <span className="block text-xs text-warning">
+                        {t('expiry.commerce.variant')} · {line.expiryBarcode}
+                      </span>
+                    ) : null}
                     <span className="block truncate text-xs text-muted-foreground">
                       {t('posKiosk.returns.sold', {
                         qty: formatQty(line.qty),
@@ -255,7 +260,9 @@ function ReturnsPanel(props: {
                     {t('posKiosk.returns.damaged')}
                   </label>
                   <Input
-                    aria-label={t('posKiosk.returns.qty', { name: line.name })}
+                    aria-label={t('posKiosk.returns.qty', {
+                      name: `${line.name}${line.expiryBarcode ? ` · ${line.expiryBarcode}` : ''}`,
+                    })}
                     inputMode="decimal"
                     autoComplete="off"
                     disabled={!left.gt(0) || !sale.withinWindow}

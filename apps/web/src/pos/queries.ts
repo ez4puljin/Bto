@@ -57,7 +57,7 @@ export const kioskKeys = {
       'kiosk',
       epoch,
       'quote',
-      lines.map((line) => `${line.productUnitId}:${line.qty}`),
+      lines.map((line) => `${line.productUnitId}:${line.expiryBarcode ?? ''}:${line.qty}`),
       [...codes],
     ] as const,
 };

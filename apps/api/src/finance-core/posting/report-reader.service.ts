@@ -196,6 +196,8 @@ export interface FinLedgerLine {
   /** The core's document behind the entry (a voucher, an opening), its number. */
   documentId: number | null;
   documentNumber: string | null;
+  /** That document's attributes as its source sent them (a voucher's memo), `{}` without one. */
+  documentAttributes: Record<string, string>;
   /** The line's party; on a line without one (a cash or bank line), the other side's one party. */
   partyId: string | null;
   partyName: string | null;
@@ -606,7 +608,8 @@ export class FinReports {
       SELECT l.id, l.entry_id, e.number, e.entry_date::text AS entry_date,
              e.description AS entry_description, l.description AS line_description,
              s.code AS system, e.source_doc_type, e.source_doc_id, e.document_id,
-             d.number AS document_number, coalesce(l.party_id, c.party_id) AS party_id,
+             d.number AS document_number, d.attributes AS document_attributes,
+             coalesce(l.party_id, c.party_id) AS party_id,
              p.name AS party_name,
              l.debit::text AS debit, l.credit::text AS credit, c.counters
         FROM fin.journal_lines l
@@ -641,6 +644,7 @@ export class FinReports {
         sourceDocId: row.source_doc_id === null ? null : str(row.source_doc_id),
         documentId: row.document_id === null ? null : int(row.document_id),
         documentNumber: row.document_number === null ? null : str(row.document_number),
+        documentAttributes: textAttributes(row.document_attributes),
         partyId: row.party_id === null ? null : str(row.party_id),
         partyName: row.party_name === null ? null : str(row.party_name),
         debit,
@@ -737,4 +741,14 @@ function lineConditions(filter: FinLedgerFilter): SQL {
          AND (o.debit > 0) = (l.credit > 0) AND oa.code LIKE ${`${counter}%`})`);
   }
   return parts.length ? sql.join(parts, sql` AND `) : sql`TRUE`;
+}
+
+/** A document's `attributes` (jsonb of strings) as a plain map, `{}` when absent. */
+function textAttributes(value: unknown): Record<string, string> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'string') out[key] = item;
+  }
+  return out;
 }

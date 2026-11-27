@@ -40,6 +40,7 @@ import { PartGroupHeader, PickDraftCell } from './order-pick';
 import { orderRequestOf } from './order-request';
 import { bonusSplitOf, shortOf, usePickDrafts } from './pick-drafts';
 import { usePickerSelf } from './use-picker-self';
+import { ExpiryOrderScanner } from './expiry-order-scanner';
 
 /** A line as the table edits it; saved lines keep their id as the key. */
 interface EditLine {
@@ -50,6 +51,7 @@ interface EditLine {
   unitId: number;
   unitName: string;
   qty: string;
+  expiryBarcode?: string | null;
 }
 
 const PICKED_FILTERS = ['ALL', 'PICKED', 'NOT_PICKED', 'SHORT'] as const;
@@ -72,6 +74,7 @@ const linesOf = (order: SalesOrder): EditLine[] =>
     unitId: line.productUnitId,
     unitName: line.unitName,
     qty: plainDecimal(line.qty),
+    ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
   }));
 
 const isPicked = (line: SalesOrderLine | undefined) =>
@@ -188,15 +191,31 @@ export function OrderProducts({
   const wanted = JSON.stringify(
     lines
       .filter((line) => isQty(line.qty))
-      .map((line) => ({ key: line.key, productUnitId: line.unitId, qty: line.qty })),
+      .map((line) => ({
+        key: line.key,
+        productUnitId: line.unitId,
+        qty: line.qty,
+        ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
+      })),
   );
   const asked = useDebounced(wanted, 300);
   const askedLines = useMemo(
-    () => JSON.parse(asked) as { key: string; productUnitId: number; qty: string }[],
+    () =>
+      JSON.parse(asked) as {
+        key: string;
+        productUnitId: number;
+        qty: string;
+        expiryBarcode?: string;
+      }[],
     [asked],
   );
   const request = useMemo(
-    () => askedLines.map(({ productUnitId, qty }) => ({ productUnitId, qty })),
+    () =>
+      askedLines.map(({ productUnitId, qty, expiryBarcode }) => ({
+        productUnitId,
+        qty,
+        ...(expiryBarcode ? { expiryBarcode } : {}),
+      })),
     [askedLines],
   );
   const quote = useLinesQuote(request, !frozen, order.pipelineId);
@@ -315,7 +334,11 @@ export function OrderProducts({
       await mutations.update.mutateAsync({
         id: order.id,
         body: orderRequestOf(order, {
-          lines: lines.map((line) => ({ productUnitId: line.unitId, qty: line.qty })),
+          lines: lines.map((line) => ({
+            productUnitId: line.unitId,
+            qty: line.qty,
+            ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
+          })),
         }),
       });
       setEdits(null);
@@ -393,6 +416,27 @@ export function OrderProducts({
           }}
         />
       ) : null}
+      {editable ? (
+        <ExpiryOrderScanner
+          pipelineId={order.pipelineId}
+          onPick={(picked) =>
+            setEdits((previous) => {
+              const current = previous ?? saved;
+              const found = current.find(
+                (line) =>
+                  line.expiryBarcode === picked.expiryBarcode && line.unitId === picked.unitId,
+              );
+              return found
+                ? current.map((line) =>
+                    line.key === found.key
+                      ? { ...line, qty: new Decimal(line.qty).plus(1).toFixed() }
+                      : line,
+                  )
+                : [...current, { ...picked, key: randomUuid(), qty: '1' }];
+            })
+          }
+        />
+      ) : null}
       {sections.map((section) => (
         <ListCard key={section.part?.warehouseId ?? 'rest'}>
           {section.part ? (
@@ -447,6 +491,11 @@ export function OrderProducts({
                         {line.sku}
                       </span>
                       {line.name}
+                      {line.expiryBarcode ? (
+                        <span className="block text-xs font-medium text-warning">
+                          {t('expiry.commerce.variant')} · {line.expiryBarcode}
+                        </span>
+                      ) : null}
                       {short ? (
                         <Badge variant="destructive" className="ml-2 align-middle">
                           {t('sales.pick.short')}
@@ -460,7 +509,7 @@ export function OrderProducts({
                       </TableCell>
                     )}
                     <TableCell className={editable ? UNIT_FIELD : undefined}>
-                      {editable ? (
+                      {editable && !line.expiryBarcode ? (
                         <UnitSelect
                           productId={line.productId}
                           unitId={line.unitId}

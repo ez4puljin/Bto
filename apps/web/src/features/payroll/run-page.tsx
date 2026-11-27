@@ -66,6 +66,7 @@ import {
 } from './payroll-api';
 import { cleanPercent, money, percent } from './payroll-helpers';
 import { RunStatusBadge } from './payroll-kit';
+import { PayslipSourceDeductions } from './source-deductions';
 
 // 86rem with every column; narrower, the employer's share leaves first, then the fixed salary.
 // The name, what the person earns, the deductions and «Гарт олгох» always stay; below that the
@@ -365,6 +366,7 @@ function LineDialog(props: { run: PayrollRunDetail; line: PayrollLine; onClose: 
           </form>
         </section>
 
+        <PayslipSourceDeductions rows={line.sourceDeductions ?? []} />
         <section aria-label={t('payroll.web.line.adjustments')} className="flex flex-col gap-2">
           <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             {t('payroll.web.line.adjustments')}

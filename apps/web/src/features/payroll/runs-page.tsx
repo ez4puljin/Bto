@@ -31,6 +31,7 @@ import { randomUuid } from '@/lib/uuid';
 import { usePayrollMutations, useRuns } from './payroll-api';
 import { money } from './payroll-helpers';
 import { RunStatusBadge } from './payroll-kit';
+import { PayrollSourceDeductions } from './source-deductions';
 
 const COLUMNS: readonly ColumnSpec[] = [
   { key: 'month', kind: 'code', width: 6.5 },
@@ -194,6 +195,9 @@ export function PayrollRunsPage() {
           </ListTable>
         )}
       </ListCard>
+      <div className="mt-5">
+        <PayrollSourceDeductions />
+      </div>
       {creatingOpen && canManage ? <NewRunDialog onClose={() => setCreatingOpen(false)} /> : null}
     </div>
   );

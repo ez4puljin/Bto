@@ -96,6 +96,32 @@ const FILTERS: components['schemas']['ExpiryFiltersDto'] = {
 const page = (data: Item[], nextCursor: string | null = null) => json({ data, nextCursor });
 
 const ROUTES = {
+  'GET /api/v1/expiry/items/1/prices': () => json({ productUnitId: 77, qty: '1', data: [] }),
+  'GET /api/v1/expiry/items/2/prices': () => json({ productUnitId: 77, qty: '1', data: [] }),
+  'GET /api/v1/expiry/items/1/commerce': () =>
+    json({
+      itemVersion: 1,
+      source: null,
+      sourceQtyBase: null,
+      sourceVersion: 0,
+      liabilityFingerprint: 'a'.repeat(64),
+      liableUsers: [],
+      markdowns: [],
+      exceptions: [],
+    }),
+  'GET /api/v1/expiry/items/2/commerce': () =>
+    json({
+      itemVersion: 1,
+      source: null,
+      sourceQtyBase: null,
+      sourceVersion: 0,
+      liabilityFingerprint: 'a'.repeat(64),
+      liableUsers: [],
+      markdowns: [],
+      exceptions: [],
+    }),
+  'GET /api/v1/expiry/items/1/receipt-sources': () => json({ data: [] }),
+  'GET /api/v1/expiry/items/2/receipt-sources': () => json({ data: [] }),
   'GET /api/v1/expiry/summary': () => json(SUMMARY),
   'GET /api/v1/expiry/filters': () => json(FILTERS),
   'GET /api/v1/expiry/items': () => page([ITEM, SECOND]),
@@ -126,6 +152,36 @@ const ROUTES = {
       ],
     }),
 };
+
+const RECEIPT_SOURCE = {
+  receiptLineId: 9,
+  receiptId: 4,
+  receiptNumber: 'IN-0004',
+  receiptDate: '2026-10-15',
+  warehouseId: 3,
+  qtyBase: '20',
+  first: { version: 1, qtyBase: '20', grossAmount: '0', discountAmount: '0', freeGoods: true },
+  current: {
+    version: 2,
+    accountingAmount: '20000',
+    unitCost: '1000',
+    grossAmount: '0',
+    discountAmount: '0',
+    supplierNetAmount: '0',
+    freeGoods: true,
+  },
+  promotionEvidence: 'FREE_GOODS',
+};
+const commerceOf = (source: typeof RECEIPT_SOURCE | null = null) => ({
+  itemVersion: 1,
+  liabilityFingerprint: 'a'.repeat(64),
+  liableUsers: [],
+  source,
+  sourceQtyBase: source ? '10' : null,
+  sourceVersion: source ? 1 : 0,
+  markdowns: [],
+  exceptions: [],
+});
 
 const queryOf = (request: Request) => new URL(request.url).searchParams;
 
@@ -166,6 +222,72 @@ describe('ExpiryPage', () => {
     vi.restoreAllMocks();
     // Not `unstubAllGlobals`: the test setup's ResizeObserver is a stub too.
     vi.stubGlobal('matchMedia', undefined);
+  });
+
+  it('shows itemless return diagnostics without implying acknowledgement repairs an employee charge', async () => {
+    let acknowledged = false;
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...ROUTES,
+      'GET /api/v1/expiry/commerce-exceptions': () =>
+        json({
+          data: [
+            {
+              origin: 'POS_EXCEPTION',
+              id: 71,
+              operation: 'RETURN',
+              documentId: '81',
+              lineId: '1',
+              originalSaleId: '80',
+              originalLineId: '1',
+              barcode: 'BTOEXP-999999999',
+              productId: 10,
+              warehouseId: 3,
+              reason: 'EXPIRY_RETURN_SOURCE_MISSING',
+              qtyBase: '1.000',
+              occurredAt: '2026-11-24T02:00:00Z',
+              createdAt: '2026-11-24T02:00:00Z',
+              acknowledgedAt: acknowledged ? '2026-11-24T03:00:00Z' : null,
+              acknowledgementNote: acknowledged ? 'Synthetic review note' : null,
+              financialEffect: 'RETURN_REVERSAL_UNRESOLVED',
+            },
+          ],
+          nextCursor: null,
+        }),
+      'POST /api/v1/expiry/commerce-exceptions/71/acknowledge': () => {
+        acknowledged = true;
+        return json({});
+      },
+    });
+    renderApp(PAGE, fetchMock);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: mn.expiry.posExceptions.title }));
+    expect(
+      await screen.findByText(mn.expiry.posExceptions.RETURN_REVERSAL_UNRESOLVED),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/BTOEXP-999999999/)).toBeInTheDocument();
+    await user.type(
+      screen.getByRole('textbox', { name: mn.expiry.posExceptions.note }),
+      'Synthetic review note',
+    );
+    await user.click(screen.getByRole('button', { name: mn.expiry.posExceptions.acknowledge }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: mn.expiry.posExceptions.acknowledge }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(mn.expiry.posExceptions.RETURN_REVERSAL_UNRESOLVED),
+    ).toBeInTheDocument();
+  });
+
+  it('does not request financial exception diagnostics for a shelf worker', async () => {
+    const fetchMock = signedIn(WORKER_ME, ROUTES);
+    renderApp(PAGE, fetchMock);
+    await screen.findByRole('link', { name: 'Туршилтын сүү' });
+    expect(
+      screen.queryByRole('button', { name: mn.expiry.posExceptions.title }),
+    ).not.toBeInTheDocument();
+    expect(calls(fetchMock, 'GET', '/api/v1/expiry/commerce-exceptions')).toHaveLength(0);
   });
 
   it('lists the records with the four counts, each count setting the view', async () => {
@@ -1448,7 +1570,8 @@ describe('ExpiryPage', () => {
       const panel = within(await screen.findByRole('dialog'));
       const floor = await panel.findByLabelText(FLOOR);
       await screen.findByText('321 бараа');
-      await user.click(panel.getByRole('button', { name: mn.common.calendar.open }));
+      const dateControl = within(panel.getByLabelText(mn.expiry.columns.expiryDate).parentElement!);
+      await user.click(dateControl.getByRole('button', { name: mn.common.calendar.open }));
       expect(await screen.findByRole('gridcell', { name: '2041 оны 11-р сарын 7' })).toBeEnabled();
       expect(screen.getByRole('gridcell', { name: '2041 оны 11-р сарын 8' })).toBeDisabled();
       await user.keyboard('{Escape}');
@@ -1683,4 +1806,293 @@ describe('ExpiryPage', () => {
       cleanup();
     });
   });
+});
+
+describe('expiry receipt provenance and markdown approval', () => {
+  it('loads public context prices without requesting private costs for an ordinary employee', async () => {
+    const fetchMock = signedIn(WORKER_ME, ROUTES);
+    renderApp(`${PAGE}?item=1`, fetchMock);
+    await screen.findByText(mn.expiry.commerce.prices);
+    expect(screen.queryByText(mn.expiry.commerce.accountingCost)).toBeNull();
+    expect(calls(fetchMock, 'GET', '/api/v1/expiry/items/1/commerce')).toHaveLength(0);
+    expect(calls(fetchMock, 'GET', '/api/v1/expiry/items/1/receipt-sources')).toHaveLength(0);
+  });
+
+  it('shows actual zero and free-goods evidence while unknown provenance cannot publish', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...ROUTES,
+      'GET /api/v1/expiry/items/1/commerce': () => json(commerceOf(RECEIPT_SOURCE)),
+      'GET /api/v1/expiry/items/1/receipt-sources': () => json({ data: [RECEIPT_SOURCE] }),
+    });
+    renderApp(`${PAGE}?item=1`, fetchMock);
+    await screen.findByText(mn.expiry.commerce.originalUnitGross);
+    expect(screen.getByText(mn.expiry.commerce.evidence.FREE_GOODS)).toBeInTheDocument();
+    const label = screen.getByText(mn.expiry.commerce.originalUnitGross);
+    expect(label.parentElement).toHaveTextContent('0');
+    expect(label.parentElement).not.toHaveTextContent(mn.expiry.commerce.unknown);
+    cleanup();
+    const missing = signedIn(ADMIN_ME, ROUTES);
+    renderApp(`${PAGE}?item=1`, missing);
+    expect(await screen.findByText(mn.expiry.commerce.sourceUnknown)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: mn.expiry.commerce.publish })).toBeDisabled();
+  });
+
+  it('explicitly links the receipt before publishing the selected quantity, fixed price and payroll month', async () => {
+    let commerce = commerceOf();
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...ROUTES,
+      'GET /api/v1/expiry/items/1/commerce': () => json(commerce),
+      'GET /api/v1/expiry/items/1/receipt-sources': () => json({ data: [RECEIPT_SOURCE] }),
+      'GET /api/v1/expiry/items/1/prices': () =>
+        json({
+          productUnitId: 77,
+          qty: '1',
+          data: [
+            {
+              warehouseId: 3,
+              channel: 'RETAIL',
+              contextId: 6,
+              name: 'Касс 6',
+              unitPrice: '1500',
+              netUnitPrice: '1363.64',
+            },
+          ],
+        }),
+      'PUT /api/v1/expiry/items/1/source': () => {
+        commerce = commerceOf(RECEIPT_SOURCE);
+        return json(commerce);
+      },
+      'POST /api/v1/expiry/items/1/markdowns': () => json(commerce),
+    });
+    renderApp(`${PAGE}?item=1`, fetchMock);
+    const user = userEvent.setup();
+    const source = await screen.findByLabelText(mn.expiry.commerce.receipt);
+    expect(await within(source).findByRole('option', { name: /IN-0004/ })).toHaveValue('9');
+    await user.selectOptions(source, '9');
+    await user.type(
+      screen.getByLabelText(
+        mn.expiry.commerce.sourceQty.replace('{{unit}}', ITEM.product.baseUomName),
+      ),
+      '10',
+    );
+    expect(browserAsks()).toBe(true);
+    await user.click(screen.getByRole('button', { name: mn.expiry.commerce.linkSource }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'PUT', '/api/v1/expiry/items/1/source')).toHaveLength(1),
+    );
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/expiry/items/1/source')[0])).toEqual({
+      expectedVersion: 0,
+      receiptLineId: 9,
+      qtyBase: '10',
+    });
+    await user.selectOptions(screen.getByLabelText(mn.expiry.commerce.context), 'RETAIL:6:3');
+    await user.type(
+      screen.getByLabelText(
+        mn.expiry.commerce.markdownQty.replace('{{unit}}', ITEM.product.baseUomName),
+      ),
+      '3',
+    );
+    await user.type(
+      screen.getByLabelText(
+        mn.expiry.commerce.salePrice.replace('{{unit}}', ITEM.product.baseUomName),
+      ),
+      '500',
+    );
+    await user.type(screen.getByLabelText(mn.expiry.commerce.payrollMonth), '2026-11');
+    await user.click(screen.getByRole('button', { name: mn.expiry.commerce.publish }));
+    await waitFor(() =>
+      expect(calls(fetchMock, 'POST', '/api/v1/expiry/items/1/markdowns')).toHaveLength(1),
+    );
+    const posted = calls(fetchMock, 'POST', '/api/v1/expiry/items/1/markdowns')[0];
+    expect(await bodyOf(posted)).toEqual({
+      expectedVersion: 1,
+      expectedSourceVersion: 1,
+      expectedCostingVersion: 2,
+      expectedLiabilityFingerprint: 'a'.repeat(64),
+      receiptLineId: 9,
+      qtyBase: '3',
+      warehouseId: 3,
+      channel: 'RETAIL',
+      contextId: 6,
+      unitPrice: '500',
+      payrollMonth: '2026-11',
+    });
+    expect(posted?.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/);
+    expect(calls(fetchMock, 'POST', '/api/v1/payroll/source-deductions')).toHaveLength(0);
+  });
+});
+
+it('pins the approval receipt, date, cost and liable staff through a real background query refresh', async () => {
+  const sourceB = {
+    ...RECEIPT_SOURCE,
+    receiptLineId: 10,
+    receiptId: 5,
+    receiptNumber: 'IN-0005',
+    current: { ...RECEIPT_SOURCE.current, version: 3, accountingAmount: '40000', unitCost: '2000' },
+  };
+  let record = ITEM;
+  let commerce = { ...commerceOf(RECEIPT_SOURCE), liableUsers: [{ id: 2, fullName: 'Worker A' }] };
+  const fetchMock = signedIn(ADMIN_ME, {
+    ...ROUTES,
+    'GET /api/v1/expiry/items/1': () => json(record),
+    'GET /api/v1/expiry/items/1/commerce': () => json(commerce),
+    'GET /api/v1/expiry/items/1/receipt-sources': () => json({ data: [RECEIPT_SOURCE, sourceB] }),
+    'GET /api/v1/expiry/items/1/prices': () =>
+      json({
+        productUnitId: 77,
+        qty: '1',
+        data: [
+          {
+            warehouseId: 3,
+            channel: 'RETAIL',
+            contextId: 6,
+            name: 'Till 6',
+            unitPrice: '1500',
+            netUnitPrice: '1363.64',
+          },
+        ],
+      }),
+    'POST /api/v1/expiry/items/1/markdowns': () => json(commerce),
+  });
+  renderApp(`${PAGE}?item=1`, fetchMock);
+  const user = userEvent.setup();
+  await screen.findByText(/IN-0004/);
+  await user.selectOptions(screen.getByLabelText(mn.expiry.commerce.context), 'RETAIL:6:3');
+  await user.type(
+    screen.getByLabelText(
+      mn.expiry.commerce.markdownQty.replace('{{unit}}', ITEM.product.baseUomName),
+    ),
+    '3',
+  );
+  await user.type(
+    screen.getByLabelText(
+      mn.expiry.commerce.salePrice.replace('{{unit}}', ITEM.product.baseUomName),
+    ),
+    '500',
+  );
+  await user.type(screen.getByLabelText(mn.expiry.commerce.payrollMonth), '2026-11');
+  const before = calls(fetchMock, 'GET', '/api/v1/expiry/items/1/commerce').length;
+  record = { ...ITEM, editVersion: 2, expiryDate: '2026-12-15' };
+  commerce = {
+    ...commerceOf(sourceB),
+    itemVersion: 2,
+    sourceVersion: 2,
+    sourceQtyBase: '12',
+    liabilityFingerprint: 'b'.repeat(64),
+    liableUsers: [{ id: 3, fullName: 'Worker B' }],
+  };
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  await waitFor(() =>
+    expect(calls(fetchMock, 'GET', '/api/v1/expiry/items/1/commerce').length).toBeGreaterThan(
+      before,
+    ),
+  );
+  await screen.findByText(mn.expiry.commerce.approvalChanged);
+  const frozen = within(screen.getByRole('region', { name: mn.expiry.commerce.approvalBasis }));
+  expect(frozen.getByText(/IN-0004/)).toBeInTheDocument();
+  expect(frozen.getByText('Worker A')).toBeInTheDocument();
+  expect(frozen.getByText(ITEM.expiryDate)).toBeInTheDocument();
+  expect(frozen.getByText(mn.expiry.commerce.accountingCost).parentElement).toHaveTextContent(
+    '1,000',
+  );
+  const current = within(screen.getByRole('region', { name: mn.expiry.commerce.currentBasis }));
+  expect(current.getByText(/IN-0005/)).toBeInTheDocument();
+  expect(current.getByText('Worker B')).toBeInTheDocument();
+  expect(current.getByText('2026-12-15')).toBeInTheDocument();
+  expect(current.getByText(mn.expiry.commerce.accountingCost).parentElement).toHaveTextContent(
+    '2,000',
+  );
+  expect(screen.getByLabelText(mn.expiry.commerce.receipt)).toHaveValue('9');
+  const publish = screen.getByRole('button', { name: mn.expiry.commerce.publish });
+  expect(publish).toBeDisabled();
+  await user.click(publish);
+  expect(calls(fetchMock, 'POST', '/api/v1/expiry/items/1/markdowns')).toHaveLength(0);
+  await user.click(screen.getByRole('button', { name: mn.expiry.commerce.reviewCurrentBasis }));
+  await waitFor(() => expect(publish).toBeEnabled());
+  expect(screen.getByLabelText(mn.expiry.commerce.receipt)).toHaveValue('10');
+  expect(
+    screen.getByLabelText(
+      mn.expiry.commerce.markdownQty.replace('{{unit}}', ITEM.product.baseUomName),
+    ),
+  ).toHaveValue('3');
+  expect(
+    screen.getByLabelText(
+      mn.expiry.commerce.salePrice.replace('{{unit}}', ITEM.product.baseUomName),
+    ),
+  ).toHaveValue('500');
+  expect(screen.getByLabelText(mn.expiry.commerce.payrollMonth)).toHaveValue('2026-11');
+  await user.click(publish);
+  await waitFor(() =>
+    expect(calls(fetchMock, 'POST', '/api/v1/expiry/items/1/markdowns')).toHaveLength(1),
+  );
+  expect(await bodyOf(calls(fetchMock, 'POST', '/api/v1/expiry/items/1/markdowns')[0])).toEqual({
+    expectedVersion: 2,
+    expectedSourceVersion: 2,
+    expectedCostingVersion: 3,
+    expectedLiabilityFingerprint: 'b'.repeat(64),
+    receiptLineId: 10,
+    qtyBase: '3',
+    warehouseId: 3,
+    channel: 'RETAIL',
+    contextId: 6,
+    unitPrice: '500',
+    payrollMonth: '2026-11',
+  });
+});
+
+it('guards an unsaved exception note on close and clears only that note on cancel or resolve', async () => {
+  const exception = {
+    id: 27,
+    markdownId: 7,
+    sourceKind: 'POS',
+    saleId: 'sale-7',
+    lineId: 'line-1',
+    reason: 'EXPIRY_BUDGET_EXCEEDED',
+    qtyBase: '2',
+    soldAt: ITEM.createdAt,
+    resolvedAt: null,
+    resolutionNote: null,
+  };
+  const commerce = { ...commerceOf(RECEIPT_SOURCE), exceptions: [exception] };
+  const fetchMock = signedIn(ADMIN_ME, {
+    ...ROUTES,
+    'GET /api/v1/expiry/items/1/commerce': () => json(commerce),
+    'GET /api/v1/expiry/items/1/receipt-sources': () => json({ data: [RECEIPT_SOURCE] }),
+    'POST /api/v1/expiry/sale-exceptions/27/resolve': () =>
+      json({
+        ...commerce,
+        exceptions: [
+          { ...exception, resolvedAt: ITEM.updatedAt, resolutionNote: 'Checked receipt' },
+        ],
+      }),
+  });
+  const { router } = renderApp(`${PAGE}?item=1`, fetchMock);
+  const user = userEvent.setup();
+  const note = await screen.findByLabelText(mn.expiry.commerce.resolutionNote);
+  await user.type(note, 'Check this sale');
+  expect(browserAsks()).toBe(true);
+  const panel = within(await screen.findByRole('dialog'));
+  await user.click(panel.getByRole('button', { name: mn.common.close }));
+  const question = within(await leaveQuestion());
+  expect(router.state.location.search).toBe('?item=1');
+  await user.click(question.getByRole('button', { name: mn.common.cancel }));
+  expect(note).toHaveValue('Check this sale');
+  const recordNote = screen.getByLabelText(mn.expiry.columns.note);
+  await user.type(recordNote, ' pending parent edit');
+  await user.click(within(note.closest('form')!).getByRole('button', { name: mn.common.cancel }));
+  expect(note).toHaveValue('');
+  expect(recordNote).toHaveValue(`${ITEM.note} pending parent edit`);
+  expect(browserAsks()).toBe(true);
+  await user.type(note, 'Checked receipt');
+  await user.click(screen.getByRole('button', { name: mn.expiry.commerce.resolveException }));
+  await screen.findByText(new RegExp(mn.expiry.commerce.exceptionResolved));
+  expect(screen.queryByText(mn.expiry.commerce.exceptionNoteHeld)).toBeNull();
+  expect(recordNote).toHaveValue(`${ITEM.note} pending parent edit`);
+  expect(browserAsks()).toBe(true);
+  await user.clear(recordNote);
+  await user.type(recordNote, ITEM.note ?? '');
+  await waitFor(() => expect(browserAsks()).toBe(false));
 });

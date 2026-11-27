@@ -167,6 +167,12 @@ export class LedgerLineDto {
   @ApiProperty() entryDate: string;
   @ApiProperty() entryDescription: string;
   @ApiProperty({ type: String, nullable: true }) lineDescription: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: "The voucher's own text (гүйлгээний утга) when the entry is a voucher's",
+  })
+  memo: string | null;
   @ApiProperty({ example: 'BTO' }) system: string;
   @ApiProperty({ type: String, nullable: true }) sourceDocType: string | null;
   @ApiProperty({ type: String, nullable: true }) sourceDocId: string | null;

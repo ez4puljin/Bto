@@ -25,6 +25,7 @@ export function orderRequestOf(
     lines: order.lines.map((line) => ({
       productUnitId: line.productUnitId,
       qty: plainDecimal(line.qty),
+      ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
     })),
     ...patch,
   };
