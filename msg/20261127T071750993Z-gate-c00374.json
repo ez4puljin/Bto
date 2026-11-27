@@ -1,0 +1,8 @@
+{
+  "id": "20261127T071750993Z-gate-c00374",
+  "from": "gate",
+  "to": "brain",
+  "at": "2026-11-27T07:17:50.993Z",
+  "text": "inbox gate: in/remaining-updates @ 9cb49198: REFUSED: pnpm check:fast is red (web tests (7)); what failed is in the commit comment and on the team board\nWhat failed in pnpm check:fast:\nweb tests (7):\n  FAIL apps/web/src/features/pricing/profiles-pages.test.tsx > price profiles list > archives, restores and deletes from the row, saying why one in use stays\n    TestingLibraryElementError: Unable to find role=\"link\" and name \"Жишээ: Ундаа\"\n  FAIL apps/web/src/features/pricing/profiles-pages.test.tsx > price profiles list > creates a profile on its page: checks the values, works out the example and opens it\n    TestingLibraryElementError: Unable to find an element with the text: Үнийн загвар алга. Бараа бүрт суурь үнэ оруулж, загвараа сонгоно. «Шинэ үнийн загвар»-аар үүсгэнэ.. This could be because the te…\n    at apps/web/src/features/pricing/profiles-pages.test.tsx:253:25\n      251|     const { router } = renderApp('/pricing/profiles', fetchMock);\n      252|     const user = userEvent.setup();\n      253|     expect(await screen.findByText(mn.pricing.profiles.empty)).toBeInT…\n         |                         ^\n  Test Files  1 failed | 6 passed (7)\n  Tests  2 failed | 106 passed (108)",
+  "slug": "remaining-updates"
+}
