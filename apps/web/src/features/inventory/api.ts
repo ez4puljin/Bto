@@ -220,26 +220,43 @@ export function useStockMovements(filter: MovementFilter) {
   });
 }
 
-/** The low-stock list of a warehouse (ADR-0039), 100 rows at a time; off without a warehouse. */
+/** Each warehouse keeps its own cursor; a finished list is never fetched again by Load more. */
 export function useLowStock(
-  warehouseId: number | undefined,
+  warehouseIds: readonly number[],
   filter: { status?: 'OUT' | 'LOW'; supplier?: string } = {},
 ) {
   const api = useApiClient();
   return useInfiniteQuery({
-    queryKey: [...KEYS.stock, 'low', warehouseId, filter],
-    enabled: warehouseId !== undefined,
-    initialPageParam: undefined as string | undefined,
-    queryFn: async ({ pageParam, signal }) =>
-      unwrap(
-        await api.GET('/api/v1/stock/low', {
-          params: {
-            query: { warehouseId: warehouseId ?? 0, ...filter, cursor: pageParam, limit: 100 },
-          },
-          signal,
+    queryKey: [...KEYS.stock, 'low', warehouseIds, filter],
+    enabled: warehouseIds.length > 0,
+    initialPageParam: warehouseIds.map((warehouseId) => ({
+      warehouseId,
+      cursor: undefined as string | undefined,
+    })),
+    queryFn: async ({ pageParam, signal }) => {
+      const pages = await Promise.all(
+        pageParam.map(async ({ warehouseId, cursor }) => {
+          const page = unwrap(
+            await api.GET('/api/v1/stock/low', {
+              params: { query: { warehouseId, ...filter, cursor, limit: 100 } },
+              signal,
+            }),
+          );
+          return { ...page, warehouseId };
         }),
-      ),
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
+      );
+      return {
+        data: pages.flatMap((page) =>
+          page.data.map((row) => ({ ...row, warehouseId: page.warehouseId })),
+        ),
+        next: pages.flatMap((page) =>
+          page.nextCursor === null
+            ? []
+            : [{ warehouseId: page.warehouseId, cursor: page.nextCursor }],
+        ),
+      };
+    },
+    getNextPageParam: (page) => (page.next.length > 0 ? page.next : undefined),
   });
 }
 

@@ -64,21 +64,22 @@ export function LowStockPage() {
   const [params] = useSearchParams();
   const setParam = useSetParam();
   const warehouses = useWarehouseOptions(SHELF_KINDS);
-  const mine = useWarehouseOptions(SHELF_KINDS, true);
   const warehouseName = useWarehouseName();
   const canRequest = useHasPermission('inventory.transfers.manage');
   const canWrite = useCanWrite();
-  // A worker who writes for one warehouse sees it at once.
-  const warehouseId =
-    positiveId(params.get('warehouseId')) ??
-    (mine.options.length === 1 ? mine.options[0]?.id : undefined);
+  const warehouseId = positiveId(params.get('warehouseId'));
+  const allWarehouses = warehouseId === undefined;
   const warehouse = warehouses.options.find((option) => option.id === warehouseId);
   const rawStatus = params.get('status');
   const status = rawStatus === 'OUT' || rawStatus === 'LOW' ? rawStatus : undefined;
   const supplierFilters = { supplier: readFilters(params).supplier };
   const supplier = filterParam('supplier', supplierFilters) ?? undefined;
   const [supplierOpen, setSupplierOpen] = useState(false);
-  const low = useLowStock(warehouseId, { status, supplier });
+  const warehouseIds = warehouses.options
+    .filter((option) => allWarehouses || option.id === warehouseId)
+    .map((option) => option.id);
+  const low = useLowStock(warehouseIds, { status, supplier });
+  const pending = warehouses.isPending || (warehouseIds.length > 0 && low.isPending);
   const rows = low.data?.pages.flatMap((page) => page.data) ?? [];
   const isStore = warehouse?.kind === 'STORE';
   const suppliers = useProductSuppliersOf(
@@ -123,6 +124,7 @@ export function LowStockPage() {
   // from (37, 34.5): the product's page says it (ADR-0201).
   const columnSpec: ColumnSpec[] = [
     ...(requestable ? [{ key: 'select', kind: 'check' } as const] : []),
+    ...(allWarehouses ? [{ key: 'warehouse', kind: 'text', weight: 1, min: 7.25 } as const] : []),
     { key: 'product', kind: 'text', weight: 3, min: 12 },
     { key: 'status', kind: 'status' },
     { key: 'onHand', kind: 'qty', width: 8.5 },
@@ -198,116 +200,111 @@ export function LowStockPage() {
           close={() => setSupplierOpen(false)}
         />
       ) : null}
-      {warehouseId === undefined ? (
-        <ListCard>
-          <EmptyState icon={PackageMinus} title={t('inventory.lowStock.pickWarehouse')} />
-        </ListCard>
-      ) : (
-        <>
-          <ProblemAlert problem={problemFromError(low.error)} onRetry={low.refetch} />
-          <ListCard scroll>
-            <ListTable columns={columnSpec}>
-              <TableHeader>
-                <TableRow>
+      <>
+        <ProblemAlert
+          problem={problemFromError(warehouses.error ?? low.error)}
+          onRetry={warehouses.error ? undefined : low.refetch}
+        />
+        <ListCard scroll>
+          <ListTable columns={columnSpec}>
+            <TableHeader>
+              <TableRow>
+                {requestable ? (
+                  <TableHead>
+                    <Checkbox
+                      aria-label={t('inventory.lowStock.selectAll')}
+                      checked={allChosen}
+                      onCheckedChange={(on) =>
+                        setSelected(
+                          on === true ? new Set(rows.map((row) => row.product.id)) : new Set(),
+                        )
+                      }
+                    />
+                  </TableHead>
+                ) : null}
+                {allWarehouses ? <TableHead>{t('inventory.warehouse')}</TableHead> : null}
+                <TableHead>{t('inventory.lowStock.columns.product')}</TableHead>
+                <TableHead>{t('inventory.lowStock.columns.status')}</TableHead>
+                <TableHead className="text-right">
+                  {t('inventory.lowStock.columns.onHand')}
+                </TableHead>
+                <TableHead className="text-right">{t('inventory.lowStock.columns.min')}</TableHead>
+                <TableHead className="text-right">{t('inventory.lowStock.columns.max')}</TableHead>
+                <TableHead className="text-right">
+                  {t('inventory.lowStock.columns.suggested')}
+                </TableHead>
+                {isStore ? <TableHead>{t('inventory.lowStock.columns.home')}</TableHead> : null}
+                {wholesale ? (
+                  <TableHead>{t('inventory.lowStock.columns.supplier')}</TableHead>
+                ) : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pending ? <SkeletonRows columns={columns} /> : null}
+              {rows.map((row) => (
+                <TableRow
+                  key={`${row.warehouseId}:${row.product.id}`}
+                  data-state={selected.has(row.product.id) ? 'selected' : undefined}
+                >
                   {requestable ? (
-                    <TableHead>
+                    <TableCell>
                       <Checkbox
-                        aria-label={t('inventory.lowStock.selectAll')}
-                        checked={allChosen}
-                        onCheckedChange={(on) =>
-                          setSelected(
-                            on === true ? new Set(rows.map((row) => row.product.id)) : new Set(),
-                          )
-                        }
+                        aria-label={t('inventory.lowStock.select', { name: row.product.name })}
+                        checked={selected.has(row.product.id)}
+                        onCheckedChange={(on) => toggle(row.product.id, on === true)}
                       />
-                    </TableHead>
+                    </TableCell>
                   ) : null}
-                  <TableHead>{t('inventory.lowStock.columns.product')}</TableHead>
-                  <TableHead>{t('inventory.lowStock.columns.status')}</TableHead>
-                  <TableHead className="text-right">
-                    {t('inventory.lowStock.columns.onHand')}
-                  </TableHead>
-                  <TableHead className="text-right">
-                    {t('inventory.lowStock.columns.min')}
-                  </TableHead>
-                  <TableHead className="text-right">
-                    {t('inventory.lowStock.columns.max')}
-                  </TableHead>
-                  <TableHead className="text-right">
-                    {t('inventory.lowStock.columns.suggested')}
-                  </TableHead>
-                  {isStore ? <TableHead>{t('inventory.lowStock.columns.home')}</TableHead> : null}
+                  {allWarehouses ? <TableCell>{warehouseName(row.warehouseId)}</TableCell> : null}
+                  <TruncateCell text={`${row.product.sku} ${row.product.name}`}>
+                    <Link
+                      to={`/inventory/stock/${row.product.id}`}
+                      className="text-link underline-offset-4 hover:underline"
+                    >
+                      <span className="font-mono text-muted-foreground">{row.product.sku}</span>{' '}
+                      {row.product.name}
+                    </Link>
+                  </TruncateCell>
+                  <TableCell>
+                    <Badge variant={row.status === 'OUT' ? 'destructive' : 'warning'}>
+                      {t(`inventory.lowStock.statuses.${row.status}`)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {t('inventory.qtyWithUnit', {
+                      qty: formatQty(row.onHand),
+                      unit: row.product.baseUnitName,
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {row.minQty ? formatQty(row.minQty) : t('common.none')}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {row.maxQty ? formatQty(row.maxQty) : t('common.none')}
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-medium">
+                    {row.suggestedQty ? formatQty(row.suggestedQty) : t('common.none')}
+                  </TableCell>
+                  {isStore ? (
+                    <TableCell>
+                      {row.homeWarehouseId === null
+                        ? t('common.none')
+                        : warehouseName(row.homeWarehouseId)}
+                    </TableCell>
+                  ) : null}
                   {wholesale ? (
-                    <TableHead>{t('inventory.lowStock.columns.supplier')}</TableHead>
+                    <TableCell>{supplierOf(row.product.id) ?? t('common.none')}</TableCell>
                   ) : null}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {low.isPending ? <SkeletonRows columns={columns} /> : null}
-                {rows.map((row) => (
-                  <TableRow
-                    key={row.product.id}
-                    data-state={selected.has(row.product.id) ? 'selected' : undefined}
-                  >
-                    {requestable ? (
-                      <TableCell>
-                        <Checkbox
-                          aria-label={t('inventory.lowStock.select', { name: row.product.name })}
-                          checked={selected.has(row.product.id)}
-                          onCheckedChange={(on) => toggle(row.product.id, on === true)}
-                        />
-                      </TableCell>
-                    ) : null}
-                    <TruncateCell text={`${row.product.sku} ${row.product.name}`}>
-                      <Link
-                        to={`/inventory/stock/${row.product.id}`}
-                        className="text-link underline-offset-4 hover:underline"
-                      >
-                        <span className="font-mono text-muted-foreground">{row.product.sku}</span>{' '}
-                        {row.product.name}
-                      </Link>
-                    </TruncateCell>
-                    <TableCell>
-                      <Badge variant={row.status === 'OUT' ? 'destructive' : 'warning'}>
-                        {t(`inventory.lowStock.statuses.${row.status}`)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {t('inventory.qtyWithUnit', {
-                        qty: formatQty(row.onHand),
-                        unit: row.product.baseUnitName,
-                      })}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {row.minQty ? formatQty(row.minQty) : t('common.none')}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {row.maxQty ? formatQty(row.maxQty) : t('common.none')}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
-                      {row.suggestedQty ? formatQty(row.suggestedQty) : t('common.none')}
-                    </TableCell>
-                    {isStore ? (
-                      <TableCell>
-                        {row.homeWarehouseId === null
-                          ? t('common.none')
-                          : warehouseName(row.homeWarehouseId)}
-                      </TableCell>
-                    ) : null}
-                    {wholesale ? (
-                      <TableCell>{supplierOf(row.product.id) ?? t('common.none')}</TableCell>
-                    ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </ListTable>
-            {!low.isPending && rows.length === 0 ? (
-              <EmptyState icon={PackageMinus} title={t('inventory.lowStock.empty')} />
-            ) : null}
-            <LoadMore query={low} />
-          </ListCard>
-        </>
-      )}
+              ))}
+            </TableBody>
+          </ListTable>
+          {!pending && !warehouses.error && !low.error && rows.length === 0 ? (
+            <EmptyState icon={PackageMinus} title={t('inventory.lowStock.empty')} />
+          ) : null}
+          <LoadMore query={low} />
+        </ListCard>
+      </>
     </div>
   );
 }

@@ -79,6 +79,73 @@ const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: str
     .filter((request) => request.method === method && new URL(request.url).pathname === path);
 
 describe('low-stock list', () => {
+  it('defaults to readable warehouses, keeps duplicate products distinct and pages each cursor', async () => {
+    const reads: URL[] = [];
+    const fetchMock = signedIn(WAREHOUSE_ME, {
+      'GET /api/v1/warehouses': () =>
+        list([
+          WH1,
+          STORE,
+          { ...WH1, id: 3, status: 'INACTIVE' },
+          { ...WH1, id: 4, kind: 'TRANSIT' },
+        ]),
+      'GET /api/v1/stock/low': (request) => {
+        const url = new URL(request.url);
+        reads.push(url);
+        const warehouse = url.searchParams.get('warehouseId');
+        const cursor = url.searchParams.get('cursor');
+        if (warehouse === '1') return cursor ? list([WATER]) : list([COLA], 'wh1-next');
+        return cursor
+          ? list([{ ...WATER, onHand: '1', status: 'LOW' }])
+          : list([COLA], 'store-next');
+      },
+    });
+    const { router } = renderApp('/inventory/low-stock?status=LOW&supplier=main:3', fetchMock);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText(COLA.product.name)).toHaveLength(2));
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText(WH1.name)).toBeInTheDocument();
+    expect(table.getByText(STORE.name)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(reads.map((url) => url.searchParams.get('warehouseId')).sort()).toEqual(['1', '2']);
+    expect(
+      reads.every(
+        (url) =>
+          url.searchParams.get('status') === 'LOW' && url.searchParams.get('supplier') === 'main:3',
+      ),
+    ).toBe(true);
+    await user.click(screen.getByRole('button', { name: mn.common.loadMore }));
+    await waitFor(() => expect(screen.getAllByText(WATER.product.name)).toHaveLength(2));
+    expect(
+      reads
+        .slice(2)
+        .map((url) => url.searchParams.get('cursor'))
+        .sort(),
+    ).toEqual(['store-next', 'wh1-next']);
+    expect(screen.queryByRole('button', { name: mn.common.loadMore })).toBeNull();
+    await router.navigate('/inventory/low-stock?warehouseId=2&status=LOW&supplier=main:3');
+    await waitFor(() => expect(screen.getAllByText(COLA.product.name)).toHaveLength(1));
+    // A warehouse worker may read the store, but cannot create a transfer for it.
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    await router.navigate('/inventory/low-stock?warehouseId=999');
+    await screen.findByText(mn.inventory.lowStock.empty);
+    expect(reads.some((url) => url.searchParams.get('warehouseId') === '999')).toBe(false);
+  });
+
+  it('keeps an aggregate failure visible instead of presenting a partial list as complete', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/warehouses': warehouses,
+      'GET /api/v1/stock/low': (request) =>
+        new URL(request.url).searchParams.get('warehouseId') === '1'
+          ? list([COLA])
+          : json({ code: 'FORBIDDEN', status: 403, title: 'Forbidden' }, 403),
+    });
+    renderApp('/inventory/low-stock', fetchMock);
+    await screen.findByRole('alert');
+    expect(screen.queryByText(COLA.product.name)).toBeNull();
+    expect(screen.queryByText(mn.inventory.lowStock.empty)).toBeNull();
+  });
+
   it('restores the URL filters and clears selected rows on status changes and history navigation', async () => {
     const fetchMock = signedIn(CLERK_ME, {
       'GET /api/v1/warehouses': warehouses,
@@ -223,8 +290,8 @@ describe('low-stock list', () => {
           },
         ]),
     });
-    renderApp('/inventory/low-stock', fetchMock);
-    // The worker writes for one warehouse: its list opens at once.
+    renderApp('/inventory/low-stock?warehouseId=1', fetchMock);
+    // An explicit warehouse keeps the existing supplier view.
     expect(await screen.findByText(COLA.product.name)).toBeInTheDocument();
     const read = calls(fetchMock, 'GET', '/api/v1/stock/low').at(-1);
     expect(new URL(read!.url).searchParams.get('warehouseId')).toBe('1');
@@ -287,7 +354,7 @@ describe('low-stock list', () => {
           lines: [],
         }),
     });
-    const { router } = renderApp('/inventory/low-stock', fetchMock);
+    const { router } = renderApp('/inventory/low-stock?warehouseId=2', fetchMock);
     const user = userEvent.setup();
     await screen.findByText(COLA.product.name);
     // The home warehouse is shown at the store, the supplier is not.
