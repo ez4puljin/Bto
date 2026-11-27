@@ -178,7 +178,7 @@ export class ExpiryCommerceService {
       productUnitId: unit?.id ?? null,
       qty: '1',
       data: await Promise.all(
-        (await this.contexts().list(this.db)).map(async (context) => ({
+        (await this.contexts().list(this.db, item.productId)).map(async (context) => ({
           ...context,
           ...(await this.contexts().quote(this.db, item.productId, context)),
         })),

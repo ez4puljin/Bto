@@ -4,6 +4,7 @@ import type { ExpiryReturnInput, ExpirySaleInput } from '@tugeel/shared/expiry';
 import type { Db, Tx } from './common/db/db.types';
 import {
   ExpiryCommerceModule,
+  ExpiryCommerceContexts,
   ExpiryPayrollSourceAdapter,
   ExpirySalePostingAdapter,
 } from './expiry-commerce.module';
@@ -150,5 +151,73 @@ describe('expiry synchronous composition ports', () => {
       }),
     } as unknown as ModuleRef;
     await expect(new ExpiryCommerceGate(moduleRef).lockInTx(transaction)).rejects.toBe(failure);
+  });
+});
+
+describe('expiry detail selling-price contexts', () => {
+  it('omits unrelated warehouses while retaining retail and applicable missing prices', async () => {
+    const tills = {
+      saleContexts: jest.fn().mockResolvedValue([{ id: 3, warehouseId: 30, name: 'Till' }]),
+    };
+    const pipelines = { saleContexts: jest.fn().mockResolvedValue([{ id: 4, name: 'Sales' }]) };
+    const org = {
+      warehouseNames: jest.fn().mockResolvedValue(new Map([[30, 'Shop']])),
+      listWarehouses: jest.fn().mockResolvedValue([
+        { id: 10, name: 'Home', status: 'ACTIVE' },
+        { id: 20, name: 'Unrelated', status: 'ACTIVE' },
+      ]),
+    };
+    const locations = { homeOf: jest.fn().mockResolvedValue(new Map([[7, 10]])) };
+    const catalog = {
+      get: jest.fn().mockResolvedValue({ units: [{ id: 70, isBase: true }] }),
+      getMany: jest.fn().mockResolvedValue([{ baseUnit: { id: 70 } }]),
+    };
+    const prices = {
+      quote: jest.fn().mockResolvedValue({ lines: [{ result: { priced: false } }] }),
+    };
+    const contexts = new ExpiryCommerceContexts(
+      ...([
+        tills,
+        pipelines,
+        org,
+        catalog,
+        locations,
+        prices,
+        {},
+        {},
+      ] as unknown as ConstructorParameters<typeof ExpiryCommerceContexts>),
+    );
+    const service = {
+      db: tx,
+      item: jest.fn().mockResolvedValue({ productId: 7 }),
+      catalog,
+      contexts: () => contexts,
+    } as unknown as ExpiryCommerceService;
+    const result = await ExpiryCommerceService.prototype.prices.call(service, 9);
+    expect(result).toEqual({
+      productUnitId: 70,
+      qty: '1',
+      data: [
+        {
+          warehouseId: 30,
+          channel: 'RETAIL',
+          contextId: 3,
+          name: 'Till / Shop',
+          unitPrice: null,
+          netUnitPrice: null,
+        },
+        {
+          warehouseId: 10,
+          channel: 'WHOLESALE',
+          contextId: 4,
+          name: 'Sales / Home',
+          unitPrice: null,
+          netUnitPrice: null,
+        },
+      ],
+    });
+    expect(locations.homeOf).toHaveBeenCalledWith([7], tx);
+    expect(prices.quote).toHaveBeenCalledTimes(2);
+    expect((await contexts.list(tx)).map((row) => row.warehouseId)).toEqual([30, 10, 20]);
   });
 });

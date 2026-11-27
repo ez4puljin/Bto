@@ -48,15 +48,19 @@ export class ExpiryCommerceContexts implements ExpirySaleContexts, FixedSourcePr
     private readonly expiry: ExpiryCommerceService,
   ) {}
 
-  async list(executor: Db | Tx): Promise<ExpirySaleContext[]> {
+  async list(executor: Db | Tx, productId?: number): Promise<ExpirySaleContext[]> {
     const tills = await this.tills.saleContexts(executor);
     const tillWarehouses = await this.org.warehouseNames(
       tills.map((till) => till.warehouseId),
       executor,
     );
     const pipelines = await this.pipelines.saleContexts(executor);
+    const homeWarehouseId =
+      productId === undefined
+        ? undefined
+        : (await this.locations.homeOf([productId], executor)).get(productId);
     const warehouses = (await this.org.listWarehouses({ kind: 'WHOLESALE' }, executor)).filter(
-      (row) => row.status === 'ACTIVE',
+      (row) => row.status === 'ACTIVE' && (productId === undefined || row.id === homeWarehouseId),
     );
     return [
       ...tills.map((till): ExpirySaleContext => ({

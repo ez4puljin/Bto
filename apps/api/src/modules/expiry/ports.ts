@@ -13,7 +13,7 @@ export interface ExpirySaleContext {
   name: string;
 }
 export interface ExpirySaleContexts {
-  list(executor: Db | Tx): Promise<ExpirySaleContext[]>;
+  list(executor: Db | Tx, productId?: number): Promise<ExpirySaleContext[]>;
   quote(
     executor: Db | Tx,
     productId: number,
