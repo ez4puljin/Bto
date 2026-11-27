@@ -15,6 +15,8 @@ export type BankLinePatch = Schemas['BankLinePatch'];
 export type BankRules = Schemas['BankStatementRules'];
 export type BankPostResult = Schemas['BankStatementPostResult'];
 export type BankUpload = Schemas['BankStatementUpload'];
+export type BankHistoryEntry = Schemas['BankHistoryEntry'];
+export type BankMonthTotal = Schemas['BankMonthTotal'];
 
 const ROOT = ['bank-statements'] as const;
 
@@ -57,6 +59,38 @@ export function useBankStatement(id: number | null) {
       unwrap(
         await api.GET('/api/v1/finance/bank-statements/{id}', {
           params: { path: { id: id ?? 0 } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** Every change of the lines of a day's statements, newest first (ADR-0252). */
+export function useBankHistory(date: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...ROOT, 'history', date],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/finance/bank-statements/history', {
+          params: { query: { date } },
+          signal,
+        }),
+      ),
+  });
+}
+
+/** «Сарын хөл дүн»: each bank account's month (ADR-0252). */
+export function useBankMonthTotals(month: string, enabled: boolean) {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: [...ROOT, 'month-totals', month],
+    enabled,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/v1/finance/bank-statements/month-totals', {
+          params: { query: { month } },
           signal,
         }),
       ),

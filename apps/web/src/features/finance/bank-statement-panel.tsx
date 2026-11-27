@@ -15,6 +15,7 @@ import {
   Download,
   Landmark,
   Lock,
+  PencilLine,
   Undo2,
   Wand2,
   X,
@@ -92,7 +93,8 @@ export function BankStatementPanel(props: { id: number; onClose: () => void }) {
 
   const lines = statement.data?.lines ?? [];
   const visible = lines.filter((line) => (line.kind === 'FEE') === (view === 'fees'));
-  const editable = (line: BankLine) => canWork && line.postedAt === null && line.kind === 'NORMAL';
+  // A line in the books is edited too: «Гүйлгээ засах» then writes only it again (ADR-0252).
+  const editable = (line: BankLine) => canWork && line.kind === 'NORMAL';
   const bankAccountId = statement.data?.moneyAccountId ?? null;
 
   const accountOptions = useMemo(() => {
@@ -110,6 +112,8 @@ export function BankStatementPanel(props: { id: number; onClose: () => void }) {
   }, [accounts.data, rules.data]);
 
   const ready = lines.filter((line) => line.postedAt === null && line.missing.length === 0).length;
+  const changed = lines.filter((line) => line.changed && line.missing.length === 0).length;
+  const repostOnly = ready === 0 && changed > 0;
 
   const saveLine = (line: BankLine, patch: BankLinePatch) =>
     void action.run(() =>
@@ -207,6 +211,13 @@ export function BankStatementPanel(props: { id: number; onClose: () => void }) {
               value={`${data.postedCount}/${data.lineCount}`}
               tone="text-foreground"
             />
+            {data.changedCount > 0 ? (
+              <Stat
+                label={t('finance.bankStatements.statement.statChanged')}
+                value={String(data.changedCount)}
+                tone="text-warning"
+              />
+            ) : null}
           </div>
         ) : null}
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -240,9 +251,14 @@ export function BankStatementPanel(props: { id: number; onClose: () => void }) {
             {t('finance.bankStatements.statement.export')}
           </Button>
           {canPost ? (
-            <Button disabled={ready === 0 || !bankAccountId} onClick={() => setConfirm('post')}>
-              <BookCheck />
-              {t('finance.bankStatements.statement.post')}
+            <Button
+              disabled={ready + changed === 0 || !bankAccountId}
+              onClick={() => setConfirm('post')}
+            >
+              {repostOnly ? <PencilLine /> : <BookCheck />}
+              {repostOnly
+                ? t('finance.bankStatements.statement.repost')
+                : t('finance.bankStatements.statement.post')}
             </Button>
           ) : null}
           <Button
@@ -343,9 +359,23 @@ export function BankStatementPanel(props: { id: number; onClose: () => void }) {
       <ConfirmDialog
         open={confirm === 'post'}
         variant="default"
-        title={t('finance.bankStatements.statement.postTitle')}
-        description={t('finance.bankStatements.statement.postBody', { count: ready })}
-        confirmLabel={t('finance.bankStatements.statement.post')}
+        title={
+          repostOnly
+            ? t('finance.bankStatements.statement.repostTitle')
+            : t('finance.bankStatements.statement.postTitle')
+        }
+        description={
+          repostOnly
+            ? t('finance.bankStatements.statement.repostBody', { count: changed })
+            : changed > 0
+              ? t('finance.bankStatements.statement.postAndRepostBody', { count: ready, changed })
+              : t('finance.bankStatements.statement.postBody', { count: ready })
+        }
+        confirmLabel={
+          repostOnly
+            ? t('finance.bankStatements.statement.repost')
+            : t('finance.bankStatements.statement.post')
+        }
         pending={mutations.post.isPending}
         problem={problemFromError(mutations.post.error)}
         onClose={() => {
@@ -361,6 +391,11 @@ export function BankStatementPanel(props: { id: number; onClose: () => void }) {
               if (outcome.posted > 0) {
                 toast.success(
                   t('finance.bankStatements.statement.posted', { count: outcome.posted }),
+                );
+              }
+              if (outcome.updated > 0) {
+                toast.success(
+                  t('finance.bankStatements.statement.updated', { count: outcome.updated }),
                 );
               }
             },
@@ -493,7 +528,11 @@ function LineRow(props: {
   const time = businessDateTime(new Date(line.txnAt)).slice(11);
   const partyName = line.customerName ?? line.supplierName;
   const partyCode = line.customerCode ?? line.supplierCode;
-  const partyText = partyName ? `${partyName} · ${partyCode ?? ''}` : '';
+  const partyText = partyName
+    ? `${partyName} · ${partyCode ?? ''}`
+    : line.rulePartyCode
+      ? `${line.rulePartyName ? `${line.rulePartyName} · ` : ''}${line.rulePartyCode}`
+      : '';
   const accountText = line.counterAccountCode
     ? `${line.counterAccountCode} · ${line.counterAccountName ?? ''}`
     : '';
@@ -501,7 +540,7 @@ function LineRow(props: {
   return (
     <TableRow
       data-state={props.selected ? 'selected' : undefined}
-      className={cn(posted && 'bg-canvas/60')}
+      className={cn(posted && !line.changed && 'bg-canvas/60', line.changed && 'bg-warning-soft')}
     >
       <TableCell>
         {props.editable ? (
@@ -653,6 +692,17 @@ function LineRow(props: {
             >
               <Check aria-hidden className="size-4 shrink-0" />
             </Link>
+            {line.changed ? (
+              <span
+                className="inline-flex size-7 items-center justify-center text-warning"
+                title={t('finance.bankStatements.statement.changed')}
+              >
+                <PencilLine
+                  aria-label={t('finance.bankStatements.statement.changed')}
+                  className="size-3.5"
+                />
+              </span>
+            ) : null}
             {props.canReverse ? (
               <Button
                 type="button"

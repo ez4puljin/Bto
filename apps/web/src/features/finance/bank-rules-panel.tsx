@@ -93,6 +93,17 @@ function RulesForm(props: { initial: BankRules; title: string }) {
             />
           </FormField>
           <FormField
+            htmlFor="bank-settlement-party"
+            label={t('finance.bankStatements.settings.settlementPartyCode')}
+          >
+            <Input
+              id="bank-settlement-party"
+              value={rules.settlementPartyCode}
+              placeholder={rules.partyCode}
+              onChange={(event) => set({ settlementPartyCode: event.target.value })}
+            />
+          </FormField>
+          <FormField
             htmlFor="bank-settlement-action"
             label={t('finance.bankStatements.settings.action')}
           >
@@ -126,7 +137,10 @@ function RulesForm(props: { initial: BankRules; title: string }) {
       <Card>
         <CardHeader>
           <CardTitle>{t('finance.bankStatements.settings.feeTitle')}</CardTitle>
-          <CardDescription>{t('finance.bankStatements.settings.feeHint')}</CardDescription>
+          <CardDescription>
+            {t('finance.bankStatements.settings.feeHint')}{' '}
+            {t('finance.bankStatements.settings.rulePartyHint')}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           <FormField
@@ -139,6 +153,17 @@ function RulesForm(props: { initial: BankRules; title: string }) {
               options={options}
               onChange={(value) => set({ feeAccountId: Number.parseInt(value, 10) })}
               onClear={() => set({ feeAccountId: null })}
+            />
+          </FormField>
+          <FormField
+            htmlFor="bank-fee-party"
+            label={t('finance.bankStatements.settings.feePartyCode')}
+          >
+            <Input
+              id="bank-fee-party"
+              value={rules.feePartyCode}
+              placeholder={rules.partyCode}
+              onChange={(event) => set({ feePartyCode: event.target.value })}
             />
           </FormField>
           <FormField

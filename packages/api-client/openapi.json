@@ -32750,6 +32750,107 @@
         ]
       }
     },
+    "/api/v1/finance/bank-statements/month-totals": {
+      "get": {
+        "operationId": "BankStatements_monthTotals",
+        "parameters": [
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-11",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BankMonthTotal"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "«Сарын хөл дүн»: each bank account's month by the lines' own dates (ADR-0252).",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
+    "/api/v1/finance/bank-statements/history": {
+      "get": {
+        "operationId": "BankStatements_history",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-11-05",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BankHistoryEntry"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Every change of the lines of a day's statements, newest first (ADR-0252).",
+        "tags": [
+          "finance"
+        ]
+      }
+    },
     "/api/v1/finance/bank-statements/export-manifest": {
       "get": {
         "operationId": "BankStatements_manifest",
@@ -86643,6 +86744,14 @@
             "type": "string",
             "example": "30000"
           },
+          "feePartyCode": {
+            "type": "string",
+            "example": "30000"
+          },
+          "settlementPartyCode": {
+            "type": "string",
+            "example": "30000"
+          },
           "counterAccountIds": {
             "type": "array",
             "items": {
@@ -86659,6 +86768,8 @@
           "feeAction",
           "feeExportType",
           "partyCode",
+          "feePartyCode",
+          "settlementPartyCode",
           "counterAccountIds"
         ]
       },
@@ -86710,6 +86821,15 @@
             "minLength": 1,
             "maxLength": 30
           },
+          "feePartyCode": {
+            "type": "string",
+            "description": "Left out or empty: the general party code.",
+            "maxLength": 30
+          },
+          "settlementPartyCode": {
+            "type": "string",
+            "maxLength": 30
+          },
           "counterAccountIds": {
             "type": "array",
             "items": {
@@ -86728,6 +86848,132 @@
           "feeExportType",
           "partyCode",
           "counterAccountIds"
+        ]
+      },
+      "BankMonthTotal": {
+        "type": "object",
+        "properties": {
+          "accountNumber": {
+            "type": "string"
+          },
+          "accountCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineCount": {
+            "type": "number"
+          },
+          "dayCount": {
+            "type": "number"
+          },
+          "credit": {
+            "type": "string",
+            "example": "12006380.00"
+          },
+          "debit": {
+            "type": "string",
+            "example": "2180000.00"
+          },
+          "net": {
+            "type": "string",
+            "example": "9826380.00"
+          },
+          "fees": {
+            "type": "string",
+            "example": "3600.00"
+          }
+        },
+        "required": [
+          "accountNumber",
+          "accountCode",
+          "accountName",
+          "lineCount",
+          "dayCount",
+          "credit",
+          "debit",
+          "net",
+          "fees"
+        ]
+      },
+      "BankHistoryChange": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "example": "counterAccountId"
+          },
+          "before": {
+            "type": "string",
+            "nullable": true
+          },
+          "after": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "field",
+          "before",
+          "after"
+        ]
+      },
+      "BankHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "occurredAt": {
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "example": "UPDATE",
+            "description": "UPDATE, POST, REPOST or VOID"
+          },
+          "statementId": {
+            "type": "number"
+          },
+          "accountNumber": {
+            "type": "string"
+          },
+          "lineNo": {
+            "type": "number"
+          },
+          "credit": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "debit": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankHistoryChange"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "actorName",
+          "action",
+          "statementId",
+          "accountNumber",
+          "lineNo",
+          "credit",
+          "debit",
+          "changes"
         ]
       },
       "BankExportManifest": {
@@ -86848,6 +87094,10 @@
           "postedCount": {
             "type": "number"
           },
+          "changedCount": {
+            "type": "number",
+            "description": "Lines in the books edited since (ADR-0252)"
+          },
           "missing": {
             "$ref": "#/components/schemas/BankStatementMissing"
           }
@@ -86869,6 +87119,7 @@
           "totalDebit",
           "filledCount",
           "postedCount",
+          "changedCount",
           "missing"
         ]
       },
@@ -87039,6 +87290,18 @@
             "type": "string",
             "nullable": true
           },
+          "changed": {
+            "type": "boolean",
+            "description": "In the books and edited since (ADR-0252)"
+          },
+          "rulePartyCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "rulePartyName": {
+            "type": "string",
+            "nullable": true
+          },
           "missing": {
             "type": "array",
             "items": {
@@ -87071,6 +87334,9 @@
           "paymentId",
           "journalEntryId",
           "postedAt",
+          "changed",
+          "rulePartyCode",
+          "rulePartyName",
           "missing"
         ]
       },
@@ -87134,6 +87400,10 @@
           "postedCount": {
             "type": "number"
           },
+          "changedCount": {
+            "type": "number",
+            "description": "Lines in the books edited since (ADR-0252)"
+          },
           "missing": {
             "$ref": "#/components/schemas/BankStatementMissing"
           },
@@ -87161,6 +87431,7 @@
           "totalDebit",
           "filledCount",
           "postedCount",
+          "changedCount",
           "missing",
           "lines"
         ]
@@ -87330,6 +87601,10 @@
           "posted": {
             "type": "number"
           },
+          "updated": {
+            "type": "number",
+            "description": "Edited lines in the books written again (ADR-0252)"
+          },
           "skipped": {
             "type": "number",
             "description": "Lines still lacking something"
@@ -87346,6 +87621,7 @@
         },
         "required": [
           "posted",
+          "updated",
           "skipped",
           "failures",
           "statement"

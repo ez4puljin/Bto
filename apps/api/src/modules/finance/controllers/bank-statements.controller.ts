@@ -31,10 +31,12 @@ import {
   BankExportManifestDto,
   BankFeesQueryDto,
   BankFileQueryDto,
+  BankHistoryEntryDto,
   BankLinePatchDto,
   BankLineReverseRequestDto,
   BankLinesBulkRequestDto,
   BankLinesBulkResultDto,
+  BankMonthTotalDto,
   BankStatementDetailDto,
   BankStatementDto,
   BankStatementLineDto,
@@ -120,7 +122,40 @@ export class BankStatementsController {
       ...body,
       settlementAccountId: body.settlementAccountId ?? null,
       feeAccountId: body.feeAccountId ?? null,
+      feePartyCode: body.feePartyCode ?? '',
+      settlementPartyCode: body.settlementPartyCode ?? '',
     });
+  }
+
+  /** «Сарын хөл дүн»: each bank account's month by the lines' own dates (ADR-0252). */
+  @Get('month-totals')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [BankMonthTotalDto] })
+  async monthTotals(@Query() query: BankCalendarQueryDto): Promise<BankMonthTotalDto[]> {
+    const rows = await this.statements.monthTotals(
+      `${query.month}-01`,
+      `${query.month}-${String(daysInMonth(query.month)).padStart(2, '0')}`,
+    );
+    return rows.map((row) => ({
+      ...row,
+      credit: money(row.credit),
+      debit: money(row.debit),
+      net: money(row.net),
+      fees: money(row.fees),
+    }));
+  }
+
+  /** Every change of the lines of a day's statements, newest first (ADR-0252). */
+  @Get('history')
+  @RequirePermission(READ)
+  @ApiOkResponse({ type: [BankHistoryEntryDto] })
+  async history(@Query() query: BankDateQueryDto): Promise<BankHistoryEntryDto[]> {
+    return (await this.statements.dayHistory(query.date)).map((row) => ({
+      ...row,
+      occurredAt: row.occurredAt.toISOString(),
+      credit: money(row.credit),
+      debit: money(row.debit),
+    }));
   }
 
   @Get('export-manifest')

@@ -26,6 +26,7 @@ const STATEMENT = {
   totalDebit: '2180000.00',
   filledCount: 1,
   postedCount: 0,
+  changedCount: 0,
   missing: { party: 1, account: 0, description: 0, action: 0, export: 0 },
 };
 
@@ -54,6 +55,9 @@ const line = (fields: Record<string, unknown>) => ({
   paymentId: null,
   journalEntryId: null,
   postedAt: null,
+  changed: false,
+  rulePartyCode: null,
+  rulePartyName: null,
   missing: ['party'],
   ...fields,
 });
@@ -97,6 +101,8 @@ const RULES = {
   feeAction: 'CLOSE',
   feeExportType: 'BANK',
   partyCode: '30000',
+  feePartyCode: '',
+  settlementPartyCode: '',
   counterAccountIds: [11],
 };
 
@@ -157,7 +163,7 @@ describe('«Банкны хуулга хаах» (ADR-0169)', () => {
     );
   });
 
-  it('opens a statement: open lines are edited, posted and locked ones only read', async () => {
+  it('opens a statement: open and posted lines are edited, locked ones only read', async () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...routes(),
@@ -173,9 +179,10 @@ describe('«Банкны хуулга хаах» (ADR-0169)', () => {
       '/finance/journal?entry=500',
     );
     expect(screen.getByRole('button', { name: '2-р мөрийг дэвтрээс буцаах' })).toBeInTheDocument();
+    // A posted line is edited too, «Гүйлгээ засах» writes it again (ADR-0252).
     expect(
-      screen.queryByRole('textbox', { name: `2-р мөрийн ${TEXT.columns.description}` }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('textbox', { name: `2-р мөрийн ${TEXT.columns.description}` }),
+    ).toBeInTheDocument();
 
     // Only the changed cell goes to the server, when the field is left.
     await user.clear(description);
@@ -277,6 +284,80 @@ describe('«Банкны хуулга хаах» (ADR-0169)', () => {
     expect(screen.getByText('1 мөр дутуу тул бичигдсэнгүй')).toBeInTheDocument();
     const posted = calls(fetchMock, 'POST', '/api/v1/finance/bank-statements/7/post')[0];
     expect(posted?.headers.get('Idempotency-Key')).toMatch(UUID);
+  });
+
+  it('offers «Гүйлгээ засах» for a line edited after posting (ADR-0252)', async () => {
+    const user = userEvent.setup();
+    const edited = line({
+      id: 75,
+      lineNo: 5,
+      missing: [],
+      changed: true,
+      postedAt: '2026-11-06T02:00:00.000Z',
+      journalEntryId: 501,
+    });
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
+      ...routes(),
+      'GET /api/v1/finance/bank-statements/7': () =>
+        json({ ...STATEMENT, changedCount: 1, lines: [edited] }),
+      'POST /api/v1/finance/bank-statements/7/post': () =>
+        json({
+          posted: 0,
+          updated: 1,
+          skipped: 0,
+          failures: [],
+          statement: { ...STATEMENT, lines: [{ ...edited, changed: false }] },
+        }),
+    });
+    renderApp('/finance/bank-statements?date=2026-11-05&statement=7', fetchMock);
+    await user.click(await screen.findByRole('button', { name: TEXT.statement.repost }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Засагдсан 1 мөрийн/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: TEXT.statement.repost }));
+    expect(await screen.findByText('1 гүйлгээ шинэчлэгдлээ')).toBeInTheDocument();
+  });
+
+  it('shows «Сарын хөл дүн» with each account and the sum of all', async () => {
+    const user = userEvent.setup();
+    const fetchMock = signedIn(ACCOUNTANT_ME, {
+      ...routes(),
+      'GET /api/v1/finance/bank-statements/month-totals': () =>
+        json([
+          {
+            accountNumber: '5000000001',
+            accountCode: '110900',
+            accountName: 'Туршилтын банк',
+            lineCount: 10,
+            dayCount: 4,
+            credit: '1000.00',
+            debit: '400.00',
+            net: '600.00',
+            fees: '100.00',
+          },
+          {
+            accountNumber: '5000000009',
+            accountCode: null,
+            accountName: null,
+            lineCount: 2,
+            dayCount: 1,
+            credit: '500.00',
+            debit: '0.00',
+            net: '500.00',
+            fees: '0.00',
+          },
+        ]),
+    });
+    renderApp('/finance/bank-statements?date=2026-11-05', fetchMock);
+    await user.click(await screen.findByRole('button', { name: TEXT.monthTotals.open }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('5000000001')).toBeInTheDocument();
+    expect(within(dialog).getByText('4 өдөр')).toBeInTheDocument();
+    const foot = within(dialog).getByText(TEXT.monthTotals.total).closest('tr');
+    expect(foot).toHaveTextContent('12');
+    expect(foot).toHaveTextContent(/1[\s,.]?100/);
+    expect(
+      calls(fetchMock, 'GET', '/api/v1/finance/bank-statements/month-totals')[0]?.url,
+    ).toContain('month=2026-11');
   });
 
   it('asks for the bank account of a number it does not know', async () => {

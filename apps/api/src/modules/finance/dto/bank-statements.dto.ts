@@ -73,6 +73,7 @@ export class BankStatementDto {
   @ApiProperty({ example: '2180000.00' }) totalDebit: string;
   @ApiProperty() filledCount: number;
   @ApiProperty() postedCount: number;
+  @ApiProperty({ description: 'Lines in the books edited since (ADR-0252)' }) changedCount: number;
   @ApiProperty({ type: BankStatementMissingDto }) missing: BankStatementMissingDto;
 }
 
@@ -104,6 +105,9 @@ export class BankStatementLineDto {
   @ApiProperty({ type: Number, nullable: true }) paymentId: number | null;
   @ApiProperty({ type: Number, nullable: true }) journalEntryId: number | null;
   @ApiProperty({ type: String, nullable: true }) postedAt: string | null;
+  @ApiProperty({ description: 'In the books and edited since (ADR-0252)' }) changed: boolean;
+  @ApiProperty({ type: String, nullable: true }) rulePartyCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) rulePartyName: string | null;
   @ApiProperty({ enum: BANK_LINE_MISSING, enumName: 'BankLineMissing', isArray: true })
   missing: BankLineMissing[];
 }
@@ -239,6 +243,8 @@ export class BankPostFailureDto {
 @ApiSchema({ name: 'BankStatementPostResult' })
 export class BankStatementPostResultDto {
   @ApiProperty() posted: number;
+  @ApiProperty({ description: 'Edited lines in the books written again (ADR-0252)' })
+  updated: number;
   @ApiProperty({ description: 'Lines still lacking something' }) skipped: number;
   @ApiProperty({ type: [BankPostFailureDto] }) failures: BankPostFailureDto[];
   @ApiProperty({ type: BankStatementDetailDto }) statement: BankStatementDetailDto;
@@ -271,6 +277,8 @@ export class BankStatementRulesDto {
   @ApiProperty({ enum: BANK_EXPORT_TYPES, enumName: 'BankExportType' })
   feeExportType: BankExportType;
   @ApiProperty({ example: '30000' }) partyCode: string;
+  @ApiProperty({ example: '30000' }) feePartyCode: string;
+  @ApiProperty({ example: '30000' }) settlementPartyCode: string;
   @ApiProperty({ type: [Number] }) counterAccountIds: number[];
 }
 
@@ -311,6 +319,19 @@ export class BankStatementRulesRequestDto {
   @MinLength(1)
   @MaxLength(BANK_STATEMENT_LIMITS.maxPartyCode)
   partyCode: string;
+  /** Left out or empty: the general party code. */
+  @ApiPropertyOptional({ maxLength: BANK_STATEMENT_LIMITS.maxPartyCode })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(BANK_STATEMENT_LIMITS.maxPartyCode)
+  feePartyCode?: string;
+  @ApiPropertyOptional({ maxLength: BANK_STATEMENT_LIMITS.maxPartyCode })
+  @IsOptional()
+  @Transform(trimmed)
+  @IsString()
+  @MaxLength(BANK_STATEMENT_LIMITS.maxPartyCode)
+  settlementPartyCode?: string;
   @ApiProperty({ type: [Number] })
   @IsArray()
   @ArrayMaxSize(BANK_STATEMENT_LIMITS.maxCounterAccounts)
@@ -318,4 +339,40 @@ export class BankStatementRulesRequestDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   counterAccountIds: number[];
+}
+
+@ApiSchema({ name: 'BankHistoryChange' })
+export class BankHistoryChangeDto {
+  @ApiProperty({ example: 'counterAccountId' }) field: string;
+  @ApiProperty({ type: String, nullable: true }) before: string | null;
+  @ApiProperty({ type: String, nullable: true }) after: string | null;
+}
+
+/** One change of a day's lines (ADR-0252). */
+@ApiSchema({ name: 'BankHistoryEntry' })
+export class BankHistoryEntryDto {
+  @ApiProperty() id: number;
+  @ApiProperty() occurredAt: string;
+  @ApiProperty({ type: String, nullable: true }) actorName: string | null;
+  @ApiProperty({ example: 'UPDATE', description: 'UPDATE, POST, REPOST or VOID' }) action: string;
+  @ApiProperty() statementId: number;
+  @ApiProperty() accountNumber: string;
+  @ApiProperty() lineNo: number;
+  @ApiProperty({ example: '0.00' }) credit: string;
+  @ApiProperty({ example: '1000.00' }) debit: string;
+  @ApiProperty({ type: [BankHistoryChangeDto] }) changes: BankHistoryChangeDto[];
+}
+
+/** «Сарын хөл дүн»: one bank account's month (ADR-0252). */
+@ApiSchema({ name: 'BankMonthTotal' })
+export class BankMonthTotalDto {
+  @ApiProperty() accountNumber: string;
+  @ApiProperty({ type: String, nullable: true }) accountCode: string | null;
+  @ApiProperty({ type: String, nullable: true }) accountName: string | null;
+  @ApiProperty() lineCount: number;
+  @ApiProperty() dayCount: number;
+  @ApiProperty({ example: '12006380.00' }) credit: string;
+  @ApiProperty({ example: '2180000.00' }) debit: string;
+  @ApiProperty({ example: '9826380.00' }) net: string;
+  @ApiProperty({ example: '3600.00' }) fees: string;
 }

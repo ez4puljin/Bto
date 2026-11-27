@@ -367,6 +367,11 @@ export const bankStatementLines = pgTable(
     postedAt: timestamp('posted_at', { withTimezone: true }),
     postedBy: userRef('posted_by'),
     postAttempt: integer('post_attempt').notNull().default(0),
+    /**
+     * What the books hold for the line, its fields as last written (ADR-0252): a posted line edited
+     * afterwards differs from it, and «Гүйлгээ засах» writes only such lines again.
+     */
+    postedFields: jsonValue('posted_fields'),
     updatedAt: updatedAt(),
   },
   (t) => [
@@ -414,6 +419,9 @@ export const bankStatementSettings = pgTable(
     feeAction: text('fee_action', { enum: BANK_LINE_ACTIONS }).notNull(),
     feeExportType: text('fee_export_type', { enum: BANK_EXPORT_TYPES }).notNull(),
     partyCode: text('party_code').notNull(),
+    /** The Erkhet party of a fee and of a settlement line (ADR-0252); null takes `party_code`. */
+    feePartyCode: text('fee_party_code'),
+    settlementPartyCode: text('settlement_party_code'),
     counterAccountIds: bigint('counter_account_ids', { mode: 'number' })
       .array()
       .notNull()
