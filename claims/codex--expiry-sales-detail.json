@@ -1,0 +1,21 @@
+{
+  "who": "codex",
+  "slug": "expiry-sales-detail",
+  "paths": [
+    "apps/api/src/modules/expiry/controllers/expiry-commerce.controller.ts",
+    "apps/api/src/modules/expiry/dto/expiry-commerce.dto.ts",
+    "apps/api/src/modules/expiry/expiry.module.ts",
+    "apps/api/src/modules/expiry/services/expiry-sales-query.service.ts",
+    "apps/api/test/integration/expiry-commerce.int-spec.ts",
+    "apps/web/src/features/expiry/commerce-api.ts",
+    "apps/web/src/features/expiry/expiry-commerce-section.tsx",
+    "apps/web/src/features/expiry/expiry-page.test.tsx",
+    "apps/web/src/features/expiry/expiry-record-panel.tsx",
+    "apps/web/src/features/expiry/expiry-sales-section.tsx",
+    "apps/web/src/features/news/content/2026-11-27-expiry-sales-detail.md",
+    "packages/api-client/openapi.json",
+    "packages/api-client/src/generated/schema.ts"
+  ],
+  "what": "Show original received quantity and authoritative markdown sale/return history without exposing accounting fields",
+  "since": "2026-11-27T14:49:16.622Z"
+}
