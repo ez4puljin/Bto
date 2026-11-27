@@ -32,10 +32,11 @@
     "docs/modules/payroll.md",
     "docs/modules/pos.md",
     "docs/modules/sales.md",
+    "docs/reviews/2026-11-24-inbox-feature-plan.md",
     "packages/api-client/openapi.json",
     "packages/api-client/src/generated/schema.ts",
     "packages/shared/src/expiry/index.ts"
   ],
-  "what": "Renumber unpublished expiry migration after owner approval; preserve landed0128",
+  "what": "Update current migration plan to approved0129/0130 and NOT VALID fix; retain historical provenance",
   "since": "2026-11-27T01:34:56.230Z"
 }
