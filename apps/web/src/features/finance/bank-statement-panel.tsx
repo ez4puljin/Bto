@@ -20,7 +20,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
@@ -36,12 +36,14 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCustomers, useSuppliers } from '@/features/partners/api';
+import { useCustomerLookup } from '@/features/inventory/api';
+import { useSuppliers } from '@/features/partners/api';
 import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
+import { useDebounced } from '@/lib/use-debounced';
 import { cn } from '@/lib/utils';
 import { accountOption } from './account-option';
 import { useGlAccounts, useMoneyAccounts } from './api';
@@ -771,14 +773,16 @@ function PartyCell(props: {
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
-  const q = useDeferredValue(search.trim());
-  const customers = useCustomers({ q, status: 'ACTIVE' }, { enabled: q !== '', limit: 15 });
+  // One request when typing pauses, never one per letter (owner 2026-11-27: «маш удаан»).
+  const q = useDebounced(search.trim(), 250);
+  // The light lookup (one statement, name and code), not the customer list with its debts.
+  const customers = useCustomerLookup(q, q !== '');
   const suppliers = useSuppliers({ q, status: 'ACTIVE' }, { enabled: q !== '', limit: 15 });
   const options =
     q === ''
       ? []
       : [
-          ...(customers.data?.pages[0]?.data ?? []).map((row) => ({
+          ...(customers.data ?? []).map((row) => ({
             value: `C:${row.id}`,
             label: `${row.name} · ${row.code}`,
           })),
@@ -796,7 +800,7 @@ function PartyCell(props: {
       placeholder={props.placeholder ?? t('finance.bankStatements.party.search')}
       options={options}
       {...(props.invalid === undefined ? {} : { invalid: props.invalid })}
-      searching={customers.isFetching || suppliers.isFetching}
+      searching={q !== search.trim() || customers.isFetching || suppliers.isFetching}
       onSearch={setSearch}
       onClear={() => props.onChange({ customerId: null, supplierId: null }, '')}
       onChange={(value) => {
