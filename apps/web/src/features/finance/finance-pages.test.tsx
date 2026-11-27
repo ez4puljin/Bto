@@ -63,10 +63,12 @@ describe('finance pages (ADR-0060 #11)', () => {
     renderApp('/', signedIn(ACCOUNTANT_ME, routes()));
     const sidebar = within(await findSidebar());
     expect(sidebar.getByRole('button', { name: mn.nav.groups.finance })).toBeInTheDocument();
-    expect(sidebar.getByRole('link', { name: mn.nav.invoices })).toHaveAttribute(
+    expect(sidebar.getByRole('link', { name: mn.nav.payments })).toHaveAttribute(
       'href',
-      '/finance/invoices',
+      '/finance/payments',
     );
+    // No invoices in the menu (owner 2026-11-27).
+    expect(sidebar.queryByRole('link', { name: mn.nav.invoices })).toBeNull();
     // The settings are the admin's.
     expect(sidebar.queryByRole('link', { name: mn.nav.financeSettings })).toBeNull();
   });
@@ -110,10 +112,8 @@ describe('finance pages (ADR-0060 #11)', () => {
       'href',
       '/finance/payments?payment=21',
     );
-    expect(panel.getByRole('link', { name: mn.finance.actions.print })).toHaveAttribute(
-      'href',
-      '/finance/invoices/11/print?format=a4',
-    );
+    // No invoice to print (owner 2026-11-27).
+    expect(panel.queryByRole('link', { name: mn.finance.actions.print })).toBeNull();
     await user.click(panel.getByRole('button', { name: mn.finance.actions.other }));
     await user.click(await screen.findByRole('menuitem', { name: mn.finance.actions.void }));
     const dialog = within(
@@ -130,7 +130,7 @@ describe('finance pages (ADR-0060 #11)', () => {
     expect(await screen.findByText(mn.finance.invoices.voided)).toBeInTheDocument();
   });
 
-  it('records a customer payment allocated oldest due first and opens the voucher', async () => {
+  it('records a customer payment without invoices and opens the voucher', async () => {
     const user = userEvent.setup();
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...routes(),
@@ -143,12 +143,8 @@ describe('finance pages (ADR-0060 #11)', () => {
     await user.type(dialog.getByLabelText(mn.finance.payments.dialog.customer), 'Номин');
     await user.click(await screen.findByRole('option', { name: /Номин дэлгүүр/ }));
     await user.type(dialog.getByLabelText(mn.finance.payments.dialog.amount), '50000');
-    // The open invoice is settled first; the preview shows the whole 50,000₮ on it.
-    const invoiceRow = await dialog.findByRole('row', { name: /Н-20261016-0001/ });
-    expect(within(invoiceRow).getAllByText('50,000₮').length).toBeGreaterThan(0);
-    expect(
-      dialog.getByText(mn.finance.payments.dialog.allocated.replace('{{amount}}', '50,000')),
-    ).toBeInTheDocument();
+    // No invoices to allocate to: the server settles the oldest debt first (owner 2026-11-27).
+    expect(dialog.queryByRole('row', { name: /Н-20261016-0001/ })).toBeNull();
     await user.type(
       dialog.getByLabelText(mn.finance.payments.dialog.description),
       'Жолооч тушаасан',

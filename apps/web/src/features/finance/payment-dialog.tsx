@@ -1,7 +1,7 @@
-import { allocateFifo, PAYMENT_KINDS, type PaymentKind } from '@tugeel/shared/finance';
+import { PAYMENT_KINDS, type PaymentKind } from '@tugeel/shared/finance';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { type FormEvent, useEffect, useMemo, useState, useRef } from 'react';
+import { type FormEvent, useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DialogFormFooter, FormField } from '@/components/form';
 import { NativeSelect } from '@/components/native-select';
@@ -16,39 +16,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useUsers } from '@/features/identity/api';
 import type { PickedCustomer } from '@/features/partners/customer-picker';
 import { CustomerSelect } from '@/features/partners/party-select';
-import { formatMnt, formatTugrik } from '@/lib/money';
+import { formatTugrik } from '@/lib/money';
 import { toast } from '@/lib/toast';
 import { useAction } from '@/lib/use-action';
 import { randomUuid } from '@/lib/uuid';
-import { useFinanceMutations, useGlAccounts, useInvoices, useMoneyAccounts } from './api';
+import { useFinanceMutations, useGlAccounts, useMoneyAccounts } from './api';
 import { DateInput } from '@/components/date-input';
 import { accountOption } from './account-option';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const isKind = (value: string): value is PaymentKind =>
   PAYMENT_KINDS.some((kind) => kind === value);
-
-/**
- * The open invoices' box: one height from the first moment, as tall as the window leaves it —
- * three rows on a 600px window, six where there is room — and it scrolls inside itself. The
- * rest of a customer's payment in three columns is 24.5rem tall and the dialog may take the
- * window less 2rem: 26.75rem are kept for them.
- */
-const ALLOCATIONS_BOX =
-  'h-[clamp(7.5rem,calc(100svh-26.75rem),15rem)] overflow-y-auto rounded-lg border border-border';
 
 /**
  * Two columns from 36rem, three at the dialog's whole width (53.5rem; one rem less would break
@@ -59,14 +40,13 @@ const FIELDS =
   'grid gap-x-4 gap-y-3.5 *:min-w-0 @xl:grid-cols-2 @[53rem]:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,0.9fr)]';
 
 /**
- * «Төлбөр бүртгэх» (ADR-0060 #5): a customer's payment settled oldest due first or as the
- * accountant allocates it (the rest an advance), a refund, another income or an expense against
- * its account; into a cash box or a bank account, on a date, with the driver who handed it in.
+ * «Төлбөр бүртгэх» (ADR-0060 #5): a customer's payment, which the server settles oldest first
+ * and which lowers the customer's balance (no invoices on screen, owner 2026-11-27), a refund,
+ * another income or an expense against its account; into a cash box or a bank account, on a date, with the driver who handed it in.
  *
  * The form lays itself out by its own width (three columns in the whole dialog, two on a tablet)
- * and a customer's payment keeps one height while it is filled (ADR-0201): the open invoices
- * have their box before a customer is chosen, the account's balance stands on its label's line,
- * what is allocated in the footer. So it fits a laptop's and a till PC's height without scrolling.
+ * and keeps one height while it is filled (ADR-0201): the account's balance stands on its
+ * label's line. So it fits a laptop's and a till PC's height without scrolling.
  */
 export function PaymentDialog({
   open,
@@ -119,8 +99,6 @@ function PaymentForm({
   const [reference, setReference] = useState('');
   const [counterparty, setCounterparty] = useState('');
   const [collectedBy, setCollectedBy] = useState<number | null>(null);
-  const [manual, setManual] = useState(false);
-  const [chosen, setChosen] = useState<Record<number, string>>({});
   const [checked, setChecked] = useState(false);
 
   const activeAccounts = (moneyAccounts.data ?? []).filter(
@@ -130,32 +108,7 @@ function PaymentForm({
     if (moneyAccountId === null && activeAccounts[0]) setMoneyAccountId(activeAccounts[0].id);
   }, [activeAccounts, moneyAccountId]);
   const customerKind = kind === 'CUSTOMER_PAYMENT' || kind === 'CUSTOMER_REFUND';
-  const allocating = kind === 'CUSTOMER_PAYMENT' && customer !== null;
-  const invoices = useInvoices(
-    { customerId: customer?.id, status: 'ISSUED' },
-    { enabled: allocating },
-  );
-  const open = useMemo(
-    () =>
-      (invoices.data?.pages.flatMap((page) => page.data) ?? []).filter((invoice) =>
-        new Decimal(invoice.openAmount).gt(0),
-      ),
-    [invoices.data],
-  );
   const amountValue = MONEY.test(amount) ? new Decimal(amount) : null;
-  // Oldest due first unless the accountant allocates by hand.
-  const fifo = amountValue ? allocateFifo(amountValue, open) : [];
-  const allocations = manual
-    ? open.flatMap((invoice) => {
-        const typed = chosen[invoice.id] ?? '';
-        if (!typed) return [];
-        const value = MONEY.test(typed) ? new Decimal(typed) : null;
-        return value && value.gt(0) ? [{ invoiceId: invoice.id, amount: value }] : [];
-      })
-    : fifo;
-  const allocated = allocations.reduce((sum, entry) => sum.plus(entry.amount), new Decimal(0));
-  const remainder = amountValue ? amountValue.minus(allocated) : null;
-  const overAllocated = remainder !== null && remainder.lt(0);
   const accountOptions = (glAccounts.data ?? []).filter((account) => account.status === 'ACTIVE');
   const moneyAccount = activeAccounts.find((account) => account.id === moneyAccountId);
 
@@ -171,8 +124,7 @@ function PaymentForm({
       !amountValue.gt(0) ||
       moneyAccountId === null ||
       (customerKind && customer === null) ||
-      (!customerKind && glAccountId === null) ||
-      overAllocated
+      (!customerKind && glAccountId === null)
     ) {
       return;
     }
@@ -190,13 +142,9 @@ function PaymentForm({
           reference: reference.trim() || null,
           counterpartyName: counterparty.trim() || null,
           collectedBy,
-          allocations:
-            kind === 'CUSTOMER_PAYMENT' && manual
-              ? allocations.map((entry) => ({
-                  invoiceId: entry.invoiceId,
-                  amount: entry.amount.toFixed(),
-                }))
-              : null,
+          // The server settles a customer's payment oldest first (owner 2026-11-27: no
+          // invoices on screen); what is left over stays on the customer's balance.
+          allocations: null,
         },
       });
       toast.success(t('finance.payments.recorded', { number: payment.number }));
@@ -209,8 +157,6 @@ function PaymentForm({
         setDescription('');
         setReference('');
         setCounterparty('');
-        setManual(false);
-        setChosen({});
         return;
       }
       // The page replaces the address with the voucher, which closes the dialog.
@@ -335,78 +281,6 @@ function PaymentForm({
               />
             </FormField>
           </div>
-          {kind === 'CUSTOMER_PAYMENT' ? (
-            <section className="col-span-full flex flex-col gap-2">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <h3 className="text-sm font-semibold">
-                  {t('finance.payments.dialog.allocations')}
-                </h3>
-                <div className="flex items-center gap-2 text-sm">
-                  <Switch
-                    checked={manual}
-                    disabled={!allocating}
-                    onCheckedChange={setManual}
-                    id="payment-manual"
-                  />
-                  <Label htmlFor="payment-manual">{t('finance.payments.dialog.manual')}</Label>
-                </div>
-              </div>
-              <div className={ALLOCATIONS_BOX}>
-                {!allocating ? (
-                  <p className="p-3 text-[0.8125rem] text-muted-foreground">
-                    {t('finance.payments.dialog.allocationsHint')}
-                  </p>
-                ) : open.length === 0 ? (
-                  <p className="p-3 text-[0.8125rem] text-muted-foreground">
-                    {t('finance.payments.dialog.noOpenInvoices')}
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t('finance.fields.number')}</TableHead>
-                        <TableHead>{t('finance.fields.dueDate')}</TableHead>
-                        <TableHead className="text-right">{t('finance.fields.open')}</TableHead>
-                        <TableHead className="text-right">
-                          {t('finance.payments.dialog.allocate')}
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {open.map((invoice) => {
-                        const auto = fifo.find((entry) => entry.invoiceId === invoice.id);
-                        return (
-                          <TableRow key={invoice.id}>
-                            <TableCell className="font-mono">{invoice.number}</TableCell>
-                            <TableCell className="font-mono">{invoice.dueDate}</TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatTugrik(invoice.openAmount)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {manual ? (
-                                <MoneyInput
-                                  aria-label={`${t('finance.payments.dialog.allocate')}: ${invoice.number}`}
-                                  className="ml-auto w-32"
-                                  value={chosen[invoice.id] ?? ''}
-                                  onValueChange={(raw) =>
-                                    setChosen((previous) => ({ ...previous, [invoice.id]: raw }))
-                                  }
-                                />
-                              ) : (
-                                <span className="font-mono">
-                                  {auto ? formatTugrik(auto.amount.toFixed(2)) : '—'}
-                                </span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </section>
-          ) : null}
           <FormField label={t('finance.payments.dialog.reference')} htmlFor="payment-reference">
             <Input
               id="payment-reference"
@@ -468,25 +342,6 @@ function PaymentForm({
           onCancel={onClose}
           submitLabel={t('finance.payments.dialog.submit')}
           {...(preset ? {} : { onSaveAndNew: () => save(true) })}
-          start={
-            allocating ? (
-              <div className="grid gap-0.5 text-[0.8125rem] leading-snug">
-                <p>
-                  {t('finance.payments.dialog.allocated', {
-                    amount: formatMnt(allocated.toFixed(2)),
-                  })}
-                  {remainder !== null && remainder.gt(0)
-                    ? ` · ${t('finance.payments.dialog.remainder', { amount: formatMnt(remainder.toFixed(2)) })}`
-                    : ''}
-                </p>
-                {overAllocated ? (
-                  <p role="alert" className="text-destructive">
-                    {t('finance.payments.dialog.overAllocated')}
-                  </p>
-                ) : null}
-              </div>
-            ) : undefined
-          }
         />
       </form>
     </DialogContent>
