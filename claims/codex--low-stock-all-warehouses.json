@@ -1,0 +1,12 @@
+{
+  "who": "codex",
+  "slug": "low-stock-all-warehouses",
+  "paths": [
+    "apps/web/src/features/inventory/api.ts",
+    "apps/web/src/features/inventory/low-stock-page.test.tsx",
+    "apps/web/src/features/inventory/low-stock-page.tsx",
+    "apps/web/src/features/news/content/2026-11-27-low-stock-all-warehouses.md"
+  ],
+  "what": "Show all readable warehouses when low-stock warehouse filter is empty",
+  "since": "2026-11-27T14:14:19.624Z"
+}
