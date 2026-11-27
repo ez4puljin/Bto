@@ -4,8 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { useApiClient } from '@/app/api-client-context';
 import { SegmentedControl } from '@/components/list';
+import { NativeSelect } from '@/components/native-select';
 import { ProblemAlert } from '@/components/problem-alert';
 import { Button } from '@/components/ui/button';
+import { useWarehouses } from '@/features/identity/api';
 import { formatCount, formatQty, formatTugrik } from '@/lib/money';
 import { problemFromError, unwrap } from '@/lib/problem';
 import { cn } from '@/lib/utils';
@@ -43,14 +45,16 @@ const TYPE: Record<LabelSheet, { name: string; price: string; small: string; pad
   },
 };
 
-function usePriceLabels(productIds: readonly number[]) {
+function usePriceLabels(productIds: readonly number[], warehouseId: number | null) {
   const api = useApiClient();
   return useQuery({
-    queryKey: ['pricing', 'labels', productIds],
+    queryKey: ['pricing', 'labels', productIds, warehouseId],
     enabled: productIds.length > 0,
     queryFn: async () =>
       unwrap(
-        await api.POST('/api/v1/product-prices/labels', { body: { productIds: [...productIds] } }),
+        await api.POST('/api/v1/product-prices/labels', {
+          body: { productIds: [...productIds], ...(warehouseId === null ? {} : { warehouseId }) },
+        }),
       ),
   });
 }
@@ -70,7 +74,14 @@ export function PriceLabelsPage() {
   const [sheet, setSheet] = useState<LabelSheet>(
     () => parseLabelSheet(search.get('sheet')) ?? savedLabelSheet(),
   );
-  const labels = usePriceLabels(ids);
+  const warehouses = useWarehouses();
+  const warehouseParam = search.get('warehouseId');
+  const warehouseId =
+    warehouseParam && /^\d{1,15}$/.test(warehouseParam) && Number(warehouseParam) > 0
+      ? Number(warehouseParam)
+      : null;
+  const warehouse = warehouses.data?.find((row) => row.id === warehouseId);
+  const labels = usePriceLabels(ids, warehouseId);
   const spec = LABEL_SHEET_SPECS[sheet];
   const type = TYPE[sheet];
   const pages = useMemo(
@@ -99,6 +110,32 @@ export function PriceLabelsPage() {
     <div className="p-6 text-foreground print:p-0">
       <style>{spec.page}</style>
       <div className="mx-auto mb-4 flex max-w-4xl flex-wrap items-center gap-2 print:hidden">
+        <NativeSelect
+          aria-label={t('pricing.settings.labelLocation')}
+          className="w-auto min-w-48"
+          value={warehouseId === null ? '' : String(warehouseId)}
+          onChange={(event) => {
+            const value = event.target.value;
+            setSearch(
+              (current) => {
+                const next = new URLSearchParams(current);
+                if (value) next.set('warehouseId', value);
+                else next.delete('warehouseId');
+                return next;
+              },
+              { replace: true },
+            );
+          }}
+        >
+          <option value="">{t('pricing.settings.labelLegacy')}</option>
+          {(warehouses.data ?? [])
+            .filter((row) => row.status === 'ACTIVE' && row.kind !== 'TRANSIT')
+            .map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.name}
+              </option>
+            ))}
+        </NativeSelect>
         <SegmentedControl
           options={LABEL_SHEETS}
           value={sheet}
@@ -127,6 +164,11 @@ export function PriceLabelsPage() {
           </p>
         ) : null}
         <p className="text-[0.8125rem] text-muted-foreground">{t('pricing.labels.hint')}</p>
+        <p className="text-[0.8125rem] text-muted-foreground">
+          {warehouse
+            ? `${warehouse.name} · ${t('pricing.settings.labelLocationHint')}`
+            : t('pricing.settings.labelLegacy')}
+        </p>
       </div>
       {pages.map((page, pageIndex) => (
         <div

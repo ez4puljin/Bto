@@ -67,10 +67,10 @@ import {
 import { PageQueryDto } from '../../../common/pagination/page';
 import { VAT_TYPES, type VatType } from '../../catalog';
 import { EbarimtReceiptDto } from '../../ebarimt';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CODE = /^[0-9A-Za-z][0-9A-Za-z._-]{0,15}$/;
 /** A group's code: the core's code shape (ADR-0239). */
 const GROUP_CODE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
@@ -150,8 +150,8 @@ export class VoidRequestDto {
 
 @ApiSchema({ name: 'DateRangeQuery' })
 export class DateRangeQueryDto extends PageQueryDto {
-  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @IsDateOnly() to?: string;
 }
 
 // ---------------------------------------------------------------- accounts
@@ -575,7 +575,7 @@ export class JournalLineRequestDto {
 
 @ApiSchema({ name: 'JournalEntryRequest' })
 export class JournalEntryRequestDto {
-  @ApiProperty({ example: '2026-10-16' }) @Matches(DATE) entryDate: string;
+  @ApiProperty({ example: '2026-10-16' }) @IsDateOnly() entryDate: string;
   @ApiProperty({ maxLength: FINANCE_LIMITS.maxDescription })
   @Transform(trimmed)
   @IsString()
@@ -609,7 +609,7 @@ export class AccountTransactionRequestDto {
   @ApiProperty({ enum: ACCOUNT_JOURNALS, enumName: 'AccountJournal' })
   @IsIn(ACCOUNT_JOURNALS)
   journal: AccountJournal;
-  @ApiProperty({ example: '2026-11-05' }) @Matches(DATE) entryDate: string;
+  @ApiProperty({ example: '2026-11-05' }) @IsDateOnly() entryDate: string;
   @ApiProperty({ maxLength: FINANCE_LIMITS.maxDescription })
   @Transform(trimmed)
   @IsString()
@@ -935,7 +935,7 @@ export class CreditNoteRequestDto {
   reason: string;
   @ApiPropertyOptional({ example: '2026-10-17', description: 'Default today' })
   @IsOptional()
-  @Matches(DATE)
+  @IsDateOnly()
   noteDate?: string | null;
   @ApiPropertyOptional({
     type: Number,
@@ -1050,7 +1050,7 @@ export class PaymentRequestDto {
   @Min(1)
   glAccountId?: number | null;
   @ApiProperty({ example: '150000' }) @IsString() @Matches(MONEY) amount: string;
-  @ApiProperty({ example: '2026-10-16' }) @Matches(DATE) paidOn: string;
+  @ApiProperty({ example: '2026-10-16' }) @IsDateOnly() paidOn: string;
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: FINANCE_LIMITS.maxDescription })
   @IsOptional()
   @Transform(trimmed)
@@ -1225,9 +1225,9 @@ export class CustomerBalanceDto {
 
 @ApiSchema({ name: 'CustomerStatementTotalsQuery' })
 export class CustomerStatementTotalsQueryDto {
-  @ApiProperty({ example: '2026-10-21' }) @Matches(DATE) from: string;
+  @ApiProperty({ example: '2026-10-21' }) @IsDateOnly() from: string;
   @ApiProperty({ example: '2026-11-20', description: 'Cut to today when later' })
-  @Matches(DATE)
+  @IsDateOnly()
   to: string;
 }
 
@@ -1360,7 +1360,7 @@ export class AllocationRequestDto {
   supplierId?: number | null;
   @ApiPropertyOptional({ type: String, nullable: true, example: '2026-11-03' })
   @IsOptional()
-  @Matches(DATE)
+  @IsDateOnly()
   date?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: FINANCE_LIMITS.maxDescription })
   @IsOptional()
@@ -1574,8 +1574,8 @@ export class FinancePeriodReopenRequestDto {
 
 @ApiSchema({ name: 'TrialBalanceQuery' })
 export class TrialBalanceQueryDto {
-  @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-10-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-10-31' }) @IsDateOnly() to: string;
   @ApiPropertyOptional({ description: 'Also accounts without lines' })
   @IsOptional()
   @Transform(queryBoolean)
@@ -1706,7 +1706,7 @@ export class OpeningCheckQueryDto {
     description: "default: the live opening's date, else the previous month's last day",
   })
   @IsOptional()
-  @Matches(DATE)
+  @IsDateOnly()
   date?: string;
 }
 
@@ -1766,8 +1766,8 @@ export class CustomerVatTotalsDto {
 
 @ApiSchema({ name: 'CustomerVatTotalsQuery' })
 export class CustomerVatTotalsQueryDto {
-  @ApiPropertyOptional({ example: '2026-11-01' }) @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional({ example: '2026-11-30' }) @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional({ example: '2026-11-01' }) @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional({ example: '2026-11-30' }) @IsOptional() @IsDateOnly() to?: string;
 }
 
 @ApiSchema({ name: 'CounterAccountRef' })

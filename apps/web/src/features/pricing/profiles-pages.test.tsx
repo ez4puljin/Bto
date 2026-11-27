@@ -81,28 +81,91 @@ const calls = (fetchMock: ReturnType<typeof signedIn>, method: string, path: str
   fetchMock.mock.calls
     .map(([request]) => request)
     .filter((request) => request.method === method && new URL(request.url).pathname === path);
+const profilesReady = async (router: ReturnType<typeof renderApp>['router']) => {
+  await waitFor(() => expect(router.state.location.pathname).toBe('/pricing/settings'));
+  await screen.findByText(mn.pricing.settings.title, { selector: 'h1' });
+};
 const rowOf = async (name: string) => {
-  const row = (await screen.findByRole('link', { name })).closest('tr');
+  const link = await screen.findByText(name, { selector: 'a' });
+  const row = link.closest('tr');
   if (!row) throw new Error(`no row: ${name}`);
-  return within(row);
+  const contents = within(row);
+  expect(contents.getByRole('link', { name })).toBe(link);
+  return contents;
 };
 
 describe('price profiles menu', () => {
-  it('opens the pricing group with the profiles, then the discounts and the calculator', async () => {
+  it('offers one settings entry, then discounts and the calculator to a reader', async () => {
     renderApp('/system/status', signedIn(WORKER_ME));
-    const links = within(await findSidebar())
-      .getAllByRole('link')
-      .map((link) => link.textContent);
-    const at = links.indexOf(mn.nav.priceProfiles);
+    const sidebar = within(await findSidebar());
+    const links = sidebar.getAllByRole('link').map((link) => link.textContent);
+    const at = links.indexOf(mn.nav.pricingSettings);
     expect(links.slice(at, at + 3)).toEqual([
-      mn.nav.priceProfiles,
+      mn.nav.pricingSettings,
       mn.nav.discounts,
       mn.nav.priceQuote,
     ]);
+    expect(links.filter((label) => label === mn.nav.pricingSettings)).toHaveLength(1);
+    expect(sidebar.getByRole('link', { name: mn.nav.pricingSettings })).toHaveAttribute(
+      'href',
+      '/pricing/settings',
+    );
+    expect(sidebar.getAllByRole('link').map((link) => link.getAttribute('href'))).not.toContain(
+      '/pricing/profiles',
+    );
+  });
+
+  it('offers the same single settings entry to an administrator', async () => {
+    renderApp('/system/status', signedIn(ADMIN_ME));
+    const sidebar = within(await findSidebar());
+    expect(sidebar.getAllByRole('link', { name: mn.nav.pricingSettings })).toHaveLength(1);
+    expect(sidebar.getByRole('link', { name: mn.nav.pricingSettings })).toHaveAttribute(
+      'href',
+      '/pricing/settings',
+    );
+    expect(sidebar.getAllByRole('link').map((link) => link.getAttribute('href'))).not.toContain(
+      '/pricing/profiles',
+    );
   });
 });
 
 describe('price profiles list', () => {
+  it('preserves a bookmarked profile search in the shared hub and keeps the tab when clearing filters', async () => {
+    const fetchMock = signedIn(WORKER_ME, {
+      'GET /api/v1/price-profiles': () => list([OLD]),
+    });
+    const { router } = renderApp(
+      '/pricing/profiles?q=old&status=ARCHIVED&rounding=WHOLE',
+      fetchMock,
+    );
+    await profilesReady(router);
+    const user = userEvent.setup();
+    await rowOf(OLD.name);
+    expect(router.state.location.pathname).toBe('/pricing/settings');
+    const params = new URLSearchParams(router.state.location.search);
+    expect(Object.fromEntries(params)).toEqual({
+      q: 'old',
+      status: 'ARCHIVED',
+      rounding: 'WHOLE',
+      tab: 'profiles',
+    });
+    expect(screen.getAllByRole('heading', { name: mn.pricing.settings.title })).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('tab', { name: mn.pricing.settings.tabs.profiles })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const panel = within(
+      screen.getByRole('complementary', { name: mn.pricing.profiles.panel.label }),
+    );
+    await user.click(panel.getByRole('button', { name: mn.pricing.profiles.panel.clear }));
+    await waitFor(() => expect(router.state.location.search).toBe('?tab=profiles'));
+    expect(screen.getByRole('tab', { name: mn.pricing.settings.tabs.profiles })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
   it("shows each profile's values today, its products and who made it, and filters", async () => {
     const fetchMock = signedIn(WORKER_ME, {
       'GET /api/v1/price-profiles': (request) =>
@@ -111,6 +174,7 @@ describe('price profiles list', () => {
           : list([DRINKS, FOOD, LATER]),
     });
     const { router } = renderApp('/pricing/profiles', fetchMock);
+    await profilesReady(router);
     const user = userEvent.setup();
     const drinks = await rowOf('Жишээ: Ундаа');
     expect(drinks.getByRole('link', { name: '12' })).toHaveAttribute(
@@ -145,7 +209,7 @@ describe('price profiles list', () => {
     );
     await user.click(panel.getByRole('button', { name: mn.pricing.profiles.statuses.ARCHIVED }));
     expect(await screen.findByRole('link', { name: 'Хуучин' })).toBeInTheDocument();
-    expect(router.state.location.search).toBe('?status=ARCHIVED');
+    expect(router.state.location.search).toBe('?tab=profiles&status=ARCHIVED');
     await user.click(panel.getByRole('button', { name: mn.pricing.roundings.WHOLE }));
     await waitFor(() => {
       const last = calls(fetchMock, 'GET', '/api/v1/price-profiles').at(-1);
@@ -164,6 +228,7 @@ describe('price profiles list', () => {
       'DELETE /api/v1/price-profiles/7': () => new Response(null, { status: 204 }),
     });
     const { router } = renderApp('/pricing/profiles', fetchMock);
+    await profilesReady(router);
     const user = userEvent.setup();
     const drinks = await rowOf('Жишээ: Ундаа');
     await user.click(drinks.getByRole('button', { name: mn.pricing.profiles.archive }));
@@ -205,6 +270,7 @@ describe('price profiles list', () => {
       'GET /api/v1/price-profiles/4': () => json(DRINKS),
     });
     const { router } = renderApp('/pricing/profiles', fetchMock);
+    await profilesReady(router);
     const user = userEvent.setup();
     expect(await screen.findByText(mn.pricing.profiles.empty)).toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: mn.pricing.profiles.new }));
@@ -230,7 +296,11 @@ describe('price profiles list', () => {
     await user.type(screen.getByLabelText(mn.pricing.profiles.fields.retail), '30');
     await user.click(screen.getByRole('switch', { name: mn.pricing.profiles.fields.bulk }));
     // The example keeps its rows while the bulk price is still being typed.
-    const typing = within(screen.getByRole('region', { name: 'Жишээ: агуулахын үнэ 1,000₮' }));
+    const typing = within(
+      screen.getByRole('region', {
+        name: mn.pricing.profiles.example.replace('{{price}}', '1,000'),
+      }),
+    );
     expect(typing.getByText('1,150₮')).toBeInTheDocument();
     expect(typing.queryByText('Супермаркет бөөний (24+)')).toBeNull();
     await user.type(screen.getByLabelText(mn.pricing.profiles.fields.bulkQty), '24');
@@ -244,7 +314,11 @@ describe('price profiles list', () => {
     // 1,000₮: loose 1,150₮, supermarket 1,300₮, from 24 pieces 1,200₮.
     await user.clear(bulkPct);
     await user.type(bulkPct, '20');
-    const example = within(screen.getByRole('region', { name: 'Жишээ: агуулахын үнэ 1,000₮' }));
+    const example = within(
+      screen.getByRole('region', {
+        name: mn.pricing.profiles.example.replace('{{price}}', '1,000'),
+      }),
+    );
     for (const text of ['1,000₮', '1,150₮', '1,300₮', '1,200₮']) {
       expect(example.getByText(text)).toBeInTheDocument();
     }
@@ -274,6 +348,33 @@ describe('price profiles list', () => {
 });
 
 describe('price profile page', () => {
+  it('keeps an unsaved profile draft when cancelling navigation and discards only when confirmed', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      'GET /api/v1/price-profiles/4': () => json(DRINKS),
+    });
+    const { router } = renderApp('/pricing/profiles/4/edit', fetchMock);
+    const user = userEvent.setup();
+    const name = await screen.findByLabelText(mn.pricing.profiles.fields.name);
+    await user.clear(name);
+    await user.type(name, 'Хадгалаагүй загвар');
+    await user.click(screen.getByRole('button', { name: mn.common.cancel }));
+    const asked = within(
+      await screen.findByRole('dialog', { name: mn.pricing.settings.unsavedTitle }),
+    );
+    await user.click(asked.getByRole('button', { name: mn.common.cancel }));
+    expect(router.state.location.pathname).toBe('/pricing/profiles/4/edit');
+    expect(screen.getByLabelText(mn.pricing.profiles.fields.name)).toHaveValue(
+      'Хадгалаагүй загвар',
+    );
+    await user.click(screen.getByRole('button', { name: mn.common.cancel }));
+    const again = within(
+      await screen.findByRole('dialog', { name: mn.pricing.settings.unsavedTitle }),
+    );
+    await user.click(again.getByRole('button', { name: mn.common.discard.confirm }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/pricing/profiles/4'));
+    expect(calls(fetchMock, 'PUT', '/api/v1/price-profiles/4')).toHaveLength(0);
+  });
+
   it("works out today's values on an example and edits its name and values from a day", async () => {
     const planned = profile({
       scheduled: [version(41, '2099-01-01', null, { looseMarkupPct: '17.00' })],

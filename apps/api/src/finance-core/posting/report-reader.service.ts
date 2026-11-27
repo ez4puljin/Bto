@@ -1,3 +1,4 @@
+import { isIsoDate } from '@tugeel/shared/time';
 import { Inject, Injectable } from '@nestjs/common';
 import { Decimal } from '@tugeel/shared/money';
 import { type SQL, sql } from 'drizzle-orm';
@@ -10,7 +11,6 @@ import { monthOf } from '../ledger/periods';
 
 type Row = Record<string, unknown>;
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
 const str = (value: unknown): string =>
   typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
@@ -233,8 +233,8 @@ export class FinReports {
     query: { company: string; from: string; to: string; all?: boolean },
     executor: FinExecutor = this.db,
   ): Promise<FinTrialBalance> {
-    if (!ISO_DATE.test(query.from)) throw invalid('from');
-    if (!ISO_DATE.test(query.to) || query.to < query.from) throw invalid('to');
+    if (!isIsoDate(query.from)) throw invalid('from');
+    if (!isIsoDate(query.to) || query.to < query.from) throw invalid('to');
     const scope = await this.scope(executor, ctx, query.company);
     const result = await executor.execute<Row>(sql`
       SELECT a.id, a.code, a.name, a.kind, a.status, g.code AS group_code, g.name AS group_name,
@@ -295,8 +295,8 @@ export class FinReports {
     query: { company: string; from: string; to: string; closingDocTypes: readonly string[] },
     executor: FinExecutor = this.db,
   ): Promise<FinStatementBalance[]> {
-    if (!ISO_DATE.test(query.from)) throw invalid('from');
-    if (!ISO_DATE.test(query.to) || query.to < query.from) throw invalid('to');
+    if (!isIsoDate(query.from)) throw invalid('from');
+    if (!isIsoDate(query.to) || query.to < query.from) throw invalid('to');
     const scope = await this.scope(executor, ctx, query.company);
     const types =
       query.closingDocTypes.length === 0
@@ -351,7 +351,7 @@ export class FinReports {
     query: { company: string; date: string },
     executor: FinExecutor = this.db,
   ): Promise<FinAccountPartyBalance[]> {
-    if (!ISO_DATE.test(query.date)) throw invalid('date');
+    if (!isIsoDate(query.date)) throw invalid('date');
     const scope = await this.scope(executor, ctx, query.company);
     const result = await executor.execute<Row>(sql`
       SELECT a.id, a.code, a.name, a.kind, l.party_id, p.name AS party_name,
@@ -474,7 +474,7 @@ export class FinReports {
     query: { company: string; asOf: string },
     executor: FinExecutor = this.db,
   ): Promise<FinResultBalance[]> {
-    if (!ISO_DATE.test(query.asOf)) throw invalid('asOf');
+    if (!isIsoDate(query.asOf)) throw invalid('asOf');
     const scope = await this.scope(executor, ctx, query.company);
     const result = await executor.execute<Row>(sql`
       SELECT a.id, a.code, a.kind, sum(l.debit - l.credit)::text AS balance
@@ -670,8 +670,8 @@ function invalid(path: string): FinError {
 }
 
 function checkRange(from: string, to: string): void {
-  if (!ISO_DATE.test(from)) throw invalid('from');
-  if (!ISO_DATE.test(to) || to < from) throw invalid('to');
+  if (!isIsoDate(from)) throw invalid('from');
+  if (!isIsoDate(to) || to < from) throw invalid('to');
 }
 
 /** A party id as the API carries it (a positive whole number in text). */

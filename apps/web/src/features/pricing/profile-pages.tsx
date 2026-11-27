@@ -2,7 +2,7 @@ import { PRICE_ROUNDINGS } from '@tugeel/shared/pricing';
 import { Archive, ArchiveRestore, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FilterChoices, FilterSection } from '@/components/filter-panel';
@@ -86,11 +86,11 @@ const inList = <T extends string>(options: readonly T[], value: string | null): 
   options.find((option) => option === value);
 
 /**
- * «Үнэ» → «Үнийн тохиргоо» (ADR-0048 #3, ADR-0160): filters on the left and the profiles products
+ * The unified price settings' profile tab (ADR-0048 #3, ADR-0160): profiles and their filters,
  * take their prices from, with the values in force today, how many products use each, who made it
  * and when, and its row's edit, archive and delete. Every user reads them; pricing.manage changes.
  */
-export function PriceProfilesPage() {
+export function PriceProfilesPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
   const canManage = useHasPermission('pricing.manage');
   const [params, setParams] = useSearchParams();
@@ -122,7 +122,7 @@ export function PriceProfilesPage() {
   const filtered = Object.keys(filter).length > 0;
   const clear = () => {
     setSearch('');
-    setParams({}, { replace: true });
+    setParams(embedded ? { tab: 'profiles' } : {}, { replace: true });
   };
   // The same filters stand beside the list on a laptop and in the sheet below it (ADR-0201).
   const head = (className?: string) => (
@@ -171,22 +171,28 @@ export function PriceProfilesPage() {
     </>
   );
 
+  const actions = canManage ? (
+    <Button asChild>
+      <Link to="/pricing/profiles/new">
+        <Plus />
+        {t('pricing.profiles.new')}
+      </Link>
+    </Button>
+  ) : null;
   return (
     <div>
-      <PageHeader
-        title={t('pricing.profiles.title')}
-        description={t('pricing.profiles.intro')}
-        actions={
-          canManage ? (
-            <Button asChild>
-              <Link to="/pricing/profiles/new">
-                <Plus />
-                {t('pricing.profiles.new')}
-              </Link>
-            </Button>
-          ) : null
-        }
-      />
+      {embedded ? (
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <p className="max-w-3xl text-sm text-muted-foreground">{t('pricing.profiles.intro')}</p>
+          {actions}
+        </div>
+      ) : (
+        <PageHeader
+          title={t('pricing.profiles.title')}
+          description={t('pricing.profiles.intro')}
+          actions={actions}
+        />
+      )}
       <div className="flex items-start gap-3">
         <FilterRail label={t('pricing.profiles.panel.label')}>
           {head()}
@@ -229,6 +235,14 @@ export function PriceProfilesPage() {
       </div>
     </div>
   );
+}
+
+/** Existing profile-list bookmarks keep their filters and now open the shared settings hub. */
+export function PriceProfilesRedirect() {
+  const [params] = useSearchParams();
+  const next = new URLSearchParams(params);
+  next.set('tab', 'profiles');
+  return <Navigate to={{ pathname: '/pricing/settings', search: `?${next.toString()}` }} replace />;
 }
 
 type RowAct = { kind: 'archive' | 'restore' | 'delete'; profile: PriceProfile };
@@ -493,6 +507,9 @@ function ProfileDetail({ profile }: { profile: PriceProfile }) {
     <div className="space-y-4">
       <PageHeader
         title={profile.name}
+        crumbs={[
+          { label: t('pricing.settings.tabs.profiles'), to: '/pricing/settings?tab=profiles' },
+        ]}
         meta={
           <>
             <Badge variant={STATUS_VARIANT[profile.status]}>

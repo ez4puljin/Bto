@@ -652,13 +652,16 @@ describe('the line panel (ADR-0099 #3)', () => {
       'GET /api/v1/barcodes/4006381333931': () => json(COLA_BOX),
     });
     renderApp('/inventory/receipts/5', fetchMock);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: 80 });
     await findPanel();
     await user.type(productSearch(), '999{Enter}');
     expect(
       await panel().findByText(mn.inventory.scanNotFound.replace('{{code}}', '999')),
     ).toBeInTheDocument();
-    await user.type(productSearch(), '4006381333931{Enter}');
+    // Manual entry must not resemble the separately tested scanner's rapid key stream.
+    await user.type(productSearch(), '4006381333931');
+    expect(productSearch()).toHaveValue('4006381333931');
+    await user.keyboard('{Enter}');
     expect(await panel().findByText(COLA.name)).toBeInTheDocument();
     expect(calls(fetchMock, 'GET', '/api/v1/barcodes/4006381333931')).toHaveLength(1);
   });
@@ -1260,7 +1263,7 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     await user.click(card.getByRole('button', { name: discountsText.add }));
     await user.click(await screen.findByRole('menuitem', { name: discountsText.kinds.FREE }));
     const free = within(card.getByRole('region', { name: discountsText.freeTitle }));
-    // A product, its unit and the quantity: no prices.
+    // Free goods have no payable price; the invoice reference is optional.
     expect(free.queryByLabelText(form.unitPrice)).toBeNull();
     await user.click(free.getByRole('combobox', { name: mn.inventory.product }));
     await user.keyboard('Будаа');
@@ -1274,6 +1277,9 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
     const qty = free.getByLabelText(mn.inventory.qty);
     await waitFor(() => expect(qty).toHaveFocus());
     await user.keyboard('3{Enter}');
+    expect(free.getByLabelText(mn.pricing.settings.printedUnitPrice)).toHaveFocus();
+    expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(0);
+    await user.keyboard('{Enter}');
     await waitFor(() =>
       expect(calls(fetchMock, 'POST', '/api/v1/receipts/5/lines')).toHaveLength(1),
     );
@@ -1281,6 +1287,7 @@ describe('discounts and free goods of a draft (ADR-0103)', () => {
       productUnitId: 110,
       enteredQty: '3',
       freeGoods: true,
+      printedUnitPrice: null,
     });
     const freeList = within(await card.findByRole('region', { name: discountsText.freeList }));
     const row = within(freeList.getByRole('row', { name: /Будаа/ }));

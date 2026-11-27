@@ -46,8 +46,8 @@ import {
   type StockFilter,
 } from '../services/stock-report.service';
 import { AP_ENTRY_KINDS, type ApEntryKind } from '../services/supplier-report.service';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH = /^\d{4}-\d{2}$/;
 
 /** "true"/"false" query strings as booleans (other values fail @IsBoolean). */
@@ -259,8 +259,8 @@ export class AgingItemsDto {
 
 @ApiSchema({ name: 'SalesFilterQuery' })
 export class SalesFilterQueryDto {
-  @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-10-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-10-31' }) @IsDateOnly() to: string;
   @ApiPropertyOptional({ enum: SALES_SOURCES })
   @IsOptional()
   @IsIn(SALES_SOURCES)
@@ -406,8 +406,8 @@ export class StockReportDto {
 
 @ApiSchema({ name: 'SupplierReportQuery' })
 export class SupplierReportQueryDto {
-  @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-10-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-10-31' }) @IsDateOnly() to: string;
   @ApiPropertyOptional() @IsOptional() @Transform(trimmed) @IsString() @MaxLength(100) q?: string;
   @ApiPropertyOptional({
     description:
@@ -456,8 +456,8 @@ export class SupplierReportDto extends ReportRangeDto {
 
 @ApiSchema({ name: 'SupplierEntriesQuery' })
 export class SupplierEntriesQueryDto {
-  @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-10-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-10-31' }) @IsDateOnly() to: string;
   @ApiPropertyOptional({
     description:
       'ADR-0234: receipts before their discounts, the discounts apart (default false: after them)',

@@ -749,6 +749,9 @@ function ReceiptView({ detail, head }: { detail: ReceiptDetail; head: ReceiptHea
             cells={(line, name) => ({
               prices: (
                 <PriceCells
+                  referenceEditable={
+                    detail.costingStatus === 'PENDING' && line.printedUnitPrice == null
+                  }
                   name={name}
                   enteredQty={line.enteredQty}
                   entry={
@@ -780,6 +783,13 @@ function ReceiptView({ detail, head }: { detail: ReceiptDetail; head: ReceiptHea
           editable={changeable}
           tooLarge={detail.totals?.discountTooLarge}
           onChange={costs.changeDiscounts}
+          pending={costs.pending}
+          reference={{
+            value: (line) => costs.entry(line.id).printedUnitPrice ?? '',
+            editable: (line) =>
+              changeable && detail.costingStatus === 'PENDING' && line.printedUnitPrice == null,
+            onChange: (lineId, value) => costs.change(lineId, { printedUnitPrice: value }),
+          }}
         />
       ) : null}
       <StickyActions
@@ -1031,12 +1041,20 @@ function DraftEditor(props: {
                 body: {
                   enteredQty: line.enteredQty,
                   ...(line.price ? priceBody(line.price, entryOfLine(editing, false)) : {}),
+                  ...(line.printedUnitPrice === undefined
+                    ? {}
+                    : { printedUnitPrice: line.printedUnitPrice }),
                 },
               });
               setEditing(null);
               return;
             }
-            const prices = line.price ? priceBody(line.price, null) : {};
+            const prices = {
+              ...(line.price ? priceBody(line.price, null) : {}),
+              ...(line.printedUnitPrice === undefined
+                ? {}
+                : { printedUnitPrice: line.printedUnitPrice }),
+            };
             const id = draftId.current;
             if (id === null) {
               made = await createDraft({

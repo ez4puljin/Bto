@@ -31,11 +31,16 @@ export type MovementDocType = NonNullable<
 export type LocationRequest = Schemas['ProductLocationRequest'];
 export type ReceiptSummary = Schemas['ReceiptSummary'];
 export type ReceiptDetail = Schemas['ReceiptDetail'];
-export type ReceiptLine = Schemas['ReceiptLine'];
+export type ReceiptLine = Schemas['ReceiptLine'] & {
+  printedUnitPrice?: string | null;
+  printedPriceFactor?: string | null;
+};
 export type ReceiptCreate = Schemas['ReceiptCreateRequest'];
 export type ReceiptUpdate = Schemas['ReceiptUpdateRequest'];
 export type ReceiptLineRequest = Schemas['ReceiptLineRequest'];
-export type ReceiptLineUpdate = Schemas['ReceiptLineUpdateRequest'];
+export type ReceiptLineUpdate = Schemas['ReceiptLineUpdateRequest'] & {
+  printedUnitPrice?: string | null;
+};
 export type ReceiptCostRequest = Schemas['ReceiptCostRequest'];
 export type ReceiptCosting = Schemas['ReceiptCosting'];
 export type ReceiptCostingLine = Schemas['ReceiptCostingLine'];
@@ -534,7 +539,8 @@ export function useInventoryMutations() {
   const invalidate = (...keys: (readonly unknown[])[]) =>
     Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
   const binsChanged = () => invalidate(KEYS.bins, KEYS.locations);
-  const receiptsChanged = () => invalidate(KEYS.receipts, KEYS.stock, ATTENTION_KEY);
+  const receiptsChanged = () =>
+    invalidate(KEYS.receipts, KEYS.stock, ATTENTION_KEY, ['notifications', 'mine'], ['pricing']);
   /** A draft's new copy goes into the cache at once; lists and stock refresh behind it. */
   const receiptLinesChanged = async (receipt: ReceiptDetail) => {
     const key = [...KEYS.receipts, receipt.id];

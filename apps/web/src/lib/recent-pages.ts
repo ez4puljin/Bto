@@ -1,3 +1,5 @@
+import { canonicalMenuPath } from './page-path';
+
 /**
  * The menu pages a user opened last in this browser, newest first (ADR-0042), kept per user like
  * the column choices (`tugeel.recent.v1:<userId>`, ADR-0053): a colleague signing in on the same
@@ -13,9 +15,10 @@ export function readRecentPages(userId: number): string[] {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(keyOf(userId)) ?? '[]');
     if (!Array.isArray(parsed)) return [];
-    return parsed
+    const paths = parsed
       .filter((path): path is string => typeof path === 'string' && path.startsWith('/'))
-      .slice(0, MAX_RECENT);
+      .map(canonicalMenuPath);
+    return [...new Set(paths)].slice(0, MAX_RECENT);
   } catch {
     return [];
   }
@@ -23,7 +26,8 @@ export function readRecentPages(userId: number): string[] {
 
 export function rememberRecentPage(userId: number, path: string) {
   try {
-    const next = [path, ...readRecentPages(userId).filter((known) => known !== path)].slice(
+    const page = canonicalMenuPath(path);
+    const next = [page, ...readRecentPages(userId).filter((known) => known !== page)].slice(
       0,
       MAX_RECENT,
     );

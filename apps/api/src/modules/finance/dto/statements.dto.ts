@@ -1,14 +1,14 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { STATEMENT_KINDS, type StatementKind } from '@tugeel/shared/finance';
-import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ROW_TYPES = ['HEADING', 'LINE', 'TOTAL'] as const;
 const ACCOUNT_KINDS = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] as const;
 
 export class StatementQueryDto {
-  @ApiProperty({ example: '2026-01-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-12-31' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-01-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-12-31' }) @IsDateOnly() to: string;
 }
 
 @ApiSchema({ name: 'StatementRowAccount' })

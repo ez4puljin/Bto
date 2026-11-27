@@ -108,7 +108,7 @@ export function StockCountPage() {
       {/* One row of title and facts, so the sheet starts high in a short window (ADR-0201). */}
       <PageHeader
         dense
-        title={detail.number ?? t('inventory.stocktake.noNumber', { id: detail.id })}
+        title={detail.number ?? t('inventory.counts.noNumber', { id: detail.id })}
         crumbs={[{ label: t('inventory.counts.title'), to: '/inventory/counts' }]}
         actions={
           counting ? null : (

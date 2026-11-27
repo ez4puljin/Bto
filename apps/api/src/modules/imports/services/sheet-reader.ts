@@ -35,9 +35,13 @@ export function columnLabels(kind: ImportKind, key: string): string[] {
   const aliases = (mn.imports.aliases as Record<string, Record<string, string> | undefined>)[
     kind
   ]?.[key];
+  const exportAliases = (
+    mn.imports.exportAliases as Record<string, Record<string, string> | undefined>
+  )[kind]?.[key];
   return [
     ...(label ? [label] : []),
     ...(aliases ? aliases.split('|').map((alias) => alias.trim()) : []),
+    ...(exportAliases ? exportAliases.split('|').map((alias) => alias.trim()) : []),
   ].filter((value) => value !== '');
 }
 

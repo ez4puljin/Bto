@@ -1,4 +1,4 @@
-import type { Permission } from '@tugeel/shared/auth';
+import { isPermission } from '@tugeel/shared/auth';
 import { useTranslation } from 'react-i18next';
 import { RoleName } from '@/components/role-name';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,7 @@ export function PositionPermissions({ permissions }: { permissions: readonly str
       {codes.length ? (
         <ul className="mt-2 grid gap-1 text-xs text-muted-foreground @xl:grid-cols-2">
           {codes.map((code) => (
-            <li key={code}>{t(`permissions.${code as Permission}`)}</li>
+            <li key={code}>{isPermission(code) ? t(`permissions.${code}`) : code}</li>
           ))}
         </ul>
       ) : (

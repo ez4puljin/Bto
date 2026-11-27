@@ -75,6 +75,12 @@ export function ReceiptDiscountsCard(props: {
   /** Inside a sheet (ADR-0156): no card of its own, and room for the sheet's ✕. */
   plain?: boolean;
   onChange?: (discounts: DiscountDraft[]) => void;
+  /** Only a missing reference can be filled at first costing; posted references stay frozen. */
+  reference?: {
+    value: (line: ReceiptLine) => string;
+    editable: (line: ReceiptLine) => boolean;
+    onChange: (lineId: number, value: string) => void;
+  };
   /** Free goods are added and removed on a draft only. */
   free?: {
     supplierId?: number;
@@ -276,6 +282,9 @@ export function ReceiptDiscountsCard(props: {
                   <TableHead>{t('inventory.warehouse')}</TableHead>
                   <TableHead>{t('inventory.unit')}</TableHead>
                   <TableHead className="text-right">{t('inventory.qty')}</TableHead>
+                  <TableHead className="text-right whitespace-normal">
+                    {t('pricing.settings.printedUnitPrice')}
+                  </TableHead>
                   {props.free ? (
                     <TableHead>
                       <span className="sr-only">{t('common.actions')}</span>
@@ -292,6 +301,34 @@ export function ReceiptDiscountsCard(props: {
                     <TableCell>{line.unitName}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatQty(line.enteredQty)}
+                    </TableCell>
+                    <TableCell className="min-w-40 text-right">
+                      {props.reference?.editable(line) ? (
+                        <Input
+                          aria-label={`${t('pricing.settings.printedUnitPrice')}: ${nameOf(line.id)}`}
+                          inputMode="decimal"
+                          className="ml-auto w-36 text-right font-mono"
+                          value={props.reference.value(line)}
+                          disabled={props.pending}
+                          onChange={(event) =>
+                            props.reference?.onChange(line.id, event.target.value)
+                          }
+                        />
+                      ) : (
+                        <span className="font-mono">
+                          {line.printedUnitPrice == null
+                            ? t('pricing.settings.unknown')
+                            : formatMnt(line.printedUnitPrice)}
+                        </span>
+                      )}
+                      {line.printedPriceFactor != null &&
+                      !new Decimal(line.printedPriceFactor).eq(line.factorSnapshot) ? (
+                        <p className="mt-1 max-w-48 text-xs whitespace-normal text-muted-foreground">
+                          {t('pricing.settings.printedPriceFactorHint', {
+                            qty: formatQty(line.printedPriceFactor),
+                          })}
+                        </p>
+                      ) : null}
                     </TableCell>
                     {props.free ? (
                       <RowActions>

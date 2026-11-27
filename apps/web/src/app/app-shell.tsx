@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useMatches } from 'react-router';
 import { useAuthState } from '@/app/auth-context';
 import { CommandPalette } from '@/app/command-palette';
@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
  * screen counts (ADR-0197).
  */
 export function AppShell() {
+  const configuredLabel: unknown = import.meta.env.VITE_QA_LABEL;
+  const qaLabel = typeof configuredLabel === 'string' ? configuredLabel.trim() : '';
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -74,8 +76,12 @@ export function AppShell() {
   };
 
   return (
-    <div className="flex min-h-svh flex-col bg-canvas">
+    <div
+      className="flex min-h-svh flex-col bg-canvas"
+      style={qaLabel ? ({ '--qa-banner-height': '2rem' } as CSSProperties) : undefined}
+    >
       <TopBar
+        qaLabel={qaLabel}
         menuOpen={menuOpen}
         onMenu={() => setMenuOpen((open) => !open)}
         onSearch={openSearch}

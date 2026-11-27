@@ -11,11 +11,11 @@ import {
   IsObject,
   IsOptional,
   IsString,
-  Matches,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
+import { IsCommaSeparatedIds } from '../../../common/validation/comma-separated-ids';
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -96,7 +96,7 @@ export class DocumentPrintLayoutsQueryDto {
   @ApiPropertyOptional({ description: 'Pipeline ids, comma-separated (up to 100)' })
   @IsOptional()
   @IsString()
-  @Matches(/^[0-9,]{0,1000}$/)
+  @IsCommaSeparatedIds(100)
   pipelineIds?: string;
 }
 

@@ -11,6 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { invalid } from '../../../common/errors/app-error';
+import { commaSeparatedIds } from '../../../common/validation/comma-separated-ids';
 import { type AuthContext, CurrentUser, RequirePermission } from '../../identity';
 import {
   DocumentPrintLayoutsDto,
@@ -73,10 +75,10 @@ export class SalesDocumentTemplatesController {
   async printLayouts(
     @Query() query: DocumentPrintLayoutsQueryDto,
   ): Promise<DocumentPrintLayoutsDto> {
-    const ids = (query.pipelineIds ?? '')
-      .split(',')
-      .map((value) => Number.parseInt(value, 10))
-      .filter((value) => Number.isInteger(value) && value > 0);
+    const ids = commaSeparatedIds(query.pipelineIds ?? '');
+    if (ids === null) {
+      throw invalid('pipelineIds', 'isCommaSeparatedIds', 'up to 100 positive safe integer ids');
+    }
     const result = await this.templates.forPrint(ids);
     return {
       templates: result.templates.map((entry) => ({

@@ -31,13 +31,12 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  Matches,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 const flag = ({ value }: { value: unknown }) => value === true || value === 'true';
@@ -319,8 +318,8 @@ export class SalesOrderFiltersQueryDto {
   @IsOptional()
   @IsIn(PAYMENT_METHODS)
   paymentMethod?: PaymentMethod;
-  @ApiPropertyOptional({ format: 'date' }) @IsOptional() @Matches(DATE) deliveryFrom?: string;
-  @ApiPropertyOptional({ format: 'date' }) @IsOptional() @Matches(DATE) deliveryTo?: string;
+  @ApiPropertyOptional({ format: 'date' }) @IsOptional() @IsDateOnly() deliveryFrom?: string;
+  @ApiPropertyOptional({ format: 'date' }) @IsOptional() @IsDateOnly() deliveryTo?: string;
 }
 
 @ApiSchema({ name: 'SalesCustomerOverdue' })

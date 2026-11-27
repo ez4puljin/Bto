@@ -11,12 +11,14 @@ import {
 import { businessDate } from '@tugeel/shared/time';
 import { ExternalLink } from 'lucide-react';
 import { type ComponentProps, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 import { z } from 'zod';
 import { DateInput } from '@/components/date-input';
 import { FormRow, FormSection } from '@/components/form';
+import { LeaveGuard } from '@/components/leave-guard';
 import { NativeSelect } from '@/components/native-select';
 import { type Crumb, PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -246,6 +248,7 @@ function ProfileForm(props: { profile: PriceProfile | null; crumbs?: readonly Cr
   const { profile } = props;
   const [today] = useState(businessDate);
   const [key] = useState(randomUuid);
+  const [submitted, setSubmitted] = useState(false);
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(PROFILE_SCHEMA),
     defaultValues: defaultsOf(profile, today),
@@ -294,15 +297,26 @@ function ProfileForm(props: { profile: PriceProfile | null; crumbs?: readonly Cr
         : mutations.createProfile.mutateAsync({ key, ...body }),
     );
     if (!saved) return;
+    // Release the navigation guard only after the server has accepted the form.
+    flushSync(() => setSubmitted(true));
     toast.success(t(profile ? 'pricing.profiles.saved' : 'pricing.profiles.created'));
     void navigate(`/pricing/profiles/${saved.id}`, { replace: true });
   });
 
   return (
     <div>
+      <LeaveGuard
+        when={form.formState.isDirty && !submitted}
+        title={t('pricing.settings.unsavedTitle')}
+        description={t('pricing.settings.unsavedHint')}
+        leaveLabel={t('common.discard.confirm')}
+      />
       <PageHeader
         title={t(profile ? 'pricing.profiles.edit' : 'pricing.profiles.new')}
-        crumbs={props.crumbs}
+        crumbs={[
+          { label: t('pricing.settings.tabs.profiles'), to: '/pricing/settings?tab=profiles' },
+          ...(props.crumbs ?? []),
+        ]}
       />
       <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void submit(event)}>
         <ProblemAlert problem={problemFromError(mutation.error)} />

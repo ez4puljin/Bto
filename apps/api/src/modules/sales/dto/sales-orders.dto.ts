@@ -30,10 +30,10 @@ import {
 import { PageQueryDto } from '../../../common/pagination/page';
 import { SalesCustomerOverdueDto, SalesOrderFiltersQueryDto } from './sales-boards.dto';
 import { SalesOrderLoadingDto } from './sales-loading.dto';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 /** Up to 11 whole digits and 3 decimals, as the quantity columns hold. */
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
@@ -80,7 +80,7 @@ export class SalesOrderRequestDto {
   stageId?: number | null;
   @ApiProperty({ enum: FULFILMENTS }) @IsIn(FULFILMENTS) fulfilment: Fulfilment;
   @ApiProperty({ format: 'date', description: 'Today or later (Ulaanbaatar)' })
-  @Matches(DATE)
+  @IsDateOnly()
   deliveryDate: string;
   @ApiPropertyOptional({ type: Number, nullable: true, description: 'Required for DELIVERY' })
   @IsOptional()

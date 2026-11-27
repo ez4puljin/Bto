@@ -172,6 +172,29 @@ describe('import sheet reader (ADR-0036 #1)', () => {
     expect(columnLabels('PRICES', 'baseUnit')).toEqual(['Хэмжих нэгж', 'Суурь нэгж']);
   });
 
+  it('preserves optional price and profile values under old and new exported labels', async () => {
+    for (const price of ['Агуулахын үнэ', 'Бөөний үнэ', 'Үнэ', 'Суурь үнэ']) {
+      for (const profile of ['Үнийн тохиргоо', 'Тохиргоо', 'Үнийн загвар']) {
+        const result = await readSheet(
+          await workbook([
+            ['Код *', price, profile],
+            ['0012', '1500.25', 'Туршилтын тохиргоо'],
+          ]),
+          'PRICES',
+        );
+        if (!result.ok) throw new Error(result.issue.code);
+        expect(result.columns).toEqual(['sku', 'warehousePrice', 'profile']);
+        expect(result.rows).toEqual([
+          {
+            rowNo: 2,
+            values: { sku: '0012', warehousePrice: '1500.25', profile: 'Туршилтын тохиргоо' },
+            issues: [],
+          },
+        ]);
+      }
+    }
+  });
+
   it('fills the price sheet with its rows and a reference sheet the reader skips (ADR-0054)', async () => {
     const template = await buildTemplate('PRICES', {
       rows: [

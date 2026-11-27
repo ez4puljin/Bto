@@ -1,4 +1,4 @@
-import { Bell, Megaphone, PackageCheck, PhoneCall } from 'lucide-react';
+import { Bell, Megaphone, PackageCheck, PhoneCall, Tags } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -61,6 +61,40 @@ function EntryText({ entry }: { entry: Entry }) {
     );
   }
   const { item } = entry;
+  if (item.kind === 'PRICE_CHANGED') {
+    const change = item.priceChange;
+    const first = change?.changes[0];
+    return (
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">
+          {t('notifications.staffKinds.PRICE_CHANGED')}
+        </span>
+        <span className="block truncate text-[0.8125rem] text-muted-foreground">
+          {change
+            ? t('pricing.settings.notificationSummary', {
+                number: change.receiptNumber,
+                changed: change.changeCount,
+                warnings: change.warningCount,
+              })
+            : t('pricing.settings.receiptChanges')}
+        </span>
+        {first ? (
+          <span className="block truncate text-xs text-muted-foreground">
+            {first.name} ·{' '}
+            {first.oldBasePrice === null
+              ? t('pricing.settings.unknown')
+              : formatTugrik(first.oldBasePrice)}{' '}
+            → {formatTugrik(first.newBasePrice)}
+          </span>
+        ) : null}
+        {(change?.overwrittenManualCount ?? 0) > 0 ? (
+          <span className="block text-xs text-warning">
+            {t('pricing.settings.notificationManual', { count: change?.overwrittenManualCount })}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
   if (item.kind === 'PHONE_ORDER') {
     return (
       <span className="min-w-0 flex-1">
@@ -107,9 +141,11 @@ function EntryIcon({ entry }: { entry: Entry }) {
   const Icon =
     entry.kind === 'notice'
       ? Megaphone
-      : entry.item.kind === 'ORDER_SOLD'
-        ? PackageCheck
-        : PhoneCall;
+      : entry.item.kind === 'PRICE_CHANGED'
+        ? Tags
+        : entry.item.kind === 'ORDER_SOLD'
+          ? PackageCheck
+          : PhoneCall;
   return (
     <span className="relative grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-link">
       <Icon aria-hidden className="size-4" />
@@ -123,6 +159,11 @@ function EntryIcon({ entry }: { entry: Entry }) {
 const orderLink = (entry: Entry) => {
   if (entry.kind !== 'own') return null;
   const { item } = entry;
+  if (item.kind === 'PRICE_CHANGED') {
+    return item.priceChange
+      ? `/pricing/settings?receiptId=${item.priceChange.receiptId}`
+      : '/pricing/settings';
+  }
   if (item.kind === 'PHONE_CALLBACK') {
     return item.callId !== null ? `/sales/phone-calls/${item.callId}` : null;
   }

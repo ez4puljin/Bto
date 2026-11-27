@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import { canonicalMenuPath } from './page-path';
 
 /**
  * The menu pages a user starred (☆, ADR-0114), in the order starred, kept per user in this browser
@@ -16,9 +17,10 @@ export function readFavoritePages(userId: number): string[] {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(keyOf(userId)) ?? '[]');
     if (!Array.isArray(parsed)) return [];
-    return parsed
+    const paths = parsed
       .filter((path): path is string => typeof path === 'string' && path.startsWith('/'))
-      .slice(0, MAX_FAVORITES);
+      .map(canonicalMenuPath);
+    return [...new Set(paths)].slice(0, MAX_FAVORITES);
   } catch {
     return [];
   }
@@ -26,8 +28,9 @@ export function readFavoritePages(userId: number): string[] {
 
 /** Stars a page (at the end, dropping the oldest past the limit) or unstars it. */
 export function setFavoritePage(userId: number, path: string, favorite: boolean) {
-  const known = readFavoritePages(userId).filter((item) => item !== path);
-  const next = favorite ? [...known, path].slice(-MAX_FAVORITES) : known;
+  const page = canonicalMenuPath(path);
+  const known = readFavoritePages(userId).filter((item) => item !== page);
+  const next = favorite ? [...known, page].slice(-MAX_FAVORITES) : known;
   try {
     localStorage.setItem(keyOf(userId), JSON.stringify(next));
   } catch {

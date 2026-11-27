@@ -297,12 +297,18 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: 'nav.groups.pricing',
     items: [
       {
+        to: '/pricing/settings',
+        label: 'nav.pricingSettings',
+        icon: SlidersHorizontal,
+        // Read-only profiles remain available to every employee in the shared settings hub.
+        also: ['/pricing/profiles'],
+      },
+      {
         to: '/catalog/pending',
         label: 'nav.pendingProducts',
         icon: Hourglass,
         permission: 'pricing.prices.manage',
       },
-      { to: '/pricing/profiles', label: 'nav.priceProfiles', icon: Tags },
       { to: '/pricing/discounts', label: 'nav.discounts', icon: BadgePercent },
       { to: '/pricing/quote', label: 'nav.priceQuote', icon: Calculator },
     ],

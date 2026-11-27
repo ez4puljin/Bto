@@ -16,6 +16,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -23,7 +24,6 @@ const trimmed = ({ value }: { value: unknown }) =>
 const COORDINATE = /^[-+]?\d{1,3}(\.\d{1,9})?$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const WORKDAYS = /^[01]{7}$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 @ApiSchema({ name: 'WorkSite' })
@@ -279,15 +279,15 @@ export class DashboardQueryDto {
   @ApiPropertyOptional({ description: 'YYYY-MM-DD; today when left out' })
   @IsOptional()
   @IsString()
-  @Matches(DATE)
+  @IsDateOnly()
   date?: string;
 }
 
 export class DaysQueryDto {
-  @ApiProperty({ description: 'YYYY-MM-DD' }) @IsString() @Matches(DATE) from: string;
+  @ApiProperty({ description: 'YYYY-MM-DD' }) @IsString() @IsDateOnly() from: string;
   @ApiProperty({ description: 'YYYY-MM-DD, at most 62 days after from' })
   @IsString()
-  @Matches(DATE)
+  @IsDateOnly()
   to: string;
   @ApiPropertyOptional({ type: Number })
   @IsOptional()
@@ -303,7 +303,7 @@ export class MyDaysQueryDto {
 
 export class EventsQueryDto {
   @ApiProperty({ type: Number }) @Type(() => Number) @IsInt() @Min(1) userId: number;
-  @ApiProperty({ description: 'YYYY-MM-DD' }) @IsString() @Matches(DATE) date: string;
+  @ApiProperty({ description: 'YYYY-MM-DD' }) @IsString() @IsDateOnly() date: string;
 }
 
 @ApiSchema({ name: 'AttendanceEventRequest' })

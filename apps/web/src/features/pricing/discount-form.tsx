@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 import { DateInput } from '@/components/date-input';
 import { FormRow, FormSection } from '@/components/form';
+import { LeaveGuard } from '@/components/leave-guard';
 import { NativeSelect } from '@/components/native-select';
 import { type Crumb, PageHeader } from '@/components/page-header';
 import { ProblemAlert } from '@/components/problem-alert';
@@ -246,7 +247,9 @@ function ProgramForm(props: {
   const action = useAction();
   const uoms = useUoms();
   const [key] = useState(randomUuid);
-  const [draft, setDraft] = useState<ProgramDraft>(props.initial);
+  const [initial] = useState(props.initial);
+  const [draft, setDraft] = useState<ProgramDraft>(initial);
+  const [submitted, setSubmitted] = useState(false);
   const [products, setProducts] = useState<readonly NamedProduct[]>(props.products);
   const [step, setStep] = useState<Step>('GENERAL');
   const [shown, setShown] = useState<ReturnType<typeof draftIssue>>(null);
@@ -326,6 +329,7 @@ function ProgramForm(props: {
         props.programId === null
           ? await mutations.createProgram.mutateAsync({ key, ...body })
           : await mutations.updateProgram.mutateAsync({ id: props.programId, body });
+      flushSync(() => setSubmitted(true));
       void navigate(`/pricing/discounts/${saved.id}`);
     });
   };
@@ -335,6 +339,12 @@ function ProgramForm(props: {
   return (
     // A form page: header and card in one column, the buttons at the window's foot (ADR-0066).
     <div>
+      <LeaveGuard
+        when={!submitted && JSON.stringify(draft) !== JSON.stringify(initial)}
+        title={t('pricing.settings.unsavedTitle')}
+        description={t('pricing.settings.unsavedHint')}
+        leaveLabel={t('common.discard.confirm')}
+      />
       <PageHeader
         title={t(props.programId === null ? 'pricing.programs.new' : 'pricing.programs.edit')}
         crumbs={props.crumbs}

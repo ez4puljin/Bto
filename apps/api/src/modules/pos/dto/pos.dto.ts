@@ -56,13 +56,13 @@ import {
 } from 'class-validator';
 import { PageQueryDto } from '../../../common/pagination/page';
 import { VAT_TYPES, type VatType } from '../../catalog';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 const MONEY = /^\d{1,12}(\.\d{1,2})?$/;
 const SIGNED_MONEY = /^-?\d{1,12}(\.\d{1,2})?$/;
 const QTY = /^\d{1,11}(\.\d{1,3})?$/;
 const FACTOR = /^\d{1,12}(\.\d{1,6})?$/;
 const PERCENT = /^\d{1,3}(\.\d{1,2})?$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIN = /^[0-9]{11,14}$/;
 const CONSUMER = /^([0-9]{8}|11\*{6})$/;
 const HASH = /^[0-9a-f]{64}$/;
@@ -515,8 +515,8 @@ export class ShiftListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(SHIFT_STATUSES)
   status?: ShiftStatus;
-  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @IsDateOnly() to?: string;
 }
 
 @ApiSchema({ name: 'PosShiftPage' })
@@ -549,7 +549,7 @@ export class HandoverRequestDto {
   amount?: string | null;
   @ApiPropertyOptional({ example: '2026-10-16', description: 'Default: today' })
   @IsOptional()
-  @Matches(DATE)
+  @IsDateOnly()
   paidOn?: string | null;
 }
 
@@ -717,8 +717,8 @@ export class SaleListQueryDto extends PageQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   creditToCheck?: boolean;
-  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @IsDateOnly() to?: string;
 }
 
 @ApiSchema({ name: 'PosSalePage' })
@@ -896,8 +896,8 @@ export class DayCountDto {
 @ApiSchema({ name: 'PosDayCountsQuery' })
 export class DayCountsQueryDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) tillId?: number;
-  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @IsDateOnly() to?: string;
 }
 
 @ApiSchema({ name: 'PosCreditReviewRequest' })
@@ -1210,7 +1210,7 @@ export class VoidDocLineDto {
 export class DayCountDocDto {
   @ApiProperty({ format: 'uuid' }) @IsUUID() clientId: string;
   @ApiProperty({ example: 'К3' }) @Transform(trimmed) @IsString() @MaxLength(8) tillCode: string;
-  @ApiProperty({ example: '2026-10-27' }) @Matches(DATE) day: string;
+  @ApiProperty({ example: '2026-10-27' }) @IsDateOnly() day: string;
   @ApiProperty() @IsInt() @Min(1) cashierUserId: number;
   @ApiProperty({ type: [DayCountRowDto] })
   @IsArray()
@@ -1580,8 +1580,8 @@ export class VoidListQueryDto extends PageQueryDto {
   @IsOptional()
   @IsIn(VOID_REASONS)
   reason?: VoidReason;
-  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional({ example: '2026-10-01' }) @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional({ example: '2026-10-31' }) @IsOptional() @IsDateOnly() to?: string;
 }
 
 @ApiSchema({ name: 'PosVoidPage' })

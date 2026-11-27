@@ -134,6 +134,8 @@ export interface CostEntry {
   source: 'unitPrice' | 'amount';
   value: string;
   free: boolean;
+  /** Printed invoice reference per entered unit on free goods; never part of their amount. */
+  printedUnitPrice?: string;
 }
 
 /** The amount a receipt line will be costed at, or null while its field is empty or invalid. */

@@ -1,12 +1,13 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import {
   defaultDocumentLayout,
+  DOCUMENT_TEMPLATE_LIMITS,
   type DocumentLayout,
   documentLayoutFor,
   type PublishedDocumentTemplate,
 } from '@tugeel/shared/sales';
-import request from 'supertest';
-import { createHttpApp } from '../harness/apps';
+import request, { type Response } from 'supertest';
+import { connectAs, createHttpApp, waitFor } from '../harness/apps';
 import { bearer, login, seedUser } from '../harness/identity';
 
 interface TemplateJson {
@@ -83,6 +84,49 @@ describe('sales document templates', () => {
   });
   afterAll(async () => {
     await app.close();
+  });
+
+  it('validates print-layout pipeline ids before SQL without changing the comma-separated contract', async () => {
+    const endpoint = '/api/v1/sales/document-templates/print-layouts';
+    for (const query of [{}, { pipelineIds: '' }]) {
+      const response = await http().get(endpoint).set(bearer(office)).query(query).expect(200);
+      expect(response.body.pipelines).toEqual([]);
+      expect(response.body.templates).toHaveLength(2);
+    }
+    for (const pipelineIds of [
+      String(pipelineId),
+      `00${pipelineId},${pipelineId}`,
+      Array.from({ length: 100 }, () => String(pipelineId)).join(','),
+    ]) {
+      const response = await http()
+        .get(endpoint)
+        .set(bearer(office))
+        .query({ pipelineIds })
+        .expect(200);
+      expect(response.body.pipelines).toEqual([expect.objectContaining({ id: pipelineId })]);
+    }
+    for (const pipelineIds of [
+      '99999999999999999999',
+      '9'.repeat(1000),
+      '9007199254740992',
+      '0',
+      ',',
+      `${pipelineId},`,
+      `,${pipelineId}`,
+      `${pipelineId},,${pipelineId}`,
+      Array.from({ length: 101 }, () => String(pipelineId)).join(','),
+    ]) {
+      const response = await http()
+        .get(endpoint)
+        .set(bearer(office))
+        .query({ pipelineIds })
+        .expect(422);
+      expect(response.body).toMatchObject({
+        code: 'VALIDATION_FAILED',
+        errors: expect.arrayContaining([expect.objectContaining({ path: 'pipelineIds' })]),
+      });
+    }
+    await http().get(`${endpoint}?pipelineIds=1&pipelineIds=2`).set(bearer(office)).expect(422);
   });
 
   it('starts with a default of each kind laid out as the document printed before', async () => {
@@ -237,5 +281,75 @@ describe('sales document templates', () => {
       .set(bearer(office))
       .send({ kind: 'PICK_LIST', name: 'x' })
       .expect(403);
+  });
+
+  it('keeps the catalogue cap when different managers create both kinds concurrently', async () => {
+    const otherAdmin = (await login(app, await seedUser(app, { roles: ['ADMIN'] }))).accessToken;
+    const initial = await list();
+    for (let n = initial.length; n < DOCUMENT_TEMPLATE_LIMITS.maxTemplates - 1; n += 1) {
+      await http()
+        .post('/api/v1/sales/document-templates')
+        .set(bearer(admin))
+        .send({ kind: 'PICK_LIST', name: `Concurrent baseline ${n}` })
+        .expect(201);
+    }
+
+    const gate = await connectAs('admin');
+    let pending: Promise<Response[]> | undefined;
+    try {
+      await gate.query('BEGIN');
+      // Counts can run, but inserts wait: concurrent creates must share the last free slot.
+      await gate.query('LOCK TABLE sales_document_templates IN SHARE MODE');
+      pending = Promise.all(
+        Array.from({ length: 8 }, (_, n) =>
+          http()
+            .post('/api/v1/sales/document-templates')
+            .set(bearer(n % 2 === 0 ? admin : otherAdmin))
+            .send({
+              kind: n % 2 === 0 ? 'PICK_LIST' : 'DELIVERY_NOTE',
+              name: `Concurrent new ${n}`,
+            }),
+        ),
+      );
+      // Observe actual blocked transactions; no timing sleep or mocked database/service.
+      await waitFor(async () => {
+        await gate.query('SELECT pg_stat_clear_snapshot()');
+        const { rows } = await gate.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM pg_stat_activity
+           WHERE datname = current_database() AND wait_event_type = 'Lock'
+             AND (query LIKE 'insert into "sales_document_templates"%'
+                  OR query LIKE 'SELECT pg_advisory_xact_lock%')`,
+        );
+        return (rows[0]?.n ?? 0) >= 2 ? true : undefined;
+      });
+    } finally {
+      await gate.query('ROLLBACK');
+      await gate.end();
+    }
+    const responses = await pending;
+    if (!responses) throw new Error('concurrent creates did not start');
+    const successful = responses.filter((response) => response.status === 201);
+    expect(successful).toHaveLength(1);
+    expect(responses.filter((response) => response.status === 422)).toHaveLength(7);
+    for (const response of responses.filter((result) => result.status === 422)) {
+      expect(response.body).toMatchObject({
+        code: 'VALIDATION_FAILED',
+        errors: expect.arrayContaining([
+          expect.objectContaining({ path: 'name', constraint: 'count' }),
+        ]),
+      });
+    }
+    expect(await list()).toHaveLength(DOCUMENT_TEMPLATE_LIMITS.maxTemplates);
+    const winner = successful[0]?.body as TemplateJson;
+    await http()
+      .delete(`/api/v1/sales/document-templates/${winner.id}`)
+      .set(bearer(admin))
+      .expect(204);
+    await http()
+      .post('/api/v1/sales/document-templates')
+      .set(bearer(otherAdmin))
+      .send({ kind: 'DELIVERY_NOTE', name: 'After cap slot released' })
+      .expect(201);
+    expect(await list()).toHaveLength(DOCUMENT_TEMPLATE_LIMITS.maxTemplates);
   });
 });

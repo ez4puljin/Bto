@@ -34,6 +34,8 @@ export function TopBar(props: {
   onMenu: () => void;
   onSearch: () => void;
   menuButtonRef: Ref<HTMLButtonElement>;
+  /** Explicitly labelled isolated test data; absent on the normal application. */
+  qaLabel?: string;
 }) {
   const { t } = useTranslation();
   const state = useAuthState();
@@ -53,6 +55,14 @@ export function TopBar(props: {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md print:hidden">
+      {props.qaLabel ? (
+        <div
+          role="status"
+          className="flex h-8 items-center justify-center bg-warning-soft px-4 text-xs font-medium text-warning"
+        >
+          <span className="truncate">{props.qaLabel}</span>
+        </div>
+      ) : null}
       <div className="flex h-13 items-center gap-1 px-2 lg:px-4">
         <Button
           ref={props.menuButtonRef}

@@ -28,8 +28,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
@@ -139,7 +139,7 @@ export class BankCalendarQueryDto {
 
 @ApiSchema({ name: 'BankDateQuery' })
 export class BankDateQueryDto {
-  @ApiProperty({ example: '2026-11-05' }) @Matches(DATE) date: string;
+  @ApiProperty({ example: '2026-11-05' }) @IsDateOnly() date: string;
 }
 
 @ApiSchema({ name: 'BankFileQuery' })
@@ -151,13 +151,13 @@ export class BankFileQueryDto {
 
 @ApiSchema({ name: 'BankDateFileQuery' })
 export class BankDateFileQueryDto extends BankFileQueryDto {
-  @ApiProperty({ example: '2026-11-05' }) @Matches(DATE) date: string;
+  @ApiProperty({ example: '2026-11-05' }) @IsDateOnly() date: string;
 }
 
 @ApiSchema({ name: 'BankFeesQuery' })
 export class BankFeesQueryDto {
-  @ApiProperty({ example: '2026-11-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-11-30' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-11-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-11-30' }) @IsDateOnly() to: string;
 }
 
 @ApiSchema({ name: 'BankExportManifest' })

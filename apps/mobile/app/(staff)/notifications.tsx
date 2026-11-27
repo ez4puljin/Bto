@@ -68,7 +68,7 @@ export default function NotificationsScreen() {
   return (
     <Page edges={[]}>
       <StoreHeader
-        title={t('mobile.notifications.title')}
+        title={t('mobile.staffMenu.items.repNotifications')}
         onBack={() => router.back()}
         right={
           <Pressable
@@ -154,24 +154,36 @@ function FeedRow({ item, onPress }: { item: Item; onPress: () => void }) {
   const title =
     item.type === 'notice'
       ? item.notice.title
-      : t('mobile.notifications.sold', { number: item.notification.orderNumber });
+      : item.notification.kind === 'PRICE_CHANGED'
+        ? t('notifications.staffKinds.PRICE_CHANGED')
+        : t('mobile.notifications.sold', { number: item.notification.orderNumber });
   const text =
     item.type === 'notice'
       ? item.notice.body
-      : [
-          item.notification.customerName,
-          item.notification.orderTotal
-            ? t('pricing.money', { amount: formatMnt(item.notification.orderTotal) })
-            : null,
-        ]
-          .filter((part) => part !== null)
-          .join(' · ');
+      : item.notification.kind === 'PRICE_CHANGED'
+        ? item.notification.priceChange
+          ? t('pricing.settings.notificationSummary', {
+              number: item.notification.priceChange.receiptNumber,
+              changed: item.notification.priceChange.changeCount,
+              warnings: item.notification.priceChange.warningCount,
+            })
+          : t('pricing.settings.receiptChanges')
+        : [
+            item.notification.customerName,
+            item.notification.orderTotal
+              ? t('pricing.money', { amount: formatMnt(item.notification.orderTotal) })
+              : null,
+          ]
+            .filter((part) => part !== null)
+            .join(' · ');
   const caption =
     item.type === 'notice'
       ? eyebrow(item.notice)
-      : item.notification.invoiceNumber
-        ? t('mobile.notifications.soldInvoice', { number: item.notification.invoiceNumber })
-        : null;
+      : item.notification.kind === 'PRICE_CHANGED'
+        ? t('pricing.settings.mobileDetailHint')
+        : item.notification.invoiceNumber
+          ? t('mobile.notifications.soldInvoice', { number: item.notification.invoiceNumber })
+          : null;
   return (
     <Pressable
       accessibilityRole="button"

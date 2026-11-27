@@ -41,17 +41,11 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { queryBoolean, queryInteger } from '../../../common/pagination/page';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
-const toInt = ({ value }: { value: unknown }) =>
-  typeof value === 'string' && value !== ''
-    ? Number.parseInt(value, 10)
-    : typeof value === 'number'
-      ? value
-      : undefined;
-const toBool = ({ value }: { value: unknown }) => value === true || value === 'true';
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // ── divisions ──────────────────────────────────────────────────────────────
@@ -77,7 +71,11 @@ export class HrArchiveRequestDto {
 }
 
 export class IncludeArchivedQueryDto {
-  @ApiPropertyOptional() @IsOptional() @Transform(toBool) @IsBoolean() includeArchived?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  includeArchived?: boolean;
 }
 
 // ── employees ──────────────────────────────────────────────────────────────
@@ -175,7 +173,7 @@ export class HrStaffRequestDto {
   @IsOptional()
   @IsIn(EMPLOYEE_GENDERS)
   gender: EmployeeGender | null;
-  @ApiProperty({ type: String, nullable: true }) @IsOptional() @Matches(DATE) employedOn:
+  @ApiProperty({ type: String, nullable: true }) @IsOptional() @IsDateOnly() employedOn:
     string | null;
   @ApiProperty({ type: Number, nullable: true }) @IsOptional() @IsInt() @Min(1) scheduleId:
     number | null;
@@ -194,7 +192,7 @@ export class HrStaffRequestDto {
 export class HrStaffLeftRequestDto {
   @ApiProperty({ type: String, nullable: true, description: 'null: back at work' })
   @IsOptional()
-  @Matches(DATE)
+  @IsDateOnly()
   leftOn: string | null;
   @ApiProperty({ type: String, nullable: true })
   @IsOptional()
@@ -330,8 +328,8 @@ export class HrTimeRequestCreateDto {
   @Min(1)
   userId?: number;
   @ApiProperty() @IsInt() @Min(1) typeId: number;
-  @ApiProperty({ example: '2026-11-05' }) @Matches(DATE) fromDate: string;
-  @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @Matches(DATE) toDate?:
+  @ApiProperty({ example: '2026-11-05' }) @IsDateOnly() fromDate: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @IsDateOnly() toDate?:
     string | null;
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   @IsOptional()
@@ -379,10 +377,10 @@ export class HrRequestsQueryDto {
   @IsOptional()
   @IsIn(REQUEST_STATUSES)
   status?: RequestStatus;
-  @ApiPropertyOptional() @IsOptional() @Transform(toInt) @IsInt() @Min(1) userId?: number;
-  @ApiPropertyOptional() @IsOptional() @Transform(toInt) @IsInt() @Min(1) typeId?: number;
-  @ApiPropertyOptional() @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional() @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional() @IsOptional() @Transform(queryInteger) @IsInt() @Min(1) userId?: number;
+  @ApiPropertyOptional() @IsOptional() @Transform(queryInteger) @IsInt() @Min(1) typeId?: number;
+  @ApiPropertyOptional() @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateOnly() to?: string;
 }
 
 @ApiSchema({ name: 'HrPendingCount' })
@@ -393,10 +391,15 @@ export class HrPendingCountDto {
 // ── reports ────────────────────────────────────────────────────────────────
 
 export class HrReportQueryDto {
-  @ApiProperty() @Matches(DATE) from: string;
-  @ApiProperty() @Matches(DATE) to: string;
-  @ApiPropertyOptional() @IsOptional() @Transform(toInt) @IsInt() @Min(1) userId?: number;
-  @ApiPropertyOptional() @IsOptional() @Transform(toInt) @IsInt() @Min(1) divisionId?: number;
+  @ApiProperty() @IsDateOnly() from: string;
+  @ApiProperty() @IsDateOnly() to: string;
+  @ApiPropertyOptional() @IsOptional() @Transform(queryInteger) @IsInt() @Min(1) userId?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(queryInteger)
+  @IsInt()
+  @Min(1)
+  divisionId?: number;
 }
 
 @ApiSchema({ name: 'HrReportRow' })

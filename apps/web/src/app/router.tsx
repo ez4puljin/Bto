@@ -52,8 +52,9 @@ import {
 import { DiscountProgramPage, DiscountProgramsPage } from '@/features/pricing/discount-pages';
 import { PendingProductsPage } from '@/features/pricing/pending-products-page';
 import { PriceProfileCreatePage, PriceProfileEditPage } from '@/features/pricing/profile-form';
-import { PriceProfilePage, PriceProfilesPage } from '@/features/pricing/profile-pages';
+import { PriceProfilePage, PriceProfilesRedirect } from '@/features/pricing/profile-pages';
 import { PriceQuotePage } from '@/features/pricing/quote-page';
+import { SupplierPricingPage } from '@/features/pricing/supplier-pricing-page';
 import { SalesOrderNewPage, SalesOrderPage } from '@/features/sales/orders-pages';
 import { SalesBatchPrintPage, SalesOrderPrintPage } from '@/features/sales/print-page';
 import { DocumentTemplateEditorPage } from '@/features/sales/document-template-editor';
@@ -642,7 +643,16 @@ export const routes: RouteObject[] = [
               </RequirePermission>
             ),
           },
-          { path: 'pricing/profiles', handle: { width: 'wide' }, element: <PriceProfilesPage /> },
+          {
+            path: 'pricing/settings',
+            handle: { width: 'wide' },
+            element: <SupplierPricingPage />,
+          },
+          {
+            path: 'pricing/profiles',
+            handle: { width: 'wide' },
+            element: <PriceProfilesRedirect />,
+          },
           {
             path: 'pricing/profiles/new',
             handle: { width: 'reading' },

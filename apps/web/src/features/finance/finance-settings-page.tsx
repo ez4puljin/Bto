@@ -69,9 +69,9 @@ const isMoneyKind = (value: string): value is MoneyAccountKind =>
 
 /**
  * The money accounts' columns (ADR-0119). The name alone takes the spare width: all seven are
- * 45.5rem and leave it 19rem in a till PC's card (53), its longest names whole. A tablet's card
+ * 49.5rem and leave it 15rem in a till PC's card (53), its longest names whole. A tablet's card
  * (38) lets the branch and the journal account go, which the account's dialog shows, so the
- * balance and the menu stay in view: 34rem (ADR-0201).
+ * balance and the menu stay in view: 38rem (ADR-0201).
  */
 const MONEY_ACCOUNT_COLUMNS: readonly ColumnSpec[] = [
   { key: 'code', kind: 'code', width: 6 },
@@ -79,7 +79,7 @@ const MONEY_ACCOUNT_COLUMNS: readonly ColumnSpec[] = [
   { key: 'kind', kind: 'text', weight: 0, min: 4 },
   { key: 'branch', kind: 'text', weight: 0, min: 5.5, drop: 1 },
   { key: 'account', kind: 'code', width: 6, drop: 1 },
-  { key: 'balance', kind: 'money' },
+  { key: 'balance', kind: 'money', width: 12.5 },
   // One icon button and the last cell's wider padding.
   { key: 'actions', kind: 'actions', width: 3.5 },
 ];
@@ -104,6 +104,9 @@ export function FinanceSettingsPage() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {t('finance.settings.moneyAccountsDescription')}
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('finance.cash.voucherBalanceHint', { journal: t('nav.journal') })}
+              </p>
             </div>
             <Button size="sm" onClick={() => setCreating(true)}>
               <Plus />
@@ -123,7 +126,7 @@ export function FinanceSettingsPage() {
                   <TableHead>{t('finance.fields.kind')}</TableHead>
                   <TableHead>{t('finance.fields.branch')}</TableHead>
                   <TableHead>{t('finance.fields.account')}</TableHead>
-                  <TableHead className="text-right">{t('finance.fields.balance')}</TableHead>
+                  <TableHead className="text-right">{t('finance.cash.voucherBalance')}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>

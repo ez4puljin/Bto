@@ -87,6 +87,8 @@ export interface PanelLine {
   enteredQty: string;
   /** The delivery note's price as typed (cost holders); null when the panel shows no prices. */
   price: CostEntry | null;
+  /** The invoice reference on a free-goods line, per entered unit; never a payable amount. */
+  printedUnitPrice?: string | null;
   /** Only for a product without a home warehouse: the one it is received into. */
   warehouseId?: number;
 }
@@ -139,14 +141,14 @@ function productOfLine(line: ReceiptLine): PanelProduct {
  * warehouse it goes into, which becomes its home. A line of the table opens here for editing (its
  * product and unit stay). With a supplier chosen the search shows that supplier's products, or all
  * products at a switch (ADR-0103). The `free` variant is a form of its own for free goods: a product,
- * its unit and the quantity, no prices and no scanner.
+ * its unit, quantity and a separate printed reference price; no payable amount and no scanner.
  */
 export function ReceiptLinePanel(props: {
   editing: ReceiptLine | null;
   pending: boolean;
   /** The receipt's supplier: its products are searched first (ADR-0103). */
   supplierId?: number;
-  /** Free goods (урамшуулал): no prices, no page-wide scanner. */
+  /** Free goods: a printed reference price, no payable amount or page-wide scanner. */
   free?: boolean;
   /** Shown beside the save button (the free goods' «Болих»). */
   onClose?: () => void;
@@ -164,7 +166,8 @@ export function ReceiptLinePanel(props: {
   const { t } = useTranslation();
   const { editing } = props;
   const free = props.free === true;
-  const canCost = useHasPermission('inventory.costs.manage') && !free;
+  const canReference = useHasPermission('inventory.costs.manage');
+  const canCost = canReference && !free;
   // Without a table's say, a laptop's: every column.
   const shape: DraftShape = props.shape ?? {
     stacked: false,
@@ -191,11 +194,13 @@ export function ReceiptLinePanel(props: {
   const qtyRef = useRef<HTMLInputElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const printedPriceRef = useRef<HTMLInputElement>(null);
 
   const [product, setProduct] = useState<PanelProduct | null>(null);
   const [unitId, setUnitId] = useState<number | null>(null);
   const [qty, setQty] = useState('1');
   const [entry, setEntry] = useState<CostEntry>(START);
+  const [printedPrice, setPrintedPrice] = useState('');
   const [warehouseId, setWarehouseId] = useState<number | undefined>();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -214,6 +219,7 @@ export function ReceiptLinePanel(props: {
       setUnitId(editing.productUnitId);
       setQty(new Decimal(editing.enteredQty).toString());
       setEntry(entryOfLine(editing, false));
+      setPrintedPrice(editing.printedUnitPrice ?? '');
       setWarehouseId(undefined);
       setSearch('');
       setMessage(null);
@@ -223,6 +229,7 @@ export function ReceiptLinePanel(props: {
       setUnitId(null);
       setQty('1');
       setEntry(START);
+      setPrintedPrice('');
     }
   }
   const wasEditing = useRef(false);
@@ -416,6 +423,9 @@ export function ReceiptLinePanel(props: {
     homeless ? warehouseRef.current : null,
     product && product.units.length > 1 && !editing ? unitRef.current : null,
     qtyRef.current,
+    canReference && (free || entry.free) && !printedPriceRef.current?.disabled
+      ? printedPriceRef.current
+      : null,
     canCost && !entry.free
       ? entry.source === 'amount' && entry.value.trim() !== ''
         ? amountRef.current
@@ -449,6 +459,7 @@ export function ReceiptLinePanel(props: {
     setUnitId(null);
     setQty('1');
     setEntry(START);
+    setPrintedPrice('');
     setWarehouseId(undefined);
     // The search box replaces the chosen product once this renders.
     window.setTimeout(() => searchRef.current?.focus(), 0);
@@ -470,16 +481,36 @@ export function ReceiptLinePanel(props: {
       setMessage(t('inventory.receipt.form.scanPriceInvalid'));
       return;
     }
+    if (
+      canReference &&
+      (free || entry.free) &&
+      printedPrice.trim() !== '' &&
+      parseMoney(printedPrice) === null
+    ) {
+      setMessage(t('inventory.receipt.form.scanPriceInvalid'));
+      printedPriceRef.current?.focus();
+      return;
+    }
     if (homeless && warehouseId === undefined) {
       setMessage(t('inventory.receipt.panel.pickHome'));
       warehouseRef.current?.focus();
       return;
     }
+    const printedText = printedPrice.trim();
+    const previousReference = editing?.printedUnitPrice ?? null;
+    const referenceChanged =
+      editing === null ||
+      (printedText === ''
+        ? previousReference !== null
+        : previousReference === null || !new Decimal(printedText).equals(previousReference));
     const saved = await props.onSubmit({
       product,
       productUnitId: unitId,
       enteredQty: qtyValue,
       price: free ? { ...START, free: true } : canCost ? entry : null,
+      ...(canReference && (free || entry.free) && referenceChanged
+        ? { printedUnitPrice: printedPrice.trim() === '' ? null : parseMoney(printedPrice) }
+        : {}),
       ...(homeless && warehouseId !== undefined ? { warehouseId } : {}),
     });
     if (saved && !editing) {
@@ -489,6 +520,31 @@ export function ReceiptLinePanel(props: {
   };
 
   const none = t('common.none');
+  const differentReferenceUnit =
+    editing?.printedPriceFactor != null &&
+    !new Decimal(editing.printedPriceFactor).eq(editing.factorSnapshot);
+  const printedPriceControl =
+    canReference && (free || entry.free) ? (
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <Label htmlFor={`${ids}-printed-price`}>{t('pricing.settings.printedUnitPrice')}</Label>
+        <MoneyInput
+          ref={printedPriceRef}
+          id={`${ids}-printed-price`}
+          value={printedPrice}
+          onValueChange={setPrintedPrice}
+          onKeyDown={onEnter}
+          disabled={props.pending || differentReferenceUnit}
+          className="text-right font-mono"
+        />
+        <p className="text-xs text-muted-foreground">
+          {differentReferenceUnit && editing?.printedPriceFactor != null
+            ? t('pricing.settings.printedPriceFactorHint', {
+                qty: formatQty(editing.printedPriceFactor),
+              })
+            : t('pricing.settings.printedUnitPriceHint')}
+        </p>
+      </div>
+    ) : null;
   const singleUnit = (product?.units.length ?? 0) < 2;
 
   const chooseScope = (value: 'supplier' | 'all') => {
@@ -870,6 +926,7 @@ export function ReceiptLinePanel(props: {
 
   const feedback = (
     <div aria-live="polite" className="text-sm empty:-mr-4 has-data-[slot=alert]:basis-full">
+      {!free ? printedPriceControl : null}
       {message ? <p className="text-destructive">{message}</p> : null}
       {props.problem}
     </div>
@@ -921,6 +978,7 @@ export function ReceiptLinePanel(props: {
             )}
             {field(t('inventory.unit'), `${ids}-unit`, unitControl)}
             {field(t('inventory.qty'), `${ids}-qty`, qtyControl)}
+            <div className="sm:col-span-2">{printedPriceControl}</div>
             <div className="flex items-center justify-end gap-2 self-end sm:col-span-2 sm:col-start-5">
               {props.onClose ? (
                 <Button variant="ghost" size="sm" onClick={props.onClose}>

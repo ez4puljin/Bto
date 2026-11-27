@@ -13,8 +13,8 @@ import {
 } from 'class-validator';
 import { queryIds } from '../../../common/pagination/page';
 import { LEDGER_REPORT_KINDS, type LedgerReportKind } from '../services/ledger-reports.service';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CONTROLS = [
   'NONE',
   'RECEIVABLE',
@@ -36,8 +36,8 @@ const trimmed = ({ value }: { value: unknown }) =>
 @ApiSchema({ name: 'LedgerReportQuery' })
 export class LedgerReportQueryDto {
   @ApiProperty({ enum: LEDGER_REPORT_KINDS }) @IsIn(LEDGER_REPORT_KINDS) kind: LedgerReportKind;
-  @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-10-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-10-31' }) @IsDateOnly() to: string;
 
   @ApiPropertyOptional({ type: [Number] })
   @IsOptional()

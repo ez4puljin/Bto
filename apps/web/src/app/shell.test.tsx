@@ -10,6 +10,31 @@ import { ADMIN_ME, findSidebar, json, renderApp, signedIn, WORKER_ME } from '@/t
 
 const page = (data: unknown[]) => json({ data, nextCursor: null });
 
+describe('isolated test-data label', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('keeps the ordinary application unlabelled by default', async () => {
+    vi.stubEnv('VITE_QA_LABEL', '');
+    renderApp('/system/status', signedIn(ADMIN_ME));
+    await findSidebar();
+    expect(document.querySelector('[style*="--qa-banner-height"]')).toBeNull();
+    expect(document.querySelector('header [role="status"]')).toBeNull();
+  });
+
+  it('clearly labels an explicitly configured dataset and renders the label as plain text', async () => {
+    const label = 'Туршилтын мэдээлэл · 2026.06–11 <test>';
+    vi.stubEnv('VITE_QA_LABEL', label);
+    renderApp('/system/status', signedIn(ADMIN_ME));
+    await findSidebar();
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(document.querySelector('header [role="status"]')).toHaveTextContent(label);
+    expect(document.querySelector('header test')).toBeNull();
+    expect(document.querySelector('[style*="--qa-banner-height"]')).toHaveStyle(
+      '--qa-banner-height: 2rem',
+    );
+  });
+});
+
 describe('navTrail', () => {
   it('finds the menu entry of a list page and of the pages below it', () => {
     expect(navTrail('/inventory/transfers')).toMatchObject({
@@ -23,6 +48,7 @@ describe('navTrail', () => {
     });
     expect(navTrail('/catalog/products/new')?.item.to).toBe('/catalog/products');
     expect(navTrail('/inventory/receipts/3/costing')?.item.to).toBe('/inventory/receipts');
+    expect(navTrail('/pricing/profiles/4')?.item.to).toBe('/pricing/settings');
   });
 
   it('knows nothing of pages outside the menu and of look-alike paths', () => {
@@ -34,6 +60,17 @@ describe('navTrail', () => {
 
 describe('recent pages', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('keeps a previous profile-list shortcut as one unified settings page', () => {
+    localStorage.setItem(
+      'tugeel.recent.v1:1',
+      JSON.stringify(['/pricing/profiles', '/inventory/stock', '/pricing/settings']),
+    );
+    expect(readRecentPages(1)).toEqual(['/pricing/settings', '/inventory/stock']);
+    rememberRecentPage(1, '/pricing/profiles');
+    expect(readRecentPages(1)).toEqual(['/pricing/settings', '/inventory/stock']);
+    expect(readRecentPages(2)).toEqual([]);
+  });
 
   it('keeps the newest menu paths first, each once, at most five', () => {
     for (const path of ['/a', '/b', '/c', '/b', '/d', '/e', '/f']) rememberRecentPage(1, path);
@@ -245,6 +282,18 @@ describe('modules (ADR-0114)', () => {
 });
 
 describe('favourites (ADR-0114)', () => {
+  it('preserves old profile-list stars once and can unstar them from the shared hub', () => {
+    localStorage.setItem(
+      'tugeel.favorites.v1:1',
+      JSON.stringify(['/pricing/profiles', '/pricing/settings', '/inventory/stock']),
+    );
+    expect(readFavoritePages(1)).toEqual(['/pricing/settings', '/inventory/stock']);
+    setFavoritePage(1, '/pricing/settings', false);
+    expect(readFavoritePages(1)).toEqual(['/inventory/stock']);
+    setFavoritePage(2, '/pricing/profiles', true);
+    expect(readFavoritePages(2)).toEqual(['/pricing/settings']);
+  });
+
   it('stars a menu page from its title and lists it under the star', async () => {
     const user = userEvent.setup();
     renderApp('/inventory/stock', signedIn(ADMIN_ME));
@@ -369,7 +418,7 @@ describe('search (Ctrl+K)', () => {
     await findSidebar();
     await user.keyboard('{Control>}k{/Control}');
     const box = await screen.findByRole('combobox', { name: mn.palette.label });
-    await user.type(box, 'шилж');
+    await user.type(box, mn.nav.transfers);
     // The page comes first, the quick action after it; Enter opens the first.
     expect(
       await screen.findByRole('option', { name: mn.home.actions.newTransfer }),

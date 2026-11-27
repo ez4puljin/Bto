@@ -19,6 +19,8 @@ export function PriceCells(props: {
   enteredQty: string;
   entry: CostEntry;
   editable: boolean;
+  /** Printed reference is frozen after first costing, even while accounting costs may be revised. */
+  referenceEditable?: boolean;
   /** A draft's table lists free goods apart, so it has no «Бонус» cell (ADR-0156). */
   noFreeCell?: boolean;
   onChange?: (patch: Partial<CostEntry>) => void;
@@ -45,7 +47,19 @@ export function PriceCells(props: {
     return (
       <>
         <TableCell className="text-right font-mono">
-          {entry.free || unitPrice === null ? none : formatMnt(unitPrice.toString())}
+          {entry.free ? (
+            entry.printedUnitPrice?.trim() ? (
+              <span title={t('pricing.settings.printedUnitPrice')}>
+                {formatMnt(entry.printedUnitPrice)}
+              </span>
+            ) : (
+              none
+            )
+          ) : unitPrice === null ? (
+            none
+          ) : (
+            formatMnt(unitPrice.toString())
+          )}
         </TableCell>
         <TableCell className="text-right font-mono">
           {amount === null ? none : formatMnt(amount.toString())}
@@ -88,7 +102,32 @@ export function PriceCells(props: {
   };
   return (
     <>
-      <TableCell className="text-right">{field('unitPrice')}</TableCell>
+      <TableCell className="text-right">
+        {entry.free ? (
+          <div className="flex flex-col items-end gap-1">
+            <Input
+              data-cost="unitPrice"
+              aria-label={`${t('pricing.settings.printedUnitPrice')}: ${props.name}`}
+              inputMode="decimal"
+              className="ml-auto w-28 text-right font-mono"
+              value={entry.printedUnitPrice ?? ''}
+              disabled={!props.referenceEditable}
+              onChange={(event) => props.onChange?.({ printedUnitPrice: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  props.onEnter?.('unitPrice', event.currentTarget);
+                }
+              }}
+            />
+            <span className="text-xs text-muted-foreground">
+              {t('pricing.settings.printedReferenceShort')}
+            </span>
+          </div>
+        ) : (
+          field('unitPrice')
+        )}
+      </TableCell>
       <TableCell className="text-right">{field('amount')}</TableCell>
       <TableCell>
         <Switch

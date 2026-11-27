@@ -14,11 +14,10 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 /** A screen name as the clients make it: `/sales/orders/:id`. */
 const SCREEN = /^\/([a-z0-9:_-]+(\/[a-z0-9:_-]+)*)?$/;
-
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 @ApiSchema({ name: 'ScreenUsageEvent' })
 export class ScreenUsageEventDto {
@@ -62,8 +61,8 @@ export class ScreenUsageRequestDto {
 
 @ApiSchema({ name: 'ScreenUsageQuery' })
 export class ScreenUsageQueryDto {
-  @ApiProperty({ example: '2026-11-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-11-30' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-11-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-11-30' }) @IsDateOnly() to: string;
 }
 
 @ApiSchema({ name: 'ScreenUsageRow' })

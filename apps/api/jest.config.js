@@ -24,6 +24,8 @@ const withDatabase = (project) => ({
 
 /** @type {import('jest').Config} */
 module.exports = {
+  // Recycle idle ts-jest workers before retained compiler state exhausts their heaps.
+  workerIdleMemoryLimit: '1200MB',
   projects: [
     { ...common, displayName: 'unit', roots: ['<rootDir>/src'], testMatch: ['**/*.spec.ts'] },
     {

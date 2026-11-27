@@ -171,7 +171,7 @@ export function StockCountsPage() {
                     to={`/inventory/counts/${row.id}`}
                     className="font-medium underline-offset-4 hover:underline"
                   >
-                    {row.number ?? t('inventory.stocktake.noNumber', { id: row.id })}
+                    {row.number ?? t('inventory.counts.noNumber', { id: row.id })}
                   </Link>
                 </TableCell>
                 <TableCell>{row.warehouseName}</TableCell>
@@ -562,7 +562,7 @@ export function StockCountVariancePage() {
                     to={`/inventory/counts/${row.stocktakeId}`}
                     className="font-medium underline-offset-4 hover:underline"
                   >
-                    {row.number ?? t('inventory.stocktake.noNumber', { id: row.stocktakeId })}
+                    {row.number ?? t('inventory.counts.noNumber', { id: row.stocktakeId })}
                   </Link>
                 </TableCell>
                 <TruncateCell text={row.warehouseName} />

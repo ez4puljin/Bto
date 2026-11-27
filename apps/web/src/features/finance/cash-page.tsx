@@ -54,7 +54,10 @@ export function CashPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('finance.cash.title')} />
+      <PageHeader
+        title={t('finance.cash.title')}
+        description={t('finance.cash.voucherBalanceHint', { journal: t('nav.journal') })}
+      />
       <ProblemAlert problem={problemFromError(accounts.error)} onRetry={accounts.refetch} />
       {accounts.data && accounts.data.length === 0 ? (
         <ListCard>
@@ -85,6 +88,9 @@ export function CashPage() {
               {entry.code}
               {entry.branchName ? ` · ${entry.branchName}` : ''}
               {entry.bankAccountNo ? ` · ${entry.bankAccountNo}` : ''}
+            </span>
+            <span className="mt-1 text-xs text-muted-foreground">
+              {t('finance.cash.voucherBalance')}
             </span>
             <span className="font-mono text-lg font-semibold">{formatTugrik(entry.balance)}</span>
           </Link>

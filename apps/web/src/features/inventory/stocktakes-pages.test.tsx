@@ -155,7 +155,11 @@ describe('a new stocktake', () => {
     });
 
     await user.click(dialog.getByRole('button', { name: mn.inventory.stocktake.createDraft }));
-    expect(await screen.findByRole('heading', { name: 'Тооллого №5' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        name: mn.inventory.stocktake.noNumber.replace('{{id}}', '5'),
+      }),
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/inventory/stocktakes/5');
     const created = calls(fetchMock, 'POST', '/api/v1/stocktakes');
     expect(created).toHaveLength(1);
@@ -195,7 +199,9 @@ describe('counting', () => {
     const { router } = renderApp('/inventory/stocktakes/5', fetchMock);
     const user = userEvent.setup();
     const scan = await screen.findByRole('textbox', { name: mn.inventory.stocktake.scanLabel });
-    expect(screen.getByRole('heading', { name: 'Тооллого №5' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: mn.inventory.stocktake.noNumber.replace('{{id}}', '5') }),
+    ).toBeInTheDocument();
 
     // A product before any shelf: the counter is asked for the shelf first.
     await user.type(scan, '4006381333931{Enter}');

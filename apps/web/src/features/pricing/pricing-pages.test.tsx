@@ -357,7 +357,7 @@ describe('product prices card', () => {
     expect(dialog.queryByLabelText(mn.pricing.dialog.wholeUnit)).toBeNull();
     await user.type(dialog.getByLabelText(mn.pricing.dialog.warehousePrice), '500');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
-    expect(dialog.getByText(mn.pricing.dialog.profileRequired)).toBeInTheDocument();
+    expect(dialog.getByRole('alert')).toHaveTextContent(mn.pricing.dialog.profileRequired);
     await user.selectOptions(dialog.getByLabelText(mn.pricing.dialog.profile), 'Хүнс');
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -505,6 +505,33 @@ describe('discount programs', () => {
     await waitFor(() =>
       expect(calls(fetchMock, 'DELETE', '/api/v1/discount-programs/9')).toHaveLength(1),
     );
+  });
+
+  it('keeps an unsaved discount draft on a cancelled exit and discards only when confirmed', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...MASTERS,
+      'GET /api/v1/discount-programs': () => list([]),
+    });
+    const { router } = renderApp('/pricing/discounts/new', fetchMock);
+    const user = userEvent.setup();
+    const name = await screen.findByLabelText(mn.pricing.programs.fields.name);
+    await user.type(name, 'Хадгалаагүй хөнгөлөлт');
+    await user.click(screen.getByRole('button', { name: mn.common.cancel }));
+    const asked = within(
+      await screen.findByRole('dialog', { name: mn.pricing.settings.unsavedTitle }),
+    );
+    await user.click(asked.getByRole('button', { name: mn.common.cancel }));
+    expect(router.state.location.pathname).toBe('/pricing/discounts/new');
+    expect(screen.getByLabelText(mn.pricing.programs.fields.name)).toHaveValue(
+      'Хадгалаагүй хөнгөлөлт',
+    );
+    await user.click(screen.getByRole('button', { name: mn.common.cancel }));
+    const again = within(
+      await screen.findByRole('dialog', { name: mn.pricing.settings.unsavedTitle }),
+    );
+    await user.click(again.getByRole('button', { name: mn.common.discard.confirm }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/pricing/discounts'));
+    expect(calls(fetchMock, 'POST', '/api/v1/discount-programs')).toHaveLength(0);
   });
 
   it('creates a product program: thresholds typed in boxes, sent in pieces', async () => {
@@ -886,7 +913,7 @@ describe('products waiting for their prices', () => {
     expect(dialog.getByText(mn.pricing.dialog.invalidPrice)).toBeInTheDocument();
     await user.type(dialog.getByLabelText(mn.pricing.dialog.warehousePrice), '1200');
     await user.click(complete);
-    expect(dialog.getByText(mn.pricing.dialog.profileRequired)).toBeInTheDocument();
+    expect(dialog.getByRole('alert')).toHaveTextContent(mn.pricing.dialog.profileRequired);
     expect(calls(fetchMock, 'POST', '/api/v1/product-prices')).toHaveLength(0);
     await user.selectOptions(dialog.getByLabelText(mn.pricing.dialog.profile), 'Жишээ: Ундаа');
     expect(dialog.getByText(DRINKS_SUMMARY)).toBeInTheDocument();

@@ -35,6 +35,21 @@ export const queryIds = ({ value }: { value: unknown }): unknown => {
   );
 };
 
+/** Query integers without parseInt's truncation or silently dropping malformed values. */
+export const queryInteger = ({ value }: { value: unknown }): unknown => {
+  if (typeof value === 'number') return Number.isSafeInteger(value) ? value : Number.NaN;
+  if (typeof value !== 'string' || !/^[+-]?\d+$/.test(value.trim())) return value;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : value;
+};
+
+/** Only the literal query booleans are converted; other values still fail @IsBoolean. */
+export const queryBoolean = ({ value }: { value: unknown }): unknown => {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
+};
+
 /** Encodes the sort key of the last row of a page. */
 export function encodeCursor(key: Record<string, string | number>): string {
   return Buffer.from(JSON.stringify(key), 'utf8').toString('base64url');

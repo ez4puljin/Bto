@@ -30,14 +30,14 @@ import {
   type StockBalanceGrouping,
 } from '../services/stock-balance.service';
 import { STOCK_PARTY_KINDS, type StockPartyKind } from '../services/stock-documents.service';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const queryList = ({ value }: { value: unknown }) =>
   value === undefined ? undefined : Array.isArray(value) ? value : [value];
 
 class RangeQueryDto {
-  @ApiProperty({ example: '2026-10-01' }) @Matches(DATE) from: string;
-  @ApiProperty({ example: '2026-10-31' }) @Matches(DATE) to: string;
+  @ApiProperty({ example: '2026-10-01' }) @IsDateOnly() from: string;
+  @ApiProperty({ example: '2026-10-31' }) @IsDateOnly() to: string;
 }
 
 function optionalId() {

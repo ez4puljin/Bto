@@ -28,17 +28,11 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { queryBoolean, queryInteger } from '../../../common/pagination/page';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
-const toInt = ({ value }: { value: unknown }) =>
-  typeof value === 'string' && value !== ''
-    ? Number.parseInt(value, 10)
-    : typeof value === 'number'
-      ? value
-      : undefined;
-const toBool = ({ value }: { value: unknown }) => value === true || value === 'true';
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MULTIPLIER = /^\d{1,3}(\.\d{1,2})?$/;
 const AMOUNT = { description: 'Money as text, «300000» or «300000.50»', example: '300000.00' };
 const PERCENT = { description: 'A percent 0–100 as text, at most two decimals', example: '86.9' };
@@ -150,7 +144,11 @@ export class PayrollTemplateApplyRequestDto {
 }
 
 export class PayrollIncludeArchivedQueryDto {
-  @ApiPropertyOptional() @IsOptional() @Transform(toBool) @IsBoolean() includeArchived?: boolean;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  includeArchived?: boolean;
 }
 
 @ApiSchema({ name: 'PayrollTerms' })
@@ -271,7 +269,7 @@ export class PayrollAdvanceRequestDto {
   @Matches(PAYROLL_MONTH_PATTERN)
   month: string;
   @ApiProperty(AMOUNT) @IsString() @Matches(PAYROLL_AMOUNT_PATTERN) amount: string;
-  @ApiProperty({ example: '2026-10-15' }) @Matches(DATE) paidOn: string;
+  @ApiProperty({ example: '2026-10-15' }) @IsDateOnly() paidOn: string;
   @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
@@ -293,8 +291,12 @@ export class PayrollAdvancesQueryDto {
   @IsOptional()
   @Matches(PAYROLL_MONTH_PATTERN)
   month?: string;
-  @ApiPropertyOptional() @IsOptional() @Transform(toInt) @IsInt() @Min(1) userId?: number;
-  @ApiPropertyOptional() @IsOptional() @Transform(toBool) @IsBoolean() includeVoided?: boolean;
+  @ApiPropertyOptional() @IsOptional() @Transform(queryInteger) @IsInt() @Min(1) userId?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  includeVoided?: boolean;
 }
 
 // ── runs and payslips ──────────────────────────────────────────────────────
@@ -379,9 +381,9 @@ export class PayrollSourceDeductionDto extends PayrollSourcePayslipEntryDto {
 export class PayrollSourceDeductionsQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) sourceReference?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) sourceKey?: string;
-  @ApiPropertyOptional() @IsOptional() @Transform(toInt) @IsInt() @Min(1) userId?: number;
+  @ApiPropertyOptional() @IsOptional() @Transform(queryInteger) @IsInt() @Min(1) userId?: number;
   @ApiPropertyOptional() @IsOptional() @Matches(PAYROLL_MONTH_PATTERN) month?: string;
-  @ApiPropertyOptional() @IsOptional() @Transform(toBool) @IsBoolean() pendingOnly?: boolean;
+  @ApiPropertyOptional() @IsOptional() @Transform(queryBoolean) @IsBoolean() pendingOnly?: boolean;
 }
 
 @ApiSchema({ name: 'PayrollSourceMonthRequest' })

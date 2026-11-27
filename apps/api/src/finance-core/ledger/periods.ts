@@ -1,3 +1,4 @@
+import { isIsoDate } from '@tugeel/shared/time';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import type { FinTx } from '../db/fin-db';
 import { FinError } from '../errors';
@@ -14,7 +15,9 @@ const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 /** The month of a business date, `YYYY-MM`, with its first and last day (calendar arithmetic only). */
 export function monthOf(date: string): { code: string; startsOn: string; endsOn: string } {
   const match = ISO_DATE.exec(date);
-  if (!match) throw new FinError('FIN_PAYLOAD_INVALID', undefined, { path: 'entryDate' });
+  if (!match || !isIsoDate(date)) {
+    throw new FinError('FIN_PAYLOAD_INVALID', undefined, { path: 'entryDate' });
+  }
   const [, year = '', month = ''] = match;
   const y = Number.parseInt(year, 10);
   const m = Number.parseInt(month, 10);

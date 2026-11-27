@@ -43,7 +43,7 @@ export function StockCountPrintPage() {
   const title = search.get('pdf')
     ? t('inventory.counts.print.fileName', { date: day })
     : t('inventory.counts.print.title', {
-        number: count.data?.number ?? t('inventory.stocktake.noNumber', { id }),
+        number: count.data?.number ?? t('inventory.counts.noNumber', { id }),
       });
   const numbers = useMemo(() => new Map(rows.map((row, index) => [row.lineId, index + 1])), [rows]);
 
@@ -68,7 +68,7 @@ export function StockCountPrintPage() {
                   {t('inventory.counts.print.subtitle', {
                     company: companyName,
                     warehouse: count.data.warehouseName,
-                    number: count.data.number ?? t('inventory.stocktake.noNumber', { id }),
+                    number: count.data.number ?? t('inventory.counts.noNumber', { id }),
                     date: day,
                   })}
                 </p>

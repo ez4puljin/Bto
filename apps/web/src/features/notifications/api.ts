@@ -60,7 +60,27 @@ export function useNoticeMutations() {
 }
 
 export type MyNotice = Schemas['MyNotice'];
-export type MyNotification = Schemas['MyNotification'];
+export interface PriceChangeNotification {
+  receiptId: number;
+  receiptNumber: string;
+  changeCount: number;
+  warningCount: number;
+  overwrittenManualCount: number;
+  changes: {
+    eventId: number;
+    productId: number;
+    sku: string;
+    name: string;
+    oldBasePrice: string | null;
+    newBasePrice: string;
+    overrodeManual: boolean;
+  }[];
+  warnings: { eventId: number; productId: number; sku: string; name: string; reason: string }[];
+}
+export type MyNotification = Omit<Schemas['MyNotification'], 'kind'> & {
+  kind: Schemas['MyNotification']['kind'] | 'PRICE_CHANGED';
+  priceChange?: PriceChangeNotification | null;
+};
 
 /** The signed-in user's own inbox (ADR-0062 #3), the web's bell since ADR-0114. */
 export const INBOX_KEY = ['notifications', 'mine'] as const;
@@ -84,7 +104,7 @@ export function useInboxItems(enabled: boolean) {
   return useQuery({
     queryKey: [...INBOX_KEY, 'items'],
     queryFn: async ({ signal }) =>
-      unwrap(
+      unwrap<{ data: MyNotification[]; nextCursor: string | null }>(
         await api.GET('/api/v1/me/notifications', { params: { query: { limit: 20 } }, signal }),
       ),
     enabled,

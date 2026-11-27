@@ -38,6 +38,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { IsDateOnly } from '../../../common/validation/date-only';
 
 const trimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -45,7 +46,6 @@ const toInt = ({ value }: { value: unknown }): unknown => {
   if (typeof value === 'number') return value;
   return typeof value === 'string' && /^\d+$/.test(value) ? Number.parseInt(value, 10) : value;
 };
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const COORDINATE = /^-?\d{1,3}(\.\d{1,7})?$/;
 
@@ -296,8 +296,8 @@ export class HrPollAnswersRequestDto {
 
 @ApiSchema({ name: 'HrRangeQuery' })
 export class HrRangeQueryDto {
-  @ApiProperty() @Matches(DATE) from: string;
-  @ApiProperty() @Matches(DATE) to: string;
+  @ApiProperty() @IsDateOnly() from: string;
+  @ApiProperty() @IsDateOnly() to: string;
 }
 
 @ApiSchema({ name: 'HrMoodRequest' })
@@ -353,8 +353,8 @@ export class HrFeedbackRequestDto {
 
 @ApiSchema({ name: 'HrFeedbackQuery' })
 export class HrFeedbackQueryDto {
-  @ApiPropertyOptional() @IsOptional() @Matches(DATE) from?: string;
-  @ApiPropertyOptional() @IsOptional() @Matches(DATE) to?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateOnly() from?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateOnly() to?: string;
   @ApiPropertyOptional({ enum: FEEDBACK_STATUSES, enumName: 'HrFeedbackStatus' })
   @IsOptional()
   @IsIn(FEEDBACK_STATUSES)
@@ -521,10 +521,10 @@ export class HrEventRequestDto {
   @IsString()
   @MaxLength(ENGAGEMENT_LIMITS.maxNote)
   note?: string | null;
-  @ApiProperty() @Matches(DATE) fromDate: string;
+  @ApiProperty() @IsDateOnly() fromDate: string;
   @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
-  @Matches(DATE)
+  @IsDateOnly()
   toDate?: string | null;
 }
 
@@ -553,7 +553,7 @@ export class HrChildDto {
   @IsOptional()
   @IsIn(EMPLOYEE_GENDERS)
   gender?: EmployeeGender | null;
-  @ApiProperty() @Matches(DATE) birthDate: string;
+  @ApiProperty() @IsDateOnly() birthDate: string;
 }
 
 @ApiSchema({ name: 'HrProfile' })
@@ -574,7 +574,7 @@ export class HrProfileDto {
 export class HrProfileRequestDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
-  @Matches(DATE)
+  @IsDateOnly()
   birthDate?: string | null;
   @ApiPropertyOptional({ enum: EMPLOYEE_GENDERS, enumName: 'EmployeeGender', nullable: true })
   @IsOptional()

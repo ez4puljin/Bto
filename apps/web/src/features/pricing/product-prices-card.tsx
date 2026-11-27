@@ -85,6 +85,15 @@ export function ProductPricesCard({ productId, pending }: { productId: number; p
           </div>
         ) : null}
         <ProblemAlert problem={completion.problem} />
+        <p className="text-xs text-muted-foreground">{t('pricing.settings.legacyProfileHint')}</p>
+        {canManage ? (
+          <Link
+            className="text-sm text-link"
+            to={`/pricing/settings?tab=products&productId=${productId}`}
+          >
+            {t('pricing.settings.viewBaseHistory')}
+          </Link>
+        ) : null}
         {data ? <PriceTermsView data={data} /> : null}
       </CardContent>
       {editing ? (

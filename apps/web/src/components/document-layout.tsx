@@ -38,7 +38,7 @@ export function DocumentWindow(props: { children: ReactNode }) {
   return (
     <div
       data-slot="document-window"
-      className="flex flex-col [--radius:0.625rem] lg:h-[calc(100svh-3.25rem-1px-1.25rem)] lg:min-h-[30rem]"
+      className="flex flex-col [--radius:0.625rem] lg:h-[calc(100svh-3.25rem-1px-1.25rem-var(--qa-banner-height,0px))] lg:min-h-[30rem]"
     >
       {props.children}
     </div>

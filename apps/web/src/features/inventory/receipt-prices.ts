@@ -34,7 +34,13 @@ const plain = (value: string) => new Decimal(value).toString();
  * amount), else the amount. A costed receipt's lines carry the costing's amounts.
  */
 export function entryOfLine(line: ReceiptLine, costed: boolean): CostEntry {
-  if (line.freeGoods) return { source: 'amount', value: '', free: true };
+  if (line.freeGoods)
+    return {
+      source: 'amount',
+      value: '',
+      free: true,
+      printedUnitPrice: line.printedUnitPrice ?? '',
+    };
   if (!costed && line.docUnitPrice != null) {
     return { source: 'unitPrice', value: plain(line.docUnitPrice), free: false };
   }
@@ -46,7 +52,10 @@ export function entryOfLine(line: ReceiptLine, costed: boolean): CostEntry {
 }
 
 export const sameEntry = (a: CostEntry, b: CostEntry) =>
-  a.free === b.free && a.source === b.source && a.value.trim() === b.value.trim();
+  a.free === b.free &&
+  a.source === b.source &&
+  a.value.trim() === b.value.trim() &&
+  (a.printedUnitPrice ?? '').trim() === (b.printedUnitPrice ?? '').trim();
 
 /** Moves the cursor to the same price field of the next line that takes one. */
 export function focusNextPrice(
@@ -136,7 +145,17 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
 
   const entry = (lineId: number) => entries[lineId] ?? initial[lineId] ?? EMPTY_ENTRY;
   const amounts = lines.map((line) => entryAmount(entry(line.id), line.enteredQty));
-  const complete = lines.length > 0 && amounts.every((amount) => amount !== null);
+  const complete =
+    lines.length > 0 &&
+    amounts.every((amount) => amount !== null) &&
+    lines.every((line) => {
+      const value = entry(line.id);
+      return (
+        !value.free ||
+        !value.printedUnitPrice?.trim() ||
+        parseMoney(value.printedUnitPrice) !== null
+      );
+    });
   const typedNote = parseMoney(noteAmount);
   const noteChanged = typedNote !== null && typedNote !== savedNote;
   const total = amounts.reduce<Decimal>((sum, amount) => sum.plus(amount ?? 0), new Decimal(0));
@@ -171,7 +190,17 @@ export function usePostedCosts(detail: ReceiptDetail, enabled: boolean) {
           ...(noteChanged ? { noteTotalAmount: typedNote } : {}),
           lines: lines.map((line) => {
             const value = entry(line.id);
-            if (value.free) return { lineId: line.id, freeGoods: true };
+            if (value.free)
+              return {
+                lineId: line.id,
+                freeGoods: true,
+                ...(!costed && line.printedUnitPrice == null && value.printedUnitPrice?.trim()
+                  ? {
+                      printedUnitPrice:
+                        parseMoney(value.printedUnitPrice) ?? value.printedUnitPrice.trim(),
+                    }
+                  : {}),
+              };
             const typed = parseMoney(value.value) ?? value.value.trim();
             return value.source === 'amount'
               ? { lineId: line.id, amount: typed }

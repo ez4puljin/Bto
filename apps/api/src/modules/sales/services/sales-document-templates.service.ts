@@ -210,6 +210,11 @@ export class SalesDocumentTemplatesService implements OnApplicationBootstrap {
   ): Promise<DocumentTemplateDetail> {
     const name = nameOf(input.name);
     const id = await inTransaction(this.db, async (tx) => {
+      // The cap covers the whole catalogue, including both kinds and every manager.
+      // Serialize the count-and-insert before either concurrent create counts.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${'sales-document-template-limit'}, 0))`,
+      );
       const [{ count } = { count: 0 }] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(salesDocumentTemplates);
