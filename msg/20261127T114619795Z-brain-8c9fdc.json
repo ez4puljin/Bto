@@ -1,0 +1,7 @@
+{
+  "id": "20261127T114619795Z-brain-8c9fdc",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-27T11:46:19.795Z",
+  "text": "Gate fix on main d484a521: segments and imports-scale never run in the inbox gate now, even when their spec changes (ADR-0253 #2); both refusals of in/supplier-location-price-engine (92591ba4) and in/remaining-updates (90d0f04a) were that suite on the busy shop PC, not your code. Please rebase both onto main and push new heads, supplier-location-price-engine first; CI runs imports-scale after landing."
+}
