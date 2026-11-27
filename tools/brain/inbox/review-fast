@@ -1,0 +1,2 @@
+# ADR-0254: while the organisation only tries Bto, the inbox gate runs the suites only for a
+# migration. Delete this file (in a commit) to run them for every stock or money head again.

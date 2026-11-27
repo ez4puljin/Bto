@@ -2880,6 +2880,37 @@ test("review: auto all (ADR-0250) takes the owner's areas with the stricter mode
   }
 });
 
+test('review: auto fast (ADR-0254) skips the suites unless the head has a migration', () => {
+  const inbox = makeInbox();
+  try {
+    assert.match(inbox.run('auto', 'fast').stdout, /only for a migration/);
+    assert.match(inbox.run('auto', 'status').stdout, /fast: suites only for a migration/);
+    inbox.push('stock-post', { 'apps/api/src/modules/sales/s.ts': 'export const s = 7;\n' });
+    inbox.run('tick');
+    const pass = inbox.run('review');
+    assert.match(pass.stdout, /suites: skipped, auto fast/);
+    assert.equal(inbox.item('stock-post').review, 'approved');
+    assert.ok(!existsSync(join(inbox.dir, 'suites')));
+    let argv = readFileSync(join(inbox.dir, 'claude-argv'), 'utf8').split('\0');
+    assert.equal(argv[argv.indexOf('--model') + 1], 'sonnet');
+    inbox.run('tick');
+    assert.equal(inbox.item('stock-post').state, 'LANDED');
+    inbox.push('schema-add', {
+      'apps/api/src/db/migrations/0300_add.sql': 'ALTER TABLE x ADD COLUMN y text;\n',
+    });
+    inbox.run('tick');
+    inbox.run('review');
+    assert.equal(inbox.item('schema-add').review, 'approved');
+    assert.match(readFileSync(join(inbox.dir, 'suites'), 'utf8'), /--integrity/);
+    argv = readFileSync(join(inbox.dir, 'claude-argv'), 'utf8').split('\0');
+    assert.equal(argv[argv.indexOf('--model') + 1], 'opus');
+    assert.doesNotMatch(inbox.run('auto', 'all').stdout, /fast/);
+    assert.doesNotMatch(inbox.run('auto', 'status').stdout, /fast:/);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
 test('review: a test deleted or skipped in an allowed area waits for the owner', () => {
   const inbox = makeInbox();
   try {

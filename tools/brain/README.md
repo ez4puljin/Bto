@@ -190,7 +190,7 @@ bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
 bash tools/brain/inbox.sh review [--dry-run]      one automatic review (the timer bto-brain-review, ADR-0249)
 bash tools/brain/inbox.sh review --again <branch> forget the automatic review's result; the next pass reviews it
 bash tools/brain/inbox.sh auto on|off|status      the automatic review's switch (on unless turned off)
-bash tools/brain/inbox.sh auto all|allowlist      all: it also lands the owner's areas (ADR-0250); allowlist: back to ADR-0249
+bash tools/brain/inbox.sh auto all|fast|allowlist all: it also lands the owner's areas (ADR-0250); fast: suites only for a migration (ADR-0254); allowlist: back to ADR-0249
 ```
 
 - **`tick`** (the user timer `bto-brain-inbox.timer`, every 20 seconds, `nice 15`, installed by
@@ -385,6 +385,10 @@ run, so the 20-second tick is as fast as before.
 12. **Focused suites (ADR-0253, owner 2026-11-27):** `--integrity` runs only the integrity suites of
    the modules the head touches (`integrity_prefixes_of`), the ones it changes, and the platform's
    guards; `segments` and `imports-scale` (20,000 products) never run in the gate. CI runs them all.
+13. **Fast (ADR-0254, while staff only try Bto):** with `tools/brain/inbox/review-fast` in the
+   repository, or `inbox.sh auto fast`, the suites run only for a head with a migration (and
+   `opus` only there); every other head lands after `check:fast` and the reviewer. Delete the file
+   before the company uses Bto for real.
 
 **Trust:** the reviewer reads a trusted collaborator's code, but a diff could still talk an AI round.
 The hard rails are the script's: the guard rails, the allow-list and the diff rules, `check:fast` and
