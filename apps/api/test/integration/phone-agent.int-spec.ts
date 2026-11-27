@@ -262,9 +262,9 @@ describe('the phone AI order line (ADR-0232)', () => {
   it('opens the station only to its key, and replaces it at once', async () => {
     const refused = await http().get('/api/v1/phone-agent/station').expect(401);
     expect(refused.body).toMatchObject({ code: 'PHONE_KEY_INVALID' });
-    await station(`${key.slice(0, -1)}x`)
-      .status()
-      .expect(401);
+    const invalidKey = `${key.slice(0, -1)}${key.endsWith('x') ? 'y' : 'x'}`;
+    expect(invalidKey).not.toBe(key);
+    await station(invalidKey).status().expect(401);
     await station(`bpl_999999_${'a'.repeat(32)}`)
       .status()
       .expect(401);
