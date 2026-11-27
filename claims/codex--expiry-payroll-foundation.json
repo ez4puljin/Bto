@@ -4,7 +4,9 @@
   "paths": [
     "apps/api/jest.config.js",
     "apps/api/src/db/migrations/0126_expiry_commerce.sql",
+    "apps/api/src/db/migrations/0129_expiry_commerce.sql",
     "apps/api/src/db/migrations/meta/0126_snapshot.json",
+    "apps/api/src/db/migrations/meta/0129_snapshot.json",
     "apps/api/src/db/migrations/meta/_journal.json",
     "apps/api/src/db/schema.ts",
     "apps/api/src/modules/expiry/ports.ts",
@@ -34,6 +36,6 @@
     "packages/api-client/src/generated/schema.ts",
     "packages/shared/src/expiry/index.ts"
   ],
-  "what": "Expiry payroll foundation additive0126 ADR0245 standalone contracts/schema; no visible flow yet",
+  "what": "Renumber unpublished expiry migration after owner approval; preserve landed0128",
   "since": "2026-11-27T01:34:56.230Z"
 }
