@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { PosSnapshot, SnapshotProgram } from '@tugeel/shared/pos';
 import { businessDate } from '@tugeel/shared/time';
 import { asc, eq } from 'drizzle-orm';
@@ -7,6 +8,7 @@ import { DB } from '../../../common/db/db.tokens';
 import type { Db } from '../../../common/db/db.types';
 import { CatalogService, CategoriesService, TaxService } from '../../catalog';
 import { HrSettingsService } from '../../hr';
+import { POS_EXPIRY_OFFERS, type PosExpiryOffers } from '../expiry-offers';
 import { OrgService, UserNamesService } from '../../identity';
 import {
   DiscountProgramsService,
@@ -49,13 +51,20 @@ export class PosSnapshotService {
     private readonly tills: PosTillsService,
     private readonly receiptTemplates: PosReceiptTemplatesService,
     private readonly hr: HrSettingsService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private expiry(): PosExpiryOffers {
+    return this.moduleRef.get<PosExpiryOffers>(POS_EXPIRY_OFFERS, { strict: false });
+  }
 
   forNode(node: EdgeNode): Promise<PosSnapshot> {
     return this.build(node);
   }
 
   private async build(node: EdgeNode): Promise<PosSnapshot> {
+    // A conservative acknowledgement watermark: every offer balance is read after this instant.
+    const generatedAt = new Date().toISOString();
     const today = businessDate();
     const settings = await this.settings.get();
     const company = await this.tax.companyRates(today);
@@ -224,8 +233,14 @@ export class PosSnapshotService {
       quickGroups: await this.quickButtons.forSnapshot(),
       paymentTypes: await this.paymentTypes.forSnapshot(),
       receiptTemplates: await this.receiptTemplates.forSnapshot(),
+      expiryOffers: (await this.expiry().snapshots(this.db, { channel: 'RETAIL' })).filter(
+        (offer) =>
+          tillRows.some(
+            (till) => till.id === offer.contextId && till.warehouseId === offer.warehouseId,
+          ),
+      ),
     };
     const version = createHash('sha256').update(JSON.stringify(body)).digest('hex').slice(0, 20);
-    return { version, generatedAt: new Date().toISOString(), ...body };
+    return { version, generatedAt, ...body };
   }
 }

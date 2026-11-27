@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Decimal } from '../money';
+import { lineBonuses } from './bonus';
 import {
   type PricedLine,
   type QuoteContext,
@@ -122,6 +123,69 @@ const program = (
   categoryIds: null,
   countUomId: null,
   ...fields,
+});
+
+describe('approved source prices', () => {
+  it('keeps fresh units of the same SKU on their ordinary programs and excludes the marked variant from coupons and thresholds', () => {
+    const promotion = program({
+      id: 810,
+      scope: 'PRODUCT',
+      effect: 'PERCENT',
+      productId: COLA,
+      steps: steps([2, 10]),
+    });
+    const order = program({ id: 811, scope: 'ORDER', effect: 'PERCENT', steps: steps([3000, 50]) });
+    const own = {
+      ...context([promotion, order], 'RETAIL'),
+      coupons: [{ code: 'TEN', name: 'Ten', effect: 'PERCENT' as const, value: d(10) }],
+    };
+    const fresh = line(COLA, colaPcs, 1);
+    const source = { ...line(COLA, colaPcs, 20), fixedBaseUnitPrice: d(55) };
+    const ordinary = resolveQuote([fresh], own);
+    const result = resolveQuote([source, fresh], own);
+    expect(result.lines[1]).toEqual(ordinary.lines[0]);
+    expect(result.lines[0]).toMatchObject({
+      priced: true,
+      subtotal: d(1100),
+      discountAmount: d(0),
+      total: d(1100),
+    });
+    expect((result.lines[0] as PricedLine).parts[0]?.applied).toEqual([]);
+    expect(result.orderAmount).toEqual(ordinary.orderAmount);
+  });
+
+  it('preserves source base quantities and channel monetary precision without ordinary price terms', () => {
+    const source = { ...line(RICE, ricePack, '1.5'), fixedBaseUnitPrice: d('55.25') };
+    const retail = resolveQuote([source], context([], 'RETAIL', [[RICE, { terms: null }]]));
+    const wholesale = resolveQuote([source], context([], 'WHOLESALE', [[RICE, { terms: null }]]));
+    expect(retail.total.toFixed(2)).toBe('124.31');
+    expect(wholesale.total.toFixed(0)).toBe('124');
+    const part = (retail.lines[0] as PricedLine).parts[0];
+    expect(part).toMatchObject({
+      unitId: riceKg.unitId,
+      qty: d('2.25'),
+      qtyBase: d('2.25'),
+      unitPrice: d('55.25'),
+    });
+  });
+
+  it('never gives an approved variant an N+M bonus or lets its quantity give a fresh line a bonus', () => {
+    const bonus = program({
+      id: 812,
+      scope: 'PRODUCT',
+      effect: 'BONUS',
+      productId: COLA,
+      steps: steps([2, 1]),
+    });
+    const own = context([bonus], 'RETAIL');
+    const fresh = line(COLA, colaPcs, 1);
+    const source = { ...line(COLA, colaPcs, 2), fixedBaseUnitPrice: d(55) };
+    const result = resolveQuote([fresh, source], own);
+    const bonuses = lineBonuses([fresh, source], result, own.programs, own.products);
+    expect(bonuses[0]?.freeQtyBase.toFixed()).toBe('0');
+    expect(bonuses[1]).toBeNull();
+    expect(result.lines[0]).toEqual(resolveQuote([fresh], own).lines[0]);
+  });
 });
 
 const priced = (result: QuoteResult, index: number): PricedLine => {

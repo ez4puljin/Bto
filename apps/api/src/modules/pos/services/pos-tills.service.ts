@@ -95,6 +95,17 @@ export class PosTillsService {
     private readonly templates: PosReceiptTemplatesService,
   ) {}
 
+  /** Trusted application context reader; no credentials or staff lists leave POS. */
+  saleContexts(
+    executor: Db | Tx = this.db,
+  ): Promise<{ id: number; name: string; warehouseId: number }[]> {
+    return executor
+      .select({ id: posTills.id, name: posTills.name, warehouseId: posTills.warehouseId })
+      .from(posTills)
+      .where(eq(posTills.status, 'ACTIVE'))
+      .orderBy(asc(posTills.id));
+  }
+
   async list(filter: { edgeNodeId?: number } = {}): Promise<Till[]> {
     const rows = await this.db
       .select()

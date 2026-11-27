@@ -52,6 +52,8 @@ import {
 import { CustomerAddressesService, CustomersService, type LockedCustomer } from '../../partners';
 import { PriceQuoteService, type QuotedLine } from '../../pricing';
 import {
+  EXPIRY_SALE_POSTING,
+  type ExpirySalePosting,
   type BackorderedLine,
   CREDIT_CHECKER,
   type CreditChecker,
@@ -85,6 +87,7 @@ type OrderRow = typeof salesOrders.$inferSelect;
 type LineRow = typeof salesOrderLines.$inferSelect;
 
 export interface OrderLineInput {
+  expiryBarcode?: string | null;
   productUnitId: number;
   /** In the unit. */
   qty: Decimal;
@@ -216,6 +219,10 @@ export class SalesOrdersService implements OnModuleInit {
     private readonly picks: SalesPicksService,
     private readonly moduleRef: ModuleRef,
   ) {}
+
+  private expiry(): ExpirySalePosting {
+    return this.moduleRef.get<ExpirySalePosting>(EXPIRY_SALE_POSTING, { strict: false });
+  }
 
   onModuleInit(): void {
     this.creditChecker = this.hook<CreditChecker>(CREDIT_CHECKER);
@@ -599,6 +606,7 @@ export class SalesOrdersService implements OnModuleInit {
           .where(eq(salesOrderLineParts.lineId, line.id))
           .orderBy(asc(salesOrderLineParts.partNo));
         await tx.insert(salesOrderExcludedLines).values({
+          expiryBarcode: line.expiryBarcode,
           orderId: id,
           productId: line.productId,
           productUnitId: line.productUnitId,
@@ -651,6 +659,7 @@ export class SalesOrdersService implements OnModuleInit {
             lineNo,
             productId: entry.row.productId,
             productUnitId: entry.row.productUnitId,
+            expiryBarcode: entry.row.expiryBarcode,
             qty: entry.qty,
             originalQty: entry.row.originalQty,
             factorSnapshot: entry.row.factorSnapshot,
@@ -693,6 +702,7 @@ export class SalesOrdersService implements OnModuleInit {
             lineNo,
             productId: line.productId,
             productUnitId: line.unitId,
+            expiryBarcode: input.add[index]?.expiryBarcode ?? null,
             qty,
             // Added after the order was placed: no first quantity (ADR-0178).
             originalQty: null,
@@ -778,6 +788,9 @@ export class SalesOrdersService implements OnModuleInit {
     priceDate: string,
     today: string,
   ): Promise<void> {
+    const sources = new Map(
+      (await this.linesOf(tx, order.id)).map((line) => [line.id, line.expiryBarcode]),
+    );
     const groups: [string, typeof lines][] = [
       [priceDate, lines.filter((line) => !line.today)],
       [today, lines.filter((line) => line.today)],
@@ -789,7 +802,11 @@ export class SalesOrdersService implements OnModuleInit {
           list: 'WHOLESALE',
           date,
           pipelineId: order.pipelineId,
-          lines: group.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
+          lines: group.map((line) => ({
+            productUnitId: line.productUnitId,
+            qty: line.qty,
+            expiryBarcode: sources.get(line.lineId),
+          })),
         },
         tx,
       );
@@ -1162,7 +1179,11 @@ export class SalesOrdersService implements OnModuleInit {
           list: 'WHOLESALE',
           date: today,
           pipelineId: order.pipelineId,
-          lines: lines.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
+          lines: lines.map((line) => ({
+            productUnitId: line.productUnitId,
+            qty: line.qty,
+            expiryBarcode: line.expiryBarcode,
+          })),
         },
         tx,
       );
@@ -1390,6 +1411,7 @@ export class SalesOrdersService implements OnModuleInit {
   private async saleInTx(tx: Tx, actor: Actor, order: OrderRow, ebarimt: boolean): Promise<void> {
     const id = order.id;
     const lines = await this.linesOf(tx, id);
+    if (lines.some((line) => line.expiryBarcode)) await this.expiry().lockInTx(tx);
     const products = new Map(
       (
         await this.catalog.getMany(
@@ -1441,13 +1463,54 @@ export class SalesOrdersService implements OnModuleInit {
       })
       .where(eq(salesOrders.id, id));
     await this.event(tx, actor, id, 'PACKED', 'DELIVERED', null);
-    const invoice = this.saleSink
-      ? await this.saleSink.onSold(
-          tx,
-          actor,
-          await this.snapshotOf(tx, order, lines, products, ebarimt),
-        )
-      : null;
+    const snapshot = await this.snapshotOf(tx, order, lines, products, ebarimt);
+    const invoice = this.saleSink ? await this.saleSink.onSold(tx, actor, snapshot) : null;
+    const marked = lines.filter(
+      (line) => line.expiryBarcode && (line.qtyPicked ?? new Decimal(0)).gt(0),
+    );
+    if (marked.length > 0) {
+      if (!invoice?.sourceLines || order.pipelineId === null)
+        throw invalid(
+          'expiryBarcode',
+          'invoice',
+          'an expiry sale needs a real sales invoice and pipeline',
+        );
+      const soldAt = new Date();
+      for (const line of marked.sort(
+        (a, b) => (a.expiryBarcode ?? '').localeCompare(b.expiryBarcode ?? '') || a.id - b.id,
+      )) {
+        const sold = snapshot.lines.find((row) => row.orderLineId === line.id);
+        if (!sold || !line.expiryBarcode) continue;
+        const parts = invoice.sourceLines.filter((part) => part.orderLineId === line.id);
+        const invoicedQty = parts.reduce((sum, part) => sum.plus(part.qtyBase), new Decimal(0));
+        if (!invoicedQty.eq(sold.qtyDelivered))
+          throw invalid(
+            'expiryBarcode',
+            'invoice',
+            'actual invoice quantity differs from the physical delivery',
+          );
+        const grossAmount = parts.reduce((sum, part) => sum.plus(part.grossAmount), new Decimal(0));
+        const revenueAmount = parts.reduce(
+          (sum, part) => sum.plus(part.revenueAmount),
+          new Decimal(0),
+        );
+        await this.expiry().recordSaleInTx(tx, actor, {
+          barcode: line.expiryBarcode,
+          sourceKind: 'WHOLESALE',
+          saleId: String(order.id),
+          lineId: String(line.id),
+          productId: line.productId,
+          productUnitId: line.productUnitId,
+          warehouseId: line.warehouseId,
+          channel: 'WHOLESALE',
+          contextId: order.pipelineId,
+          qtyBase: sold.qtyDelivered,
+          grossAmount,
+          revenueAmount,
+          soldAt,
+        });
+      }
+    }
     if (invoice) {
       await tx
         .update(salesOrders)
@@ -1822,6 +1885,51 @@ export class SalesOrdersService implements OnModuleInit {
     return row?.number ?? null;
   }
 
+  /** Finance calls before stock locks for an actual warehouse credit-note return. */
+  async lockExpiryReturnsInTx(
+    tx: Tx,
+    orderId: number,
+    orderLineIds: readonly number[],
+  ): Promise<void> {
+    if (orderLineIds.length === 0) return;
+    const lines = await tx
+      .select({ barcode: salesOrderLines.expiryBarcode })
+      .from(salesOrderLines)
+      .where(and(eq(salesOrderLines.orderId, orderId), idIn(salesOrderLines.id, orderLineIds)));
+    if (lines.some((line) => line.barcode)) await this.expiry().lockInTx(tx);
+  }
+
+  /** A physical return names the immutable delivered order line; SKU/date cannot establish it. */
+  async recordExpiryReturnInTx(
+    tx: Tx,
+    actor: Actor,
+    input: {
+      orderId: number;
+      orderLineId: number;
+      returnId: number;
+      returnLineId: number;
+      qtyBase: Decimal;
+      returnedAt: Date;
+    },
+  ): Promise<void> {
+    const [line] = await tx
+      .select({ barcode: salesOrderLines.expiryBarcode })
+      .from(salesOrderLines)
+      .where(
+        and(eq(salesOrderLines.orderId, input.orderId), eq(salesOrderLines.id, input.orderLineId)),
+      );
+    if (!line?.barcode) return;
+    await this.expiry().recordReturnInTx(tx, actor, {
+      sourceKind: 'WHOLESALE',
+      saleId: String(input.orderId),
+      lineId: String(input.orderLineId),
+      returnId: String(input.returnId),
+      returnLineId: String(input.returnLineId),
+      qtyBase: input.qtyBase,
+      returnedAt: input.returnedAt,
+    });
+  }
+
   private async numberInTx(tx: Tx, id: number): Promise<string> {
     const number = await this.settings.allocateNumber(tx);
     try {
@@ -1900,7 +2008,9 @@ export class SalesOrdersService implements OnModuleInit {
   private async placedLines(
     tx: Tx,
     lines: readonly OrderLineInput[],
-  ): Promise<{ warehouseId: number; productUnitId: number; qty: Decimal }[]> {
+  ): Promise<
+    { warehouseId: number; productUnitId: number; qty: Decimal; expiryBarcode: string | null }[]
+  > {
     const converted = [];
     for (const [index, line] of lines.entries()) {
       if (!line.qty.gt(0)) throw invalid(`lines.${index}.qty`, 'min', 'a positive quantity');
@@ -1914,6 +2024,7 @@ export class SalesOrdersService implements OnModuleInit {
       warehouseId: homes.get(line.productId) ?? 0,
       productUnitId: line.unitId,
       qty: lines[index]?.qty ?? line.qtyBase,
+      expiryBarcode: lines[index]?.expiryBarcode ?? null,
     }));
   }
 
@@ -1926,6 +2037,7 @@ export class SalesOrdersService implements OnModuleInit {
         (old) =>
           old.warehouseId === line.warehouseId &&
           old.productUnitId === line.productUnitId &&
+          old.expiryBarcode === line.expiryBarcode &&
           old.qty.equals(line.qty),
       );
       if (index < 0) continue;
@@ -1964,9 +2076,25 @@ export class SalesOrdersService implements OnModuleInit {
       tx,
       converted.map((line) => line.productId),
     );
+    const marked = lines.filter((line) => line.expiryBarcode);
+    if (marked.length > 0) {
+      const [order] = await tx
+        .select({ pipelineId: salesOrders.pipelineId })
+        .from(salesOrders)
+        .where(eq(salesOrders.id, orderId));
+      await this.quotes.quote(
+        {
+          list: 'WHOLESALE',
+          date: businessDate(),
+          pipelineId: order?.pipelineId ?? null,
+          lines: [...marked],
+        },
+        tx,
+      );
+    }
     const firsts = new Map<string, Decimal | null>();
     for (const line of replaced ?? []) {
-      const key = `${line.productUnitId}:${line.warehouseId}`;
+      const key = `${line.productUnitId}:${line.warehouseId}:${line.expiryBarcode ?? ''}`;
       const seen = firsts.get(key);
       firsts.set(
         key,
@@ -1975,9 +2103,14 @@ export class SalesOrdersService implements OnModuleInit {
           : (seen ?? new Decimal(0)).plus(line.originalQty),
       );
     }
-    const original = (unitId: number, warehouseId: number, qty: Decimal): Decimal | null => {
+    const original = (
+      unitId: number,
+      warehouseId: number,
+      qty: Decimal,
+      expiryBarcode: string | null,
+    ): Decimal | null => {
       if (replaced === null) return qty;
-      const key = `${unitId}:${warehouseId}`;
+      const key = `${unitId}:${warehouseId}:${expiryBarcode ?? ''}`;
       const first = firsts.get(key) ?? null;
       firsts.delete(key);
       return first;
@@ -1988,11 +2121,13 @@ export class SalesOrdersService implements OnModuleInit {
         lineNo: index + 1,
         productId: line.productId,
         productUnitId: line.unitId,
+        expiryBarcode: lines[index]?.expiryBarcode ?? null,
         qty: lines[index]?.qty ?? line.qtyBase,
         originalQty: original(
           line.unitId,
           homes.get(line.productId) ?? 0,
           lines[index]?.qty ?? line.qtyBase,
+          lines[index]?.expiryBarcode ?? null,
         ),
         factorSnapshot: line.factorSnapshot,
         qtyBase: line.qtyBase,
@@ -2078,14 +2213,26 @@ function assertCanEdit(access: Access, order: OrderRow): void {
 /** The warehouses whose lines an edit changes: their products, units or quantities differ. */
 function changedWarehouses(
   before: readonly LineRow[],
-  after: readonly { warehouseId: number; productUnitId: number; qty: Decimal }[],
+  after: readonly {
+    warehouseId: number;
+    productUnitId: number;
+    qty: Decimal;
+    expiryBarcode?: string | null;
+  }[],
 ): Set<number> {
-  const keys = (rows: readonly { warehouseId: number; productUnitId: number; qty: Decimal }[]) => {
+  const keys = (
+    rows: readonly {
+      warehouseId: number;
+      productUnitId: number;
+      qty: Decimal;
+      expiryBarcode?: string | null;
+    }[],
+  ) => {
     const byWarehouse = new Map<number, string[]>();
     for (const row of rows) {
       byWarehouse.set(row.warehouseId, [
         ...(byWarehouse.get(row.warehouseId) ?? []),
-        `${row.productUnitId}:${row.qty.toFixed()}`,
+        `${row.productUnitId}:${row.qty.toFixed()}:${row.expiryBarcode ?? ''}`,
       ]);
     }
     return new Map([...byWarehouse].map(([id, list]) => [id, list.sort().join('|')]));

@@ -39,6 +39,8 @@ import type { VoucherEffect, VoucherKind, VoucherRefusal } from './vouchers';
 // ---------------------------------------------------------------- edge → centre (sync)
 
 export interface SaleDocLineWire {
+  /** Explicit approved expiry source; absence means ordinary stock. */
+  expiryBarcode?: string | null;
   lineNo: number;
   productId: number;
   productUnitId: number;
@@ -375,6 +377,8 @@ export interface SnapshotQuickGroup {
 }
 
 export interface PosSnapshot {
+  /** Public approved sources only. No acquisition cost, responsible staff or payroll data. */
+  expiryOffers?: SnapshotExpiryOffer[];
   version: string;
   generatedAt: string;
   businessDate: string;
@@ -402,6 +406,22 @@ export interface PosSnapshot {
   paymentTypes?: SnapshotPaymentType[];
   /** ADR-0141: the published receipt templates; absent in a snapshot taken before it. */
   receiptTemplates?: SnapshotReceiptTemplate[];
+}
+
+export interface SnapshotExpiryOffer {
+  id: number;
+  itemId: number;
+  expiryDate: string;
+  barcode: string;
+  productId: number;
+  productUnitId: number;
+  warehouseId: number;
+  channel: 'RETAIL' | 'WHOLESALE';
+  contextId: number;
+  unitPrice: string;
+  qtyAvailable: string;
+  startsAt: string;
+  stoppedAt: string | null;
 }
 
 /**
@@ -515,7 +535,8 @@ export interface CreditCheckResponseWire {
 
 /** `GET /api/v1/pos/snapshot?since=`: the whole snapshot, or only its version when unchanged. */
 export type SnapshotResponseWire =
-  { changed: true; snapshot: PosSnapshot } | { changed: false; version: string };
+  | { changed: true; snapshot: PosSnapshot }
+  | { changed: false; version: string; generatedAt?: string };
 
 /** The pure resolver's context for RETAIL out of a snapshot (the same numbers as the centre). */
 export function quoteContextOf(snapshot: PosSnapshot): {
@@ -596,6 +617,7 @@ export function saleDocLinesOf(
   units: ReadonlyMap<number, { factor: string }>,
   vatRateOf: (productId: number) => Decimal,
   lineVat: (total: Decimal, ratePct: Decimal) => Decimal,
+  expiryBarcodes: readonly (string | null | undefined)[] = [],
 ): SaleDocLineWire[] {
   const lines: SaleDocLineWire[] = [];
   inputs.forEach((input, index) => {
@@ -604,6 +626,7 @@ export function saleDocLinesOf(
     const rate = vatRateOf(input.productId);
     for (const part of line.parts) {
       lines.push({
+        ...(expiryBarcodes[index] ? { expiryBarcode: expiryBarcodes[index] } : {}),
         lineNo: lines.length + 1,
         productId: input.productId,
         productUnitId: part.unitId,
@@ -821,11 +844,13 @@ export interface EdgeQuickGroup {
 
 /** A barcode resolves to a product and the unit the code is printed on. */
 export interface EdgeBarcodeHit {
+  expiryBarcode?: string;
   product: EdgeProductHit;
   unitId: number;
 }
 
 export interface EdgeCartLine {
+  expiryBarcode?: string | null;
   productUnitId: number;
   qty: string;
 }
@@ -859,6 +884,7 @@ export interface EdgeQuotedVoucher extends EdgeVoucher {
 }
 
 export interface EdgeQuotedLine {
+  expiryBarcode?: string | null;
   productId: number;
   productUnitId: number;
   sku: string;
@@ -1105,6 +1131,7 @@ export interface EdgeDiscardParkedRequest {
 }
 
 export interface EdgeReturnableLine {
+  expiryBarcode?: string | null;
   lineNo: number;
   productId: number;
   productUnitId: number;
@@ -1150,6 +1177,7 @@ export interface EdgeReturnRequest {
 }
 
 export interface EdgeReceiptLine {
+  expiryBarcode?: string | null;
   name: string;
   uomName: string;
   qty: string;

@@ -17,6 +17,7 @@ import {
   unitCostOf,
 } from '@tugeel/shared/inventory';
 import { Decimal } from '@tugeel/shared/money';
+import type { ExpiryReceiptSource } from '@tugeel/shared/expiry';
 import { businessDate, businessYear } from '@tugeel/shared/time';
 import { and, desc, eq, ilike, inArray, lt, or, type SQL, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
@@ -466,6 +467,85 @@ export interface ReceiptCosting {
  */
 @Injectable()
 export class ReceiptsService implements OnModuleInit {
+  /** Honest line provenance: a caller selects an actual posted receipt, never a latest-price guess.
+   * This is cost data; HTTP callers must enforce inventory.costs.manage. Locking the header
+   * serializes approval with accountant re-costing, and is only used inside the caller's tx. */
+  async expirySources(
+    productId: number,
+    executor: Db | Tx = this.db,
+    lineId?: number,
+    lock = false,
+  ): Promise<ExpiryReceiptSource[]> {
+    const rows = await executor
+      .select({ line: goodsReceiptLines, receipt: goodsReceipts })
+      .from(goodsReceiptLines)
+      .innerJoin(goodsReceipts, eq(goodsReceiptLines.receiptId, goodsReceipts.id))
+      .where(
+        and(
+          eq(goodsReceiptLines.productId, productId),
+          eq(goodsReceipts.status, 'POSTED'),
+          lineId === undefined ? undefined : eq(goodsReceiptLines.id, lineId),
+        ),
+      )
+      .orderBy(desc(goodsReceipts.id), desc(goodsReceiptLines.id))
+      .limit(200);
+    const result: ExpiryReceiptSource[] = [];
+    const receiptIds = [...new Set(rows.map(({ receipt }) => receipt.id))].sort((a, b) => a - b);
+    if (lock)
+      for (const receiptId of receiptIds)
+        await executor
+          .select({ id: goodsReceipts.id })
+          .from(goodsReceipts)
+          .where(eq(goodsReceipts.id, receiptId))
+          .for('update');
+    // Read both versions in one batch after the locks; a price correction may have committed
+    // while publication waited, and a selector page must not issue two queries per line.
+    const costings = await this.posting.sourceCostings(receiptIds, executor);
+    for (const { line, receipt } of rows) {
+      const latest = costings.get(line.id)?.current;
+      const first = costings.get(line.id)?.first;
+      result.push({
+        receiptLineId: line.id,
+        receiptId: receipt.id,
+        receiptNumber: receipt.number ?? '',
+        receiptDate: receipt.effectiveDate ?? '',
+        warehouseId: line.warehouseId,
+        qtyBase: line.qtyBase.toFixed(),
+        first: first
+          ? {
+              version: first.version,
+              qtyBase: first.qtyBase.toFixed(),
+              grossAmount: first.docAmount?.toFixed() ?? null,
+              discountAmount: first.discountAmount?.toFixed() ?? null,
+              freeGoods: first.freeGoods,
+            }
+          : null,
+        current:
+          latest && line.qtyBase.gt(0)
+            ? {
+                version: latest.version,
+                accountingAmount: latest.amount.toFixed(),
+                unitCost: latest.amount.div(line.qtyBase).toFixed(8),
+                grossAmount: latest.docAmount?.toFixed() ?? null,
+                discountAmount: latest.discountAmount?.toFixed() ?? null,
+                supplierNetAmount:
+                  latest.docAmount?.minus(latest.discountAmount ?? 0).toFixed() ?? null,
+                freeGoods: latest.freeGoods,
+              }
+            : null,
+        promotionEvidence: !first
+          ? 'UNAVAILABLE'
+          : first.freeGoods
+            ? 'FREE_GOODS'
+            : first.discountAmount === null
+              ? 'UNAVAILABLE'
+              : first.discountAmount.gt(0)
+                ? 'DISCOUNT'
+                : 'NONE',
+      });
+    }
+    return result;
+  }
   private moneyAccounts: ReceiptMoneyAccounts | null = null;
   private counterAccountsHook: ReceiptCounterAccounts | null = null;
   private salePrices: ReceiptSalePrices | null = null;

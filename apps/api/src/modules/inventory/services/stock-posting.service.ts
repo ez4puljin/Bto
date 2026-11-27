@@ -202,6 +202,7 @@ export interface CostedLine {
 
 export interface Valuation {
   docLineId: number;
+  qtyBase: Decimal;
   version: number;
   amount: Decimal;
   docAmount: Decimal | null;
@@ -954,6 +955,7 @@ export class StockPostingService implements OnModuleInit {
         absorbedLeft = absorbedLeft.minus(absorbed);
         results.push({
           docLineId: line.docLineId,
+          qtyBase: line.qtyBase,
           version: input.version,
           amount: line.amount,
           docAmount: line.docAmount ?? null,
@@ -1252,7 +1254,11 @@ export class StockPostingService implements OnModuleInit {
   }
 
   /** The latest costing of each line of a receipt (none for a receipt not costed yet). */
-  async costingOf(docId: number, executor: Db | Tx = this.db): Promise<Map<number, Valuation>> {
+  async costingOf(
+    docId: number,
+    executor: Db | Tx = this.db,
+    version?: number,
+  ): Promise<Map<number, Valuation>> {
     const rows = await executor
       .select()
       .from(stockValuationAdjustments)
@@ -1260,6 +1266,7 @@ export class StockPostingService implements OnModuleInit {
         and(
           eq(stockValuationAdjustments.docType, 'GR'),
           eq(stockValuationAdjustments.docId, docId),
+          version === undefined ? undefined : eq(stockValuationAdjustments.version, version),
         ),
       )
       .orderBy(desc(stockValuationAdjustments.version));
@@ -1268,6 +1275,7 @@ export class StockPostingService implements OnModuleInit {
       if (latest.has(row.docLineId)) continue;
       latest.set(row.docLineId, {
         docLineId: row.docLineId,
+        qtyBase: row.qtyBase,
         version: row.version,
         amount: row.amount,
         docAmount: row.docAmount,
@@ -1283,6 +1291,31 @@ export class StockPostingService implements OnModuleInit {
       });
     }
     return latest;
+  }
+
+  /** Batched V1 evidence and latest accounting snapshots for explicit source-line selectors. */
+  async sourceCostings(
+    docIds: readonly number[],
+    executor: Db | Tx = this.db,
+  ): Promise<Map<number, { first: Valuation | null; current: Valuation }>> {
+    if (!docIds.length) return new Map();
+    const rows = await executor
+      .select()
+      .from(stockValuationAdjustments)
+      .where(
+        and(
+          eq(stockValuationAdjustments.docType, 'GR'),
+          inArray(stockValuationAdjustments.docId, [...new Set(docIds)]),
+        ),
+      )
+      .orderBy(desc(stockValuationAdjustments.version));
+    const result = new Map<number, { first: Valuation | null; current: Valuation }>();
+    for (const row of rows) {
+      const entry = result.get(row.docLineId) ?? { first: null, current: row };
+      if (row.version === 1) entry.first = row;
+      result.set(row.docLineId, entry);
+    }
+    return result;
   }
 
   /**

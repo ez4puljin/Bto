@@ -627,6 +627,8 @@ export class SaleLineDto {
   @ApiProperty({ example: '10.00' }) vatRatePct: string;
   @ApiProperty({ example: '1090.91' }) vatAmount: string;
   @ApiProperty({ type: Number, nullable: true }) refundsLineId: number | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) expiryBarcode?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) expiryException?: string | null;
   @ApiProperty() damaged: boolean;
   @ApiProperty({ example: '0' }) returnedBase: string;
 }
@@ -937,6 +939,11 @@ export class EbarimtFactsDto {
 
 @ApiSchema({ name: 'PosSaleDocLine' })
 export class SaleDocLineDto {
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Matches(/^BTOEXP-[1-9]\d{0,15}$/)
+  expiryBarcode?: string | null;
   @ApiProperty() @IsInt() @Min(1) lineNo: number;
   @ApiProperty() @IsInt() @Min(1) productId: number;
   @ApiProperty() @IsInt() @Min(1) productUnitId: number;

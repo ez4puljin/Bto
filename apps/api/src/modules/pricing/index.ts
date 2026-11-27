@@ -22,6 +22,8 @@ export {
   ProductDealsService,
 } from './services/product-deals.service';
 export {
+  FIXED_SOURCE_PRICES,
+  type FixedSourcePrices,
   type PackPrice,
   PriceQuoteService,
   type Quote,

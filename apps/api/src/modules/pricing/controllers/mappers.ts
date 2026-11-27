@@ -166,12 +166,17 @@ export function toProgramDto(program: DiscountProgram): DiscountProgramDto {
 }
 
 export function toQuoteDto(quote: Quote): QuoteDto {
+  const totalPlaces =
+    quote.list === 'RETAIL' && quote.lines.some((line) => line.expiryBarcode) ? 2 : 0;
   return {
     list: quote.list,
     date: quote.date,
     lines: quote.lines.map((line) => {
       const result = line.result;
+      const unitPlaces = line.expiryBarcode ? 2 : 0;
+      const linePlaces = line.expiryBarcode && quote.list === 'RETAIL' ? 2 : 0;
       return {
+        ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
         productId: line.productId,
         productUnitId: line.productUnitId,
         qty: line.qty.toString(),
@@ -186,11 +191,11 @@ export function toQuoteDto(quote: Quote): QuoteDto {
               qty: part.qty.toString(),
               qtyBase: part.qtyBase.toString(),
               basis: part.basis,
-              listPrice: part.listPrice.toFixed(0),
-              unitPrice: part.unitPrice.toFixed(0),
-              subtotal: part.subtotal.toFixed(0),
-              discountAmount: part.discountAmount.toFixed(0),
-              total: part.total.toFixed(0),
+              listPrice: part.listPrice.toFixed(unitPlaces),
+              unitPrice: part.unitPrice.toFixed(unitPlaces),
+              subtotal: part.subtotal.toFixed(linePlaces),
+              discountAmount: part.discountAmount.toFixed(linePlaces),
+              total: part.total.toFixed(linePlaces),
               applied: part.applied.map((entry) => ({
                 programId: entry.programId,
                 name: entry.name,
@@ -202,9 +207,9 @@ export function toQuoteDto(quote: Quote): QuoteDto {
               })),
             }))
           : [],
-        subtotal: result.priced ? result.subtotal.toFixed(0) : null,
-        discountAmount: result.priced ? result.discountAmount.toFixed(0) : null,
-        total: result.priced ? result.total.toFixed(0) : null,
+        subtotal: result.priced ? result.subtotal.toFixed(linePlaces) : null,
+        discountAmount: result.priced ? result.discountAmount.toFixed(linePlaces) : null,
+        total: result.priced ? result.total.toFixed(linePlaces) : null,
         bonus: line.bonus
           ? {
               n: line.bonus.n.toFixed(),
@@ -217,8 +222,8 @@ export function toQuoteDto(quote: Quote): QuoteDto {
           : null,
       };
     }),
-    subtotal: quote.subtotal.toFixed(0),
-    discountTotal: quote.discountTotal.toFixed(0),
-    total: quote.total.toFixed(0),
+    subtotal: quote.subtotal.toFixed(totalPlaces),
+    discountTotal: quote.discountTotal.toFixed(totalPlaces),
+    total: quote.total.toFixed(totalPlaces),
   };
 }

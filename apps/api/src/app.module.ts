@@ -5,6 +5,7 @@ import { ReportGateModule } from './common/reports/report-gate.module';
 import { JobsModule } from './common/jobs/jobs.module';
 import { CoreModule } from './core.module';
 import { FinanceCoreModule } from './finance-core';
+import { ExpiryCommerceModule } from './expiry-commerce.module';
 import { HealthModule } from './health/health.module';
 import { EbarimtIntegrationModule } from './integrations/ebarimt';
 import { ElevenLabsIntegrationModule } from './integrations/elevenlabs';
@@ -58,6 +59,7 @@ import { StockProblemsHttpModule } from './modules/stock-problems';
     SmsIntegrationModule,
     ElevenLabsIntegrationModule,
     FinanceCoreModule,
+    ExpiryCommerceModule,
     FinBridgeHttpModule,
     IdentityHttpModule,
     CatalogHttpModule,

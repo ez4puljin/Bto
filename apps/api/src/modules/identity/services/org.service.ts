@@ -112,11 +112,14 @@ export class OrgService implements OnModuleInit {
     });
   }
 
-  listWarehouses(filter: { kind?: WarehouseKind; branchId?: number } = {}): Promise<Warehouse[]> {
+  listWarehouses(
+    filter: { kind?: WarehouseKind; branchId?: number } = {},
+    executor: Db | Tx = this.db,
+  ): Promise<Warehouse[]> {
     const conditions: SQL[] = [];
     if (filter.kind) conditions.push(eq(warehouses.kind, filter.kind));
     if (filter.branchId !== undefined) conditions.push(eq(warehouses.branchId, filter.branchId));
-    return this.db
+    return executor
       .select()
       .from(warehouses)
       .where(and(...conditions))

@@ -32,6 +32,11 @@ export class BarcodeService {
    * barcode of a unit becomes its primary one.
    */
   async addInTx(tx: Tx, actor: Actor, unitId: number, input: string): Promise<Barcode> {
+    if (input.trim().toUpperCase().startsWith('BTOEXP-')) {
+      throw new AppError('BARCODE_INVALID', 'reserved expiry barcode namespace', {
+        problem: 'RESERVED',
+      });
+    }
     const classified = classifyBarcode(input);
     if (!classified.ok) {
       throw new AppError('BARCODE_INVALID', `barcode rejected: ${classified.problem}`, {

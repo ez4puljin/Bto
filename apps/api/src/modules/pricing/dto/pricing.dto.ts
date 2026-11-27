@@ -305,6 +305,11 @@ export class DiscountProgramQueryDto extends PageQueryDto {
 
 @ApiSchema({ name: 'QuoteLineRequest' })
 export class QuoteLineRequestDto {
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Matches(/^BTOEXP-[1-9]\d{0,15}$/)
+  expiryBarcode?: string | null;
   @ApiProperty() @IsInt() @Min(1) productUnitId: number;
   @ApiProperty({ example: '10', description: 'In the unit' }) @Matches(QTY) qty: string;
 }
@@ -385,6 +390,7 @@ export class QuoteLineBonusDto {
 
 @ApiSchema({ name: 'QuoteLine' })
 export class QuoteLineDto {
+  @ApiPropertyOptional({ type: String, nullable: true }) expiryBarcode?: string | null;
   @ApiProperty() productId: number;
   @ApiProperty() productUnitId: number;
   @ApiProperty() qty: string;

@@ -18,6 +18,7 @@ import {
 } from '../../identity';
 import { BinsService, type Movement, StockPostingService } from '../../inventory';
 import { CustomersService } from '../../partners';
+import { SalesOrdersService } from '../../sales';
 import { FinReader } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
 import { creditNoteLines, creditNotes, invoiceLines, invoices } from '../schema';
@@ -131,6 +132,7 @@ export class CreditNotesService {
     private readonly books: FinBooks,
     private readonly parties: FinPartiesBridge,
     private readonly reader: FinReader,
+    private readonly sales: SalesOrdersService,
   ) {}
 
   async create(ctx: AuthContext, input: CreditNoteInput): Promise<CreditNoteDetail> {
@@ -175,6 +177,13 @@ export class CreditNotesService {
           ),
         );
       const byId = new Map(rows.map((row) => [row.id, row]));
+      if (input.warehouseId !== null && invoice.orderId !== null) {
+        await this.sales.lockExpiryReturnsInTx(
+          tx,
+          invoice.orderId,
+          rows.flatMap((row) => (row.orderLineId === null ? [] : [row.orderLineId])),
+        );
+      }
       const lines = input.lines.map((line, index) => {
         const row = byId.get(line.invoiceLineId);
         if (!row) {
@@ -273,6 +282,22 @@ export class CreditNotesService {
           docs: [{ docType: 'CN', docId: note.id, external: true }],
           movements,
         });
+        if (invoice.orderId !== null) {
+          const returnedAt = new Date();
+          for (const line of lines) {
+            const original = byId.get(line.invoiceLineId);
+            const returnLineId = lineIds.get(line.lineNo);
+            if (original?.orderLineId == null || returnLineId === undefined) continue;
+            await this.sales.recordExpiryReturnInTx(tx, ctx, {
+              orderId: invoice.orderId,
+              orderLineId: original.orderLineId,
+              returnId: note.id,
+              returnLineId,
+              qtyBase: line.qtyBase,
+              returnedAt,
+            });
+          }
+        }
       }
       await this.customers.lockForUpdate(tx, invoice.customerId);
       const [locked] = await tx

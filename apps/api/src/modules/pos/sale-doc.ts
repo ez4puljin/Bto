@@ -18,6 +18,7 @@ import type { ProblemParams } from '../../common/errors/app-error';
  */
 
 export interface SaleDocLine {
+  expiryBarcode?: string | null;
   lineNo: number;
   productId: number;
   productUnitId: number;

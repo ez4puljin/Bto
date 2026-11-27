@@ -416,6 +416,7 @@ export class PricingController {
       pipelineId: body.pipelineId ?? null,
       tillId: body.tillId ?? null,
       lines: body.lines.map((line) => ({
+        expiryBarcode: line.expiryBarcode ?? null,
         productUnitId: line.productUnitId,
         qty: new Decimal(line.qty),
       })),

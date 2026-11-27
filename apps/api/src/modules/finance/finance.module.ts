@@ -15,7 +15,7 @@ import {
   STOCK_COUNT_ACCOUNTS,
 } from '../inventory';
 import { CUSTOMER_DEBT_READER, PartnersModule } from '../partners';
-import { CREDIT_CHECKER, SALE_SINK } from '../sales';
+import { CREDIT_CHECKER, SALE_SINK, SalesModule } from '../sales';
 import {
   GlAccountsController,
   JournalController,
@@ -139,6 +139,7 @@ const SERVICES = [
     FinanceCoreModule,
     FinBridgeModule,
     EbarimtModule,
+    SalesModule,
   ],
   providers: [
     ...SERVICES,

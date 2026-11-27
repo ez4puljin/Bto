@@ -114,6 +114,15 @@ export class SalesPipelinesService {
     private readonly documents: SalesDocumentTemplatesService,
   ) {}
 
+  /** Trusted application reader for named sale-price contexts; transfer pipelines cannot sell. */
+  saleContexts(executor: Db | Tx = this.db): Promise<{ id: number; name: string }[]> {
+    return executor
+      .select({ id: salesPipelines.id, name: salesPipelines.name })
+      .from(salesPipelines)
+      .where(and(eq(salesPipelines.kind, 'SALES'), isNull(salesPipelines.archivedAt)))
+      .orderBy(asc(salesPipelines.id));
+  }
+
   /** A pipeline the caller sees, with the rights on it and on each stage; 404 otherwise. */
   async get(ctx: AuthContext, id: number, executor: Db | Tx = this.db): Promise<PipelineDetail> {
     const access = await this.access.load(ctx, executor);

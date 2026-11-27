@@ -122,7 +122,11 @@ export class PosSyncController {
     const snapshot = await this.snapshots.forNode(node);
     await this.nodes.touchPull(node.id, snapshot.version);
     return query.since === snapshot.version
-      ? { changed: false, version: snapshot.version }
+      ? {
+          changed: false,
+          version: snapshot.version,
+          ...(snapshot.expiryOffers?.length ? { generatedAt: snapshot.generatedAt } : {}),
+        }
       : { changed: true, snapshot };
   }
 

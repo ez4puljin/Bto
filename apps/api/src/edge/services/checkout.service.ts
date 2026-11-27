@@ -47,10 +47,10 @@ import {
 } from '@tugeel/shared/pricing';
 import { matchesQuery, matchesStrictly, queryTerms } from '@tugeel/shared/text';
 import { businessDate } from '@tugeel/shared/time';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, ne, or, sql } from 'drizzle-orm';
 import { AppError, invalid, notFound } from '../../common/errors/app-error';
 import { EDGE_DB, type EdgeDb, type EdgeTx, inEdgeTransaction } from '../db/edge-db';
-import { edgeSales, edgeVoucherUses } from '../db/schema';
+import { edgeOutbox, edgeSales, edgeVoucherUses } from '../db/schema';
 import { EbarimtService } from '../ebarimt/ebarimt.service';
 import { TaxpayerClient } from '../ebarimt/taxpayer.client';
 import { CardAttemptsService } from './card-attempts.service';
@@ -161,6 +161,17 @@ export class CheckoutService {
 
   barcode(code: string, tillCode?: string): EdgeBarcodeHit {
     const loaded = this.store.get();
+    if (code.trim().startsWith('BTOEXP-')) {
+      const offer = this.expiryOffer(loaded, code.trim(), tillCode);
+      const product = loaded.products.get(offer.productId);
+      if (!product || !this.sells(this.soldAt(tillCode), product))
+        throw invalid('expiryBarcode', 'product', 'source product is not sold at this till');
+      return {
+        product: this.hit(loaded, product, tillCode),
+        unitId: offer.productUnitId,
+        expiryBarcode: offer.barcode,
+      };
+    }
     const classified = classifyBarcode(code);
     const unitId = classified.ok ? loaded.barcodes.get(classified.value.lookupKey) : undefined;
     const found = unitId === undefined ? undefined : loaded.units.get(unitId);
@@ -216,6 +227,7 @@ export class CheckoutService {
         return {
           productId: input.productId,
           productUnitId: input.unitId,
+          ...(lines[index]?.expiryBarcode ? { expiryBarcode: lines[index]?.expiryBarcode } : {}),
           sku: found?.product.sku ?? '',
           name: found?.product.name ?? '',
           uomName: found?.unit.uomName ?? '',
@@ -227,8 +239,14 @@ export class CheckoutService {
               : null,
           total: priced ? line.total.toFixed(2) : null,
           discount: priced ? line.discountAmount.toFixed(2) : null,
-          bulk: priced ? this.bulkPrices(loaded, input, line.parts) : null,
-          bulkOffer: priced ? this.bulkOffer(loaded, input.unitId, line.parts) : null,
+          bulk:
+            priced && input.fixedBaseUnitPrice === undefined
+              ? this.bulkPrices(loaded, input, line.parts)
+              : null,
+          bulkOffer:
+            priced && input.fixedBaseUnitPrice === undefined
+              ? this.bulkOffer(loaded, input.unitId, line.parts)
+              : null,
           bonus: bonusWire(bonuses[index] ?? null),
         };
       }),
@@ -292,6 +310,7 @@ export class CheckoutService {
       new Map([...loaded.units].map(([unitId, found]) => [unitId, { factor: found.unit.factor }])),
       (productId) => this.vatRate(loaded, productId),
       lineVat,
+      request.lines.map((line) => line.expiryBarcode),
     );
     // The quote's bulk offer of each document line (one per priced part, as `saleDocLinesOf`
     // makes them), printed on the receipt only (owner 2026-11-17).
@@ -313,6 +332,9 @@ export class CheckoutService {
       new Decimal(0),
     );
     const totals = saleTotals(lines);
+    if (request.lines.some((line) => line.expiryBarcode) && totals.total.lte(0)) {
+      throw invalid('lines', 'amount', 'clearance quantity must produce a positive payable total');
+    }
     const tenders = this.tenders(loaded, request, totals.total.minus(taken.paid), taken.wire);
     if (tenders.credit.gt(0) && taken.paid.gt(0)) {
       throw new AppError('POS_VOUCHER_WITH_CREDIT', 'a partner voucher and credit together', {});
@@ -346,6 +368,7 @@ export class CheckoutService {
     const issues = this.ebarimt.enabled && !customer;
     const settings = loaded.snapshot.settings;
     return inEdgeTransaction(this.db, async (tx) => {
+      await this.assertExpiryCapacity(tx, loaded, request.lines, tillCode);
       const shift = await this.shifts.current(tillCode, tx);
       if (!shift) {
         throw new AppError('POS_SHIFT_STATE_INVALID', `till ${tillCode} has no open shift`, {
@@ -429,11 +452,15 @@ export class CheckoutService {
           const offer = offers[index] ?? null;
           return {
             name: found?.product.name ?? '',
+            ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
             uomName: found?.unit.uomName ?? '',
             qty: new Decimal(line.qty).toString(),
             unitPrice: line.unitPrice,
             total: line.total,
-            bulkOffer: offer ? { ...offer, atBulk: line.basis === 'RETAIL_BULK' } : null,
+            bulkOffer:
+              offer && !line.expiryBarcode
+                ? { ...offer, atBulk: line.basis === 'RETAIL_BULK' }
+                : null,
             bonus: bonuses[index] ?? null,
           };
         }),
@@ -544,6 +571,7 @@ export class CheckoutService {
     if (lines.length === 0 || lines.length > POS_LIMITS.maxLines) {
       throw new AppError('VALIDATION_FAILED', `a cart has 1 to ${POS_LIMITS.maxLines} lines`);
     }
+    const sourceQty = new Map<string, Decimal>();
     const inputs = lines.map((line): QuoteLineInput => {
       const found = loaded.units.get(line.productUnitId);
       if (!found) throw notFound('product_unit', line.productUnitId);
@@ -551,13 +579,29 @@ export class CheckoutService {
       if (!qty.isFinite() || qty.lte(0) || qty.decimalPlaces() > 3) {
         throw new AppError('VALIDATION_FAILED', `bad quantity ${line.qty}`);
       }
+      const qtyBase = qty.times(found.unit.factor).toDecimalPlaces(3);
+      const offer = line.expiryBarcode
+        ? this.expiryOffer(loaded, line.expiryBarcode, tillCode)
+        : null;
+      if (offer && offer.productId !== found.product.id)
+        throw invalid('expiryBarcode', 'product', 'source belongs to another product');
+      if (offer)
+        sourceQty.set(
+          offer.barcode,
+          (sourceQty.get(offer.barcode) ?? new Decimal(0)).plus(qtyBase),
+        );
       return {
         productId: found.product.id,
         unitId: line.productUnitId,
         qty,
-        qtyBase: qty.times(found.unit.factor).toDecimalPlaces(3),
+        qtyBase,
+        ...(offer ? { fixedBaseUnitPrice: new Decimal(offer.unitPrice) } : {}),
       };
     });
+    for (const [barcode, qty] of sourceQty) {
+      if (qty.gt(this.expiryOffer(loaded, barcode, tillCode).qtyAvailable))
+        throw invalid('expiryBarcode', 'quantity', 'approved source quantity exceeded');
+    }
     // ADR-0159 #5: a plan naming tills serves only those.
     const programs = loaded.quote.programs.filter((program) =>
       programServes(program, 'RETAIL', {
@@ -571,6 +615,79 @@ export class CheckoutService {
       coupons,
     });
     return { inputs, result, programs };
+  }
+
+  private expiryOffer(loaded: LoadedSnapshot, barcode: string, tillCode?: string) {
+    const till = tillCode === undefined ? undefined : loaded.tills.get(tillCode);
+    const offer = loaded.snapshot.expiryOffers?.find((row) => row.barcode === barcode);
+    const now = Date.now();
+    if (
+      !till ||
+      !offer ||
+      offer.channel !== 'RETAIL' ||
+      offer.contextId !== till.id ||
+      offer.warehouseId !== till.warehouseId ||
+      now < Date.parse(offer.startsAt) ||
+      (offer.stoppedAt !== null && now >= Date.parse(offer.stoppedAt))
+    ) {
+      throw invalid('expiryBarcode', 'approved', 'expiry source is unavailable at this till');
+    }
+    return offer;
+  }
+
+  /** Subtract completed local documents absent from this snapshot; serialize across tills. */
+  private async assertExpiryCapacity(
+    tx: EdgeTx,
+    loaded: LoadedSnapshot,
+    lines: readonly EdgeCartLine[],
+    tillCode: string,
+  ): Promise<void> {
+    const wanted = new Map<string, Decimal>();
+    for (const line of lines) {
+      if (!line.expiryBarcode) continue;
+      const factor = loaded.units.get(line.productUnitId)?.unit.factor ?? '0';
+      wanted.set(
+        line.expiryBarcode,
+        (wanted.get(line.expiryBarcode) ?? new Decimal(0)).plus(
+          new Decimal(line.qty).times(factor),
+        ),
+      );
+    }
+    if (wanted.size === 0) return;
+    for (const barcode of [...wanted.keys()].sort())
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`expiry:${barcode}`}, 0))`,
+      );
+    const events = await tx
+      .select({ payload: edgeOutbox.payload })
+      .from(edgeOutbox)
+      .where(
+        and(
+          eq(edgeOutbox.kind, 'SALE'),
+          or(
+            ne(edgeOutbox.status, 'SENT'),
+            gte(edgeOutbox.sentAt, new Date(loaded.snapshot.generatedAt)),
+          ),
+        ),
+      );
+    const consumed = new Map<string, Decimal>();
+    for (const { payload } of events) {
+      if (payload.kind !== 'SALE') continue;
+      for (const line of payload.sale.lines) {
+        const barcode = line.expiryBarcode;
+        if (!barcode || !wanted.has(barcode)) continue;
+        const qty = new Decimal(line.qty).times(line.factorSnapshot);
+        consumed.set(barcode, (consumed.get(barcode) ?? new Decimal(0)).plus(qty));
+      }
+    }
+    for (const [barcode, qty] of wanted) {
+      const offer = this.expiryOffer(this.store.get(), barcode, tillCode);
+      const available = new Decimal(offer.qtyAvailable).minus(
+        Decimal.max(0, consumed.get(barcode) ?? 0),
+      );
+      if (qty.gt(available))
+        throw invalid('expiryBarcode', 'quantity', 'approved source quantity exceeded');
+    }
   }
 
   /**

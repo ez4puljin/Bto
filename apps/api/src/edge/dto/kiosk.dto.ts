@@ -65,6 +65,7 @@ export class ShiftCloseDto {
 }
 
 export class CartLineDto {
+  @IsOptional() @IsString() @Matches(/^BTOEXP-[1-9]\d{0,15}$/) expiryBarcode?: string | null;
   @IsInt() @Min(1) productUnitId: number;
   @Matches(QTY) qty: string;
 }

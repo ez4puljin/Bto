@@ -114,7 +114,10 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
   async pullOnce(): Promise<'changed' | 'unchanged' | 'failed'> {
     try {
       const answer = await this.central.snapshot(this.store.version());
-      await this.store.apply(answer.changed ? answer.snapshot : null);
+      await this.store.apply(
+        answer.changed ? answer.snapshot : null,
+        answer.changed ? undefined : answer.generatedAt,
+      );
       await this.noteContact(null);
       await this.pullCustomersOnce();
       await this.pullVouchersOnce();
@@ -195,7 +198,7 @@ export class SyncRunner implements OnApplicationBootstrap, OnApplicationShutdown
     if (batch.length === 0) return { state: 'idle' };
     try {
       const answer = await this.central.push(batch.map((event) => event.payload));
-      await this.outbox.settle(batch, answer.results);
+      await this.outbox.settle(batch, answer.results, answer.serverTime);
       const now = new Date();
       await this.db
         .update(edgeState)

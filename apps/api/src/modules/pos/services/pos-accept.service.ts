@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Decimal } from '@tugeel/shared/money';
 import {
   CONSUMER_NO_PATTERN,
@@ -26,6 +27,7 @@ import {
   UnitConversionService,
 } from '../../catalog';
 import { PosCreditService } from '../../finance';
+import { EXPIRY_SALE_POSTING, type ExpirySalePosting } from '../../sales';
 import { type Actor, AuditService, OrgService, UserNamesService } from '../../identity';
 import {
   AdjustmentsService,
@@ -107,7 +109,12 @@ export class PosAcceptService {
     private readonly paymentTypes: PosPaymentTypesService,
     private readonly dayCounts: PosDayCountsService,
     private readonly loyalty: PosLoyaltyService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private expiry(): ExpirySalePosting {
+    return this.moduleRef.get<ExpirySalePosting>(EXPIRY_SALE_POSTING, { strict: false });
+  }
 
   /**
    * One replayed document: APPLIED or DUPLICATE on success; REJECTED (and logged) on a refusal the
@@ -314,6 +321,52 @@ export class PosAcceptService {
       if (!raced) throw new Error('pos_sales insert returned no row');
       return { id: raced.id, number: raced.number, created: false };
     }
+    const expiryExceptions = new Map<number, string>();
+    // Stable document ordinal identities exist before immutable sale lines are inserted.
+    // Source locks are taken in the same order at every till, before the stock rows.
+    for (const line of [...doc.lines].sort(
+      (a, b) => (a.expiryBarcode ?? '').localeCompare(b.expiryBarcode ?? '') || a.lineNo - b.lineNo,
+    )) {
+      if (original) {
+        const sold =
+          line.refundsLineNo === null ? undefined : original.lines.get(line.refundsLineNo);
+        if (sold?.expiryBarcode)
+          await this.expiry().recordReturnInTx(tx, actor, {
+            sourceKind: 'POS',
+            saleId: String(original.sale.id),
+            lineId: String(sold.lineNo),
+            returnId: String(sale.id),
+            returnLineId: String(line.lineNo),
+            expiryContext: {
+              barcode: sold.expiryBarcode,
+              productId: sold.productId,
+              productUnitId: sold.productUnitId,
+              warehouseId: till.warehouseId,
+              contextId: till.id,
+            },
+            qtyBase: line.qty.times(line.factorSnapshot),
+            returnedAt: doc.soldAt,
+          });
+      } else if (line.expiryBarcode) {
+        const allocation = await this.expiry().recordSaleInTx(tx, actor, {
+          barcode: line.expiryBarcode,
+          sourceKind: 'POS',
+          saleId: String(sale.id),
+          lineId: String(line.lineNo),
+          productId: line.productId,
+          productUnitId: line.productUnitId,
+          warehouseId: till.warehouseId,
+          channel: 'RETAIL',
+          contextId: till.id,
+          qtyBase: line.qty.times(line.factorSnapshot),
+          grossAmount: line.total,
+          revenueAmount: line.total.minus(line.vatAmount),
+          soldAt: doc.soldAt,
+        });
+        if (!allocation.allocated)
+          expiryExceptions.set(line.lineNo, allocation.reason ?? 'EXPIRY_UNALLOCATED');
+      }
+    }
     const lines = await tx
       .insert(posSaleLines)
       .values(
@@ -346,6 +399,10 @@ export class PosAcceptService {
                 ? null
                 : (original?.lines.get(line.refundsLineNo)?.id ?? null),
             damaged: line.damaged,
+            expiryBarcode: original
+              ? (original.lines.get(line.refundsLineNo ?? 0)?.expiryBarcode ?? null)
+              : (line.expiryBarcode ?? null),
+            expiryException: expiryExceptions.get(line.lineNo) ?? null,
           };
         }),
       )

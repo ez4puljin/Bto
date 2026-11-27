@@ -99,8 +99,16 @@ export class SnapshotStore implements OnModuleInit {
   }
 
   /** Keeps a new snapshot (or only the pull time when the centre said it is unchanged). */
-  async apply(snapshot: PosSnapshot | null): Promise<void> {
+  async apply(snapshot: PosSnapshot | null, unchangedGeneratedAt?: string): Promise<void> {
     const now = new Date();
+    if (
+      !snapshot &&
+      unchangedGeneratedAt &&
+      this.loaded &&
+      Number.isFinite(Date.parse(unchangedGeneratedAt))
+    ) {
+      snapshot = { ...this.loaded.snapshot, generatedAt: unchangedGeneratedAt };
+    }
     if (snapshot) {
       await this.db
         .insert(edgeState)

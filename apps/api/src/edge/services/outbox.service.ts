@@ -35,7 +35,11 @@ export class OutboxService {
   }
 
   /** The centre's answers, matched by kind and client id. */
-  async settle(batch: readonly PendingEvent[], results: readonly SyncOutcomeWire[]): Promise<void> {
+  async settle(
+    batch: readonly PendingEvent[],
+    results: readonly SyncOutcomeWire[],
+    serverTime?: string,
+  ): Promise<void> {
     const byKey = new Map(results.map((result) => [`${result.kind}:${result.clientId}`, result]));
     await this.db.transaction(async (tx) => {
       for (const event of batch) {
@@ -46,7 +50,11 @@ export class OutboxService {
           .set(
             result.status === 'REJECTED'
               ? { status: 'REJECTED', code: result.code, attempts: sql`${edgeOutbox.attempts} + 1` }
-              : { status: 'SENT', sentAt: new Date(), attempts: sql`${edgeOutbox.attempts} + 1` },
+              : {
+                  status: 'SENT',
+                  sentAt: serverTime ? new Date(serverTime) : new Date(),
+                  attempts: sql`${edgeOutbox.attempts} + 1`,
+                },
           )
           .where(eq(edgeOutbox.seq, event.seq));
       }

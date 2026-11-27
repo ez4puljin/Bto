@@ -84,10 +84,12 @@ export function lineBonuses(
   const productQty = new Map<number, Decimal>();
   const productLines = new Map<number, number>();
   for (const line of lines) {
+    if (line.fixedBaseUnitPrice !== undefined) continue;
     productQty.set(line.productId, (productQty.get(line.productId) ?? ZERO).plus(line.qtyBase));
     productLines.set(line.productId, (productLines.get(line.productId) ?? 0) + 1);
   }
   const held = lines.map((line, index) => {
+    if (line.fixedBaseUnitPrice !== undefined) return null;
     const own = programs.filter(
       (program) =>
         program.scope === 'PRODUCT' &&

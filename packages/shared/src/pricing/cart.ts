@@ -51,6 +51,8 @@ export interface QuoteLineInput {
   qty: Decimal;
   /** The same quantity in base units. */
   qtyBase: Decimal;
+  /** Trusted, approved source price per base unit; excluded from every discount and threshold. */
+  fixedBaseUnitPrice?: Decimal;
 }
 
 export interface QuoteContext {
@@ -290,6 +292,57 @@ interface PartState {
  * out of the amounts but its quantity still counts.
  */
 export function resolveQuote(lines: readonly QuoteLineInput[], context: QuoteContext): QuoteResult {
+  if (lines.some((line) => line.fixedBaseUnitPrice !== undefined)) {
+    const ordinary = resolveQuote(
+      lines.filter((line) => line.fixedBaseUnitPrice === undefined),
+      context,
+    );
+    let next = 0;
+    const results = lines.map((line): QuoteLineResult => {
+      if (line.fixedBaseUnitPrice === undefined) {
+        return ordinary.lines[next++] ?? { priced: false, problem: 'PRICE_MISSING' };
+      }
+      const price = line.fixedBaseUnitPrice;
+      const product = context.products.get(line.productId);
+      const unit = product?.units.find((one) => one.unitId === line.unitId);
+      const base = product?.units.find((one) => one.isBase);
+      if (!unit || !base || !price.isFinite() || price.lt(0))
+        return { priced: false, problem: 'PRICE_MISSING' };
+      const total = price
+        .times(line.qtyBase)
+        .toDecimalPlaces(context.list === 'RETAIL' ? 2 : 0, Decimal.ROUND_HALF_UP);
+      return {
+        priced: true,
+        parts: [
+          {
+            // Base-unit parts keep exact source prices when a pack's factor has fractional digits.
+            unitId: base.unitId,
+            qty: line.qtyBase,
+            qtyBase: line.qtyBase,
+            basis: context.list === 'RETAIL' ? 'RETAIL' : 'WAREHOUSE',
+            listPrice: price,
+            unitPrice: price,
+            subtotal: total,
+            discountAmount: ZERO,
+            total,
+            applied: [],
+          },
+        ],
+        subtotal: total,
+        discountAmount: ZERO,
+        total,
+      };
+    });
+    const subtotal = results.reduce((sum, line) => sum.plus(line.priced ? line.subtotal : 0), ZERO);
+    const total = results.reduce((sum, line) => sum.plus(line.priced ? line.total : 0), ZERO);
+    return {
+      lines: results,
+      subtotal,
+      total,
+      discountTotal: subtotal.minus(total),
+      orderAmount: ordinary.orderAmount,
+    };
+  }
   const productQty = new Map<number, Decimal>();
   for (const line of lines) {
     productQty.set(line.productId, (productQty.get(line.productId) ?? ZERO).plus(line.qtyBase));

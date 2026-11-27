@@ -6,15 +6,24 @@ import {
 } from '@tugeel/shared/expiry';
 import { Decimal } from '@tugeel/shared/money';
 import { businessDate } from '@tugeel/shared/time';
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { inTransaction } from '../../../common/db/transaction';
 import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { CatalogService } from '../../catalog';
 import { AuditService, type AuthContext, UserNamesService } from '../../identity';
-import { expiryItemChanges, expiryItemRoles, expiryItems, expiryItemUsers } from '../schema';
+import {
+  expiryItemChanges,
+  expiryItemRoles,
+  expiryItems,
+  expiryItemUsers,
+  expiryMarkdowns,
+  expiryMarkdownStops,
+  expiryMarkdownBalances,
+} from '../schema';
 import { type ExpiryItemRow, type ExpiryItemView, ExpiryViewService } from './expiry-view.service';
+import { ExpiryCommerceGate } from './expiry-commerce-gate.service';
 
 export interface ExpiryCreateInput {
   productId: number;
@@ -66,6 +75,7 @@ export class ExpiryItemsService {
     private readonly catalog: CatalogService,
     private readonly names: UserNamesService,
     private readonly audit: AuditService,
+    private readonly commerceGate: ExpiryCommerceGate,
   ) {}
 
   async create(ctx: AuthContext, input: ExpiryCreateInput): Promise<ExpiryItemView> {
@@ -170,6 +180,21 @@ export class ExpiryItemsService {
           ...(floorChanged ? ([['qtyFloor', qtyFloor]] as const) : []),
           ...(warehouseChanged ? ([['qtyWarehouse', qtyWarehouse]] as const) : []),
         ]);
+        const [committed] = await tx
+          .select({ qty: sql<string>`coalesce(sum(${expiryMarkdownBalances.qtySold}),0)::text` })
+          .from(expiryMarkdowns)
+          .innerJoin(
+            expiryMarkdownBalances,
+            eq(expiryMarkdownBalances.markdownId, expiryMarkdowns.id),
+          )
+          .leftJoin(expiryMarkdownStops, eq(expiryMarkdownStops.markdownId, expiryMarkdowns.id))
+          .where(eq(expiryMarkdowns.itemId, id));
+        if (qtyFloor.plus(qtyWarehouse).lt(committed?.qty ?? 0))
+          throw invalid(
+            'qtyFloor',
+            'markdownBudget',
+            'observed quantity cannot fall below already sold expiry units',
+          );
       }
       const [after] = await tx
         .update(expiryItems)
@@ -215,6 +240,7 @@ export class ExpiryItemsService {
    */
   async setStatus(ctx: AuthContext, id: number, status: ExpiryStatus): Promise<ExpiryItemView> {
     const row = await inTransaction(this.db, async (tx) => {
+      await this.commerceGate.lockInTx(tx);
       const before = await this.lock(tx, id);
       if (before.status === status) return before;
       const restoring = before.status === 'ARCHIVED';
@@ -234,6 +260,26 @@ export class ExpiryItemsService {
         .where(eq(expiryItems.id, id))
         .returning();
       if (!after) throw notFound('expiry item', id);
+      if (archiving) {
+        const approvals = await tx
+          .select({ id: expiryMarkdowns.id })
+          .from(expiryMarkdowns)
+          .where(eq(expiryMarkdowns.itemId, id));
+        for (const approval of approvals) {
+          const stopped = await tx
+            .insert(expiryMarkdownStops)
+            .values({ markdownId: approval.id, stoppedAt: now, stoppedBy: ctx.userId })
+            .onConflictDoNothing()
+            .returning();
+          if (stopped.length)
+            await this.audit.record(tx, ctx, {
+              action: 'UPDATE',
+              entity: 'expiry_markdowns',
+              entityId: approval.id,
+              after: { stopped: true, reason: 'ARCHIVED' },
+            });
+        }
+      }
       await this.audit.record(tx, ctx, {
         action: archiving ? 'ARCHIVE' : restoring ? 'UNARCHIVE' : 'UPDATE',
         entity: 'expiry_items',
@@ -318,7 +364,7 @@ export class ExpiryItemsService {
   }
 
   /** A record's liable roles and people, ascending. */
-  async liableOf(tx: Tx, itemId: number): Promise<{ roleIds: number[]; userIds: number[] }> {
+  async liableOf(tx: Db | Tx, itemId: number): Promise<{ roleIds: number[]; userIds: number[] }> {
     const roles = await tx
       .select({ id: expiryItemRoles.roleId })
       .from(expiryItemRoles)

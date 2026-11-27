@@ -28,6 +28,7 @@ export interface OrderLineChange {
 }
 
 interface LineFacts {
+  expiryBarcode?: string | null;
   productName: string;
   productUnitId: number;
   unitName: string;
@@ -57,7 +58,7 @@ export function diffOrder(
   const grouped = (lines: readonly LineFacts[]) => {
     const map = new Map<string, LineFacts>();
     for (const line of lines) {
-      const key = `${line.productUnitId}:${line.warehouseId}`;
+      const key = `${line.productUnitId}:${line.warehouseId}:${line.expiryBarcode ?? ''}`;
       const seen = map.get(key);
       map.set(
         key,

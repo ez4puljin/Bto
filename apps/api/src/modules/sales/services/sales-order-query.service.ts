@@ -68,6 +68,7 @@ export interface OrderPart {
 }
 
 export interface OrderLine {
+  expiryBarcode: string | null;
   id: number;
   lineNo: number;
   productId: number;
@@ -99,6 +100,7 @@ export interface OrderLine {
 
 /** A line taken off the order (ADR-0175 #2), shown in red until it is put back. */
 export interface ExcludedLine {
+  expiryBarcode: string | null;
   id: number;
   productId: number;
   productSku: string;
@@ -680,6 +682,7 @@ export class SalesOrderQueryService {
         productSku: product?.sku ?? '',
         productName: product?.name ?? '',
         productUnitId: row.productUnitId,
+        expiryBarcode: row.expiryBarcode,
         unitName: units.get(row.productUnitId)?.uomName ?? '',
         qty: row.qty,
         originalQty: row.originalQty,
@@ -911,6 +914,7 @@ function lineView(
     productSku: product?.sku ?? '',
     productName: product?.name ?? '',
     productUnitId: line.productUnitId,
+    expiryBarcode: line.expiryBarcode,
     unitName: units.get(line.productUnitId)?.uomName ?? '',
     qty: line.qty,
     originalQty: line.originalQty,

@@ -602,6 +602,7 @@ export class SalesRepOrdersService {
         id: salesOrderLines.id,
         productUnitId: salesOrderLines.productUnitId,
         qty: salesOrderLines.qty,
+        expiryBarcode: salesOrderLines.expiryBarcode,
       })
       .from(salesOrderLines)
       .where(idIn(salesOrderLines.orderId, orderIds))
@@ -636,7 +637,12 @@ export class SalesRepOrdersService {
    * inexact quantity) leaves every line without an estimate; any other error is thrown.
    */
   private async estimate(
-    lines: readonly { id: number; productUnitId: number; qty: Decimal }[],
+    lines: readonly {
+      id: number;
+      productUnitId: number;
+      qty: Decimal;
+      expiryBarcode?: string | null;
+    }[],
     date: string,
     pipelineId: number | null,
   ): Promise<DraftEstimate> {
@@ -646,7 +652,11 @@ export class SalesRepOrdersService {
         list: 'WHOLESALE',
         date,
         pipelineId,
-        lines: lines.map((line) => ({ productUnitId: line.productUnitId, qty: line.qty })),
+        lines: lines.map((line) => ({
+          productUnitId: line.productUnitId,
+          qty: line.qty,
+          expiryBarcode: line.expiryBarcode,
+        })),
       });
     } catch (error) {
       if (!(error instanceof AppError)) throw error;

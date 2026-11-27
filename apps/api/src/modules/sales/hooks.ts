@@ -96,13 +96,22 @@ export interface SaleSnapshot {
   lines: SoldLine[];
 }
 
+export interface SaleInvoiceFacts {
+  invoiceId: number;
+  number: string;
+  total: Decimal;
+  /** Canonical persisted invoice parts; optional only for legacy/test sinks without expiry sales. */
+  sourceLines?: readonly {
+    orderLineId: number;
+    qtyBase: Decimal;
+    grossAmount: Decimal;
+    revenueAmount: Decimal;
+  }[];
+}
+
 export interface SaleSink {
   /** Invoices the sale; null when nothing was delivered (no invoice). */
-  onSold(
-    tx: Tx,
-    actor: Actor,
-    snapshot: SaleSnapshot,
-  ): Promise<{ invoiceId: number; number: string; total: Decimal } | null>;
+  onSold(tx: Tx, actor: Actor, snapshot: SaleSnapshot): Promise<SaleInvoiceFacts | null>;
 }
 
 export const SALE_SINK = Symbol('SALE_SINK');

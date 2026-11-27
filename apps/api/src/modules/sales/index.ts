@@ -17,6 +17,7 @@ export {
   SALE_LISTENER,
   SALE_SINK,
   type SaleListener,
+  type SaleInvoiceFacts,
   type SaleNotice,
   type SaleSink,
   type SaleSnapshot,

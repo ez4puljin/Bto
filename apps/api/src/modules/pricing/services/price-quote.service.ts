@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Decimal, roundHalfUp } from '@tugeel/shared/money';
 import {
   type LineBonus,
@@ -16,7 +17,12 @@ import {
 import { DB } from '../../../common/db/db.tokens';
 import type { Db, Tx } from '../../../common/db/db.types';
 import { invalid } from '../../../common/errors/app-error';
-import { CatalogService, CategoriesService, UnitConversionService } from '../../catalog';
+import {
+  CatalogService,
+  CategoriesService,
+  type ConvertedQty,
+  UnitConversionService,
+} from '../../catalog';
 import { DiscountProgramsService } from './discount-programs.service';
 import { PriceProfilesService } from './price-profiles.service';
 import { ProductPricesService, quoteUnitsOf } from './product-prices.service';
@@ -29,7 +35,24 @@ export interface QuoteRequest {
   /** Where the order is (ADR-0159 #5); unknown: only programs that name no pipeline or till. */
   pipelineId?: number | null;
   tillId?: number | null;
-  lines: { productUnitId: number; qty: Decimal }[];
+  lines: { productUnitId: number; qty: Decimal; expiryBarcode?: string | null }[];
+}
+
+/** The application binds this without adding a pricing -> expiry module dependency. */
+export const FIXED_SOURCE_PRICES = Symbol('FIXED_SOURCE_PRICES');
+export interface FixedSourcePrices {
+  resolve(
+    executor: Db | Tx,
+    input: {
+      barcode: string;
+      productId: number;
+      productUnitId: number;
+      qtyBase: Decimal;
+      list: PriceList;
+      pipelineId: number | null;
+      tillId: number | null;
+    },
+  ): Promise<Decimal>;
 }
 
 /** A priced part with its unit's name and factor, as an order line would freeze it. */
@@ -49,6 +72,7 @@ export type QuotedResult =
     };
 
 export interface QuotedLine {
+  expiryBarcode?: string | null;
   productId: number;
   productUnitId: number;
   qty: Decimal;
@@ -86,7 +110,8 @@ export interface PackPrice {
  * quote endpoint and the calculator call it without one.
  */
 @Injectable()
-export class PriceQuoteService {
+export class PriceQuoteService implements OnModuleInit {
+  private fixedSources: FixedSourcePrices | null = null;
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly catalog: CatalogService,
@@ -96,7 +121,18 @@ export class PriceQuoteService {
     private readonly profiles: PriceProfilesService,
     private readonly programs: DiscountProgramsService,
     private readonly targets: ProgramTargetsService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  onModuleInit(): void {
+    try {
+      this.fixedSources = this.moduleRef.get<FixedSourcePrices>(FIXED_SOURCE_PRICES, {
+        strict: false,
+      });
+    } catch {
+      this.fixedSources = null;
+    }
+  }
 
   /**
    * Refuses unknown units (NOT_FOUND), superseded ones (UNIT_SUPERSEDED) and inexact quantities
@@ -106,7 +142,7 @@ export class PriceQuoteService {
     if (request.lines.length === 0 || request.lines.length > MAX_QUOTE_LINES) {
       throw invalid('lines', 'count', `1 to ${MAX_QUOTE_LINES} lines`);
     }
-    const converted = [];
+    const converted: (ConvertedQty & { qty: Decimal })[] = [];
     for (const line of request.lines) {
       const base = await this.units.toBase(line.productUnitId, line.qty, executor);
       converted.push({ ...base, qty: line.qty });
@@ -152,6 +188,35 @@ export class PriceQuoteService {
       qty: line.qty,
       qtyBase: line.qtyBase,
     }));
+    const sourceQty = new Map<string, Decimal>();
+    request.lines.forEach((line, index) => {
+      if (line.expiryBarcode)
+        sourceQty.set(
+          line.expiryBarcode,
+          (sourceQty.get(line.expiryBarcode) ?? new Decimal(0)).plus(
+            converted[index]?.qtyBase ?? 0,
+          ),
+        );
+    });
+    for (const [index, line] of inputs.entries()) {
+      const barcode = request.lines[index]?.expiryBarcode;
+      if (!barcode) continue;
+      if (!this.fixedSources)
+        throw invalid(
+          `lines.${index}.expiryBarcode`,
+          'unavailable',
+          'approved source pricing is unavailable',
+        );
+      line.fixedBaseUnitPrice = await this.fixedSources.resolve(executor, {
+        barcode,
+        productId: line.productId,
+        productUnitId: line.unitId,
+        qtyBase: sourceQty.get(barcode) ?? line.qtyBase,
+        list: request.list,
+        pipelineId: request.pipelineId ?? null,
+        tillId: request.tillId ?? null,
+      });
+    }
     const result = resolveQuote(inputs, {
       list: request.list,
       products,
@@ -167,6 +232,9 @@ export class PriceQuoteService {
       lines: converted.map((line, index): QuotedLine => {
         const priced = result.lines[index];
         return {
+          ...(request.lines[index]?.expiryBarcode
+            ? { expiryBarcode: request.lines[index]?.expiryBarcode }
+            : {}),
           productId: line.productId,
           productUnitId: line.unitId,
           qty: line.qty,

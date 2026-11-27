@@ -112,6 +112,7 @@ export class EdgeReturnsService {
         const left = new Decimal(line.qty).minus(taken.get(line.lineNo)?.qty ?? 0);
         return {
           lineNo: line.lineNo,
+          ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
           productId: line.productId,
           productUnitId: line.productUnitId,
           name: shown?.name ?? this.nameOf(line.productUnitId),
@@ -190,6 +191,7 @@ export class EdgeReturnsService {
         const rate = loaded.vatRates.get(sold.productId) ?? new Decimal(sold.vatRatePct);
         return {
           lineNo: index + 1,
+          ...(sold.expiryBarcode ? { expiryBarcode: sold.expiryBarcode } : {}),
           productId: sold.productId,
           productUnitId: sold.productUnitId,
           qty: qty.toFixed(3),
@@ -322,6 +324,7 @@ export class EdgeReturnsService {
           const shown = sale.receipt.lines[index];
           return {
             name: shown?.name ?? this.nameOf(line.productUnitId),
+            ...(line.expiryBarcode ? { expiryBarcode: line.expiryBarcode } : {}),
             uomName: shown?.uomName ?? '',
             qty: new Decimal(line.qty).toString(),
             unitPrice: line.unitPrice,

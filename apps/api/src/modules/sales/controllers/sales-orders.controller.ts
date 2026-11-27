@@ -77,6 +77,7 @@ const inputOf = (body: SalesOrderRequestDto): OrderInput => ({
   paymentMethod: body.paymentMethod,
   note: body.note ?? null,
   lines: body.lines.map((line) => ({
+    expiryBarcode: line.expiryBarcode ?? null,
     productUnitId: line.productUnitId,
     qty: new Decimal(line.qty),
   })),
@@ -127,6 +128,7 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
     picks: order.picks.map(partDto),
     loading: loadingDto(order.loading),
     excludedLines: order.excludedLines.map((line) => ({
+      expiryBarcode: line.expiryBarcode,
       id: line.id,
       productId: line.productId,
       productSku: line.productSku,
@@ -143,6 +145,7 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
       excludedAt: line.excludedAt.toISOString(),
     })),
     lines: order.lines.map((line) => ({
+      expiryBarcode: line.expiryBarcode,
       id: line.id,
       lineNo: line.lineNo,
       productId: line.productId,
@@ -173,8 +176,8 @@ function toDetail(order: OrderDetail): SalesOrderDetailDto {
         qty: part.qty.toString(),
         factorSnapshot: part.factorSnapshot.toString(),
         qtyBase: part.qtyBase.toString(),
-        listPrice: part.listPrice.toFixed(0),
-        unitPrice: part.unitPrice.toFixed(0),
+        listPrice: part.listPrice.toFixed(line.expiryBarcode ? 2 : 0),
+        unitPrice: part.unitPrice.toFixed(line.expiryBarcode ? 2 : 0),
         subtotal: part.subtotal.toFixed(0),
         discountAmount: part.discountAmount.toFixed(0),
         total: part.total.toFixed(0),
@@ -388,6 +391,7 @@ export class SalesOrdersController {
           qty: entry.qty ? new Decimal(entry.qty) : null,
         })),
         add: body.add.map((line) => ({
+          expiryBarcode: line.expiryBarcode ?? null,
           productUnitId: line.productUnitId,
           qty: new Decimal(line.qty),
         })),

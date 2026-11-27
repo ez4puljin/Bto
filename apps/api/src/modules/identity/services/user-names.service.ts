@@ -29,6 +29,29 @@ export interface RoleBrief {
 export class UserNamesService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
+  /** A frozen liability expands role IDs and explicit people once, in the caller's transaction. */
+  async activeLiableUsers(
+    roleIds: readonly number[],
+    userIds: readonly number[],
+    all: boolean,
+    executor: Db | Tx = this.db,
+  ): Promise<{ id: number; fullName: string }[]> {
+    if (!all && roleIds.length === 0 && userIds.length === 0) return [];
+    const members = roleIds.length
+      ? await executor
+          .select({ id: userRoles.userId })
+          .from(userRoles)
+          .where(inArray(userRoles.roleId, [...new Set(roleIds)]))
+      : [];
+    const ids = [...new Set([...userIds, ...members.map((row) => row.id)])];
+    if (!all && ids.length === 0) return [];
+    return executor
+      .select({ id: users.id, fullName: users.fullName })
+      .from(users)
+      .where(and(eq(users.status, 'ACTIVE'), all ? undefined : inArray(users.id, ids)))
+      .orderBy(asc(users.id));
+  }
+
   /** In the caller's transaction when one is given, never a second pooled connection beside it. */
   async namesOf(
     userIds: readonly number[],

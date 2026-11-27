@@ -12014,6 +12014,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/expiry/commerce-exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpiryCommerce_exceptionsList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/commerce-exceptions/{id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExpiryCommerce_acknowledge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/barcodes/{barcode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpiryCommerce_barcode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/items/{id}/commerce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpiryCommerce_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/items/{id}/receipt-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpiryCommerce_sources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/items/{id}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExpiryCommerce_prices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/items/{id}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["ExpiryCommerce_source"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/items/{id}/markdowns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExpiryCommerce_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/markdowns/{id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExpiryCommerce_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expiry/sale-exceptions/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExpiryCommerce_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ebarimt/receipts": {
         parameters: {
             query?: never;
@@ -18226,6 +18386,7 @@ export interface components {
             alreadyComplete: number[];
         };
         QuoteLineRequest: {
+            expiryBarcode?: string | null;
             productUnitId: number;
             /**
              * @description In the unit
@@ -18294,6 +18455,7 @@ export interface components {
             freeAmount: string;
         };
         QuoteLine: {
+            expiryBarcode?: string | null;
             productId: number;
             productUnitId: number;
             qty: string;
@@ -20416,6 +20578,7 @@ export interface components {
             applied: components["schemas"]["SalesOrderApplied"][];
         };
         SalesOrderLine: {
+            expiryBarcode?: string | null;
             id: number;
             lineNo: number;
             productId: number;
@@ -20465,6 +20628,7 @@ export interface components {
             doneAt: string | null;
         };
         SalesOrderExcludedLine: {
+            expiryBarcode?: string | null;
             id: number;
             productId: number;
             productSku: string;
@@ -20621,6 +20785,7 @@ export interface components {
             available: string;
         };
         SalesOrderLineRequest: {
+            expiryBarcode?: string | null;
             productUnitId: number;
             /**
              * @description In the unit
@@ -24203,6 +24368,8 @@ export interface components {
             /** @example 1090.91 */
             vatAmount: string;
             refundsLineId: number | null;
+            expiryBarcode?: string | null;
+            expiryException?: string | null;
             damaged: boolean;
             /** @example 0 */
             returnedBase: string;
@@ -24891,6 +25058,7 @@ export interface components {
             pendingOnEdge: string;
         };
         PosSaleDocLine: {
+            expiryBarcode?: string | null;
             lineNo: number;
             productId: number;
             productUnitId: number;
@@ -28277,6 +28445,186 @@ export interface components {
             userIds: number[];
             /** @description NONE clears it */
             note?: string;
+        };
+        ExpiryExceptionViewDto: {
+            /** @enum {string} */
+            origin: "SALE_EXCEPTION" | "POS_EXCEPTION";
+            id: number;
+            /** @enum {string} */
+            operation: "SALE" | "RETURN";
+            documentId: string;
+            lineId: string;
+            originalSaleId: string | null;
+            originalLineId: string | null;
+            barcode: string;
+            productId: number;
+            warehouseId: number;
+            reason: string;
+            qtyBase: string;
+            occurredAt: string;
+            createdAt: string;
+            acknowledgedAt: string | null;
+            acknowledgementNote: string | null;
+            /** @enum {string} */
+            financialEffect: "SALE_UNALLOCATED" | "RETURN_REVERSAL_UNRESOLVED";
+        };
+        ExpiryExceptionsDto: {
+            data: components["schemas"]["ExpiryExceptionViewDto"][];
+            nextCursor: string | null;
+        };
+        ExpiryExceptionAcknowledgementDto: {
+            /** @enum {string} */
+            origin: "SALE_EXCEPTION" | "POS_EXCEPTION";
+            /** @description Acknowledgement only; no employee charge or reversal is created */
+            note: string;
+        };
+        /** @enum {string} */
+        ExpiryChannel: "RETAIL" | "WHOLESALE";
+        ExpirySaleOfferDto: {
+            id: number;
+            itemId: number;
+            barcode: string;
+            expiryDate: string;
+            productId: number;
+            productUnitId: number;
+            warehouseId: number;
+            channel: components["schemas"]["ExpiryChannel"];
+            contextId: number;
+            unitPrice: string;
+            qtyAvailable: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            stoppedAt: string | null;
+        };
+        ExpiryLiablePreviewDto: {
+            id: number;
+            fullName: string;
+        };
+        ExpiryFirstCostingDto: {
+            version: number;
+            qtyBase: string;
+            grossAmount: string | null;
+            discountAmount: string | null;
+            freeGoods: boolean;
+        };
+        ExpiryCurrentCostingDto: {
+            version: number;
+            accountingAmount: string;
+            unitCost: string;
+            grossAmount: string | null;
+            discountAmount: string | null;
+            supplierNetAmount: string | null;
+            freeGoods: boolean;
+        };
+        ExpiryReceiptSourceDto: {
+            receiptLineId: number;
+            receiptId: number;
+            receiptNumber: string;
+            receiptDate: string;
+            warehouseId: number;
+            qtyBase: string;
+            first: components["schemas"]["ExpiryFirstCostingDto"] | null;
+            current: components["schemas"]["ExpiryCurrentCostingDto"] | null;
+            /** @enum {string} */
+            promotionEvidence: "FREE_GOODS" | "DISCOUNT" | "NONE" | "UNAVAILABLE";
+        };
+        ExpiryMarkdownDto: {
+            id: number;
+            itemId: number;
+            barcode: string;
+            expiryDate: string;
+            productId: number;
+            productUnitId: number;
+            warehouseId: number;
+            channel: components["schemas"]["ExpiryChannel"];
+            contextId: number;
+            unitPrice: string;
+            qtyAvailable: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            stoppedAt: string | null;
+            revision: number;
+            qtyBudget: string;
+            qtySold: string;
+            receiptLineId: number;
+            costingVersion: number;
+            accountingUnitCost: string;
+            /** @description Redacted without expiry.liability.manage */
+            payrollMonth: string | null;
+            /** @description Redacted without expiry.liability.manage */
+            liableUserIds: number[];
+        };
+        ExpirySaleExceptionDto: {
+            id: number;
+            markdownId: number;
+            /** @enum {string} */
+            sourceKind: "POS" | "WHOLESALE";
+            saleId: string;
+            lineId: string;
+            reason: string;
+            qtyBase: string;
+            /** Format: date-time */
+            soldAt: string;
+            /** Format: date-time */
+            resolvedAt: string | null;
+            resolutionNote: string | null;
+        };
+        ExpiryCommerceDto: {
+            itemVersion: number;
+            /** @description Draft concurrency token; redacted without liability permission */
+            liabilityFingerprint: string | null;
+            liableUsers: components["schemas"]["ExpiryLiablePreviewDto"][];
+            sourceVersion: number;
+            sourceQtyBase: string | null;
+            source: components["schemas"]["ExpiryReceiptSourceDto"] | null;
+            markdowns: components["schemas"]["ExpiryMarkdownDto"][];
+            exceptions: components["schemas"]["ExpirySaleExceptionDto"][];
+        };
+        ExpiryReceiptSourcesDto: {
+            data: components["schemas"]["ExpiryReceiptSourceDto"][];
+        };
+        ExpiryContextPriceDto: {
+            warehouseId: number;
+            channel: components["schemas"]["ExpiryChannel"];
+            contextId: number;
+            name: string;
+            unitPrice: string | null;
+            netUnitPrice: string | null;
+        };
+        ExpiryContextPricesDto: {
+            productUnitId: number | null;
+            /** @description One base unit, quoted on its own cart */
+            qty: string;
+            data: components["schemas"]["ExpiryContextPriceDto"][];
+        };
+        ExpirySourceRequestDto: {
+            /** @description sourceVersion, zero when no source is linked */
+            expectedVersion: number;
+            receiptLineId: number;
+            qtyBase: string;
+        };
+        ExpiryMarkdownRequestDto: {
+            /** @description Expiry item editVersion */
+            expectedVersion: number;
+            expectedSourceVersion: number;
+            expectedCostingVersion: number;
+            expectedLiabilityFingerprint: string;
+            receiptLineId: number;
+            qtyBase: string;
+            warehouseId: number;
+            channel: components["schemas"]["ExpiryChannel"];
+            /** @description Retail till or wholesale pipeline ID */
+            contextId: number;
+            /** @description Fixed gross price for one base unit, including tax */
+            unitPrice: string;
+            /** @description Explicit payroll month for future sold losses */
+            payrollMonth?: string;
+        };
+        ExpiryExceptionResolutionDto: {
+            /** @description Explicit reason for closing without an employee charge */
+            note: string;
         };
         EbarimtReceiptPage: {
             data: components["schemas"]["EbarimtReceipt"][];
@@ -58500,6 +58848,336 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExpiryItemDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_exceptionsList: {
+        parameters: {
+            query?: {
+                /** @description nextCursor of the previous page */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryExceptionsDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_acknowledge: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpiryExceptionAcknowledgementDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_barcode: {
+        parameters: {
+            query: {
+                pipelineId: number;
+            };
+            header?: never;
+            path: {
+                barcode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpirySaleOfferDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryCommerceDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_sources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryReceiptSourcesDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_prices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryContextPricesDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_source: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpirySourceRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryCommerceDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_publish: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpiryMarkdownRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryCommerceDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_stop: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryCommerceDto"];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ExpiryCommerce_resolve: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated UUID, kept until a response arrives */
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpiryExceptionResolutionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiryCommerceDto"];
                 };
             };
             /** @description RFC 9457 problem details */

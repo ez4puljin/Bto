@@ -39,6 +39,11 @@ const trimmed = ({ value }: { value: unknown }) =>
 
 @ApiSchema({ name: 'SalesOrderLineRequest' })
 export class SalesOrderLineRequestDto {
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Matches(/^BTOEXP-[1-9]\d{0,15}$/)
+  expiryBarcode?: string | null;
   @ApiProperty() @IsInt() @Min(1) productUnitId: number;
   @ApiProperty({ example: '2', description: 'In the unit' }) @IsString() @Matches(QTY) qty: string;
 }
@@ -193,6 +198,7 @@ export class SalesOrderLineEditRequestDto {
 /** A line taken off the order (ADR-0175 #2). */
 @ApiSchema({ name: 'SalesOrderExcludedLine' })
 export class SalesOrderExcludedLineDto {
+  @ApiPropertyOptional({ type: String, nullable: true }) expiryBarcode?: string | null;
   @ApiProperty() id: number;
   @ApiProperty() productId: number;
   @ApiProperty() productSku: string;
@@ -291,6 +297,7 @@ export class SalesOrderPartDto {
 
 @ApiSchema({ name: 'SalesOrderLine' })
 export class SalesOrderLineDto {
+  @ApiPropertyOptional({ type: String, nullable: true }) expiryBarcode?: string | null;
   @ApiProperty() id: number;
   @ApiProperty() lineNo: number;
   @ApiProperty() productId: number;

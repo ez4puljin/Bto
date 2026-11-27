@@ -55,6 +55,7 @@ export function toSaleDoc(dto: SaleDocDto): SaleDoc {
     refundsSaleClientId: orNull(dto.refundsSaleClientId),
     customerId: orNull(dto.customerId),
     lines: dto.lines.map((line) => ({
+      expiryBarcode: orNull(line.expiryBarcode),
       lineNo: line.lineNo,
       productId: line.productId,
       productUnitId: line.productUnitId,

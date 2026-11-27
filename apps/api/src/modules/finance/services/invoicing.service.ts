@@ -16,7 +16,7 @@ import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { TaxService } from '../../catalog';
 import { type Actor, AuditService, type AuthContext } from '../../identity';
 import { CustomersService } from '../../partners';
-import type { SaleSink, SaleSnapshot } from '../../sales';
+import type { SaleInvoiceFacts, SaleSink, SaleSnapshot } from '../../sales';
 import type { FinIntakeResult } from '../../../finance-core';
 import { BTO_SOURCE, FIN_DOC_TYPES, FinPartiesBridge } from '../../fin-bridge';
 import { creditNotes, invoiceLines, invoices } from '../schema';
@@ -60,11 +60,7 @@ export class InvoicingService implements SaleSink {
     private readonly ebarimt: InvoiceEbarimtService,
   ) {}
 
-  async onSold(
-    tx: Tx,
-    actor: Actor,
-    snapshot: SaleSnapshot,
-  ): Promise<{ invoiceId: number; number: string; total: Decimal } | null> {
+  async onSold(tx: Tx, actor: Actor, snapshot: SaleSnapshot): Promise<SaleInvoiceFacts | null> {
     const today = businessDate();
     const company = await this.tax.companyRates(today, tx);
     const lines: NewLine[] = [];
@@ -155,7 +151,23 @@ export class InvoicingService implements SaleSink {
     });
     // ADR-0185: the stage asked for the e-Barimt receipt; the store edge issues it after the commit.
     if (snapshot.ebarimt) await this.ebarimt.prepareInTx(tx, actor, invoice.id);
-    return { invoiceId: invoice.id, number, total: totals.total };
+    return {
+      invoiceId: invoice.id,
+      number,
+      total: totals.total,
+      sourceLines: lines.flatMap((line) =>
+        line.orderLineId == null
+          ? []
+          : [
+              {
+                orderLineId: line.orderLineId,
+                qtyBase: line.qtyBase,
+                grossAmount: line.total,
+                revenueAmount: line.total.minus(line.vatAmount).minus(line.cityTaxAmount),
+              },
+            ],
+      ),
+    };
   }
 
   /**

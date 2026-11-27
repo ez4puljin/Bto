@@ -250,6 +250,7 @@ function decodeSale(json: Json): SaleDoc {
       }
       return {
         lineNo: int(line.lineNo),
+        expiryBarcode: optStr(line.expiryBarcode),
         productId: int(line.productId),
         productUnitId: int(line.productUnitId),
         qty: dec(line.qty),

@@ -116,6 +116,8 @@ export interface SaleSummary {
 }
 
 export interface SaleLineView {
+  expiryBarcode: string | null;
+  expiryException: string | null;
   id: number;
   lineNo: number;
   productId: number;
@@ -472,6 +474,8 @@ export class PosQueryService {
         vatRatePct: line.vatRatePct,
         vatAmount: line.vatAmount,
         refundsLineId: line.refundsLineId,
+        expiryBarcode: line.expiryBarcode,
+        expiryException: line.expiryException,
         damaged: line.damaged,
         returnedBase: line.returnedBase,
       })),
