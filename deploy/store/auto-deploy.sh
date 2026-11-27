@@ -257,6 +257,28 @@ esac
 
 # web or deploy
 RUN="$DEPLOY_STATE/runs/$SHORT.log"
+# An update that failed is said at once, three ways, each on its own and none failing the round
+# (2026-11-27: four failed updates went unseen for an hour): the owner's Telegram (watch.sh --say,
+# when connected), a red «bto-deploy» status on the commit in GitHub, and a message on the team
+# board (ADR-0248) that the brain and the second developer's Codex read. Never a secret: only the
+# commit, the step and the run log's last error lines, which are build output.
+github_status() {
+  command -v gh >/dev/null 2>&1 || return 0
+  timeout 30 gh api -X POST "repos/{owner}/{repo}/statuses/$TARGET" -f state="$1" \
+    -f context=bto-deploy -f description="$2" >/dev/null 2>&1 || true
+}
+alarm() {
+  local text=$1 why
+  why=$(grep -E 'unhealthy|ERROR|[Ee]rror:|ЗОГСЛОО' "$RUN" 2>/dev/null | tail -n 3 | cut -c1-200 || true)
+  bash deploy/store/watch.sh --say "🔴 $text${why:+
+$why}" >/dev/null 2>&1 || true
+  github_status failure "$(printf '%s' "$text" | cut -c1-130)"
+  if command -v node >/dev/null 2>&1; then
+    timeout 60 node tools/brain/board.mjs say all \
+      "bto-deploy: $SHORT NOT LIVE: $text. ${why//$'\n'/ | } (log: ~/.local/state/bto-deploy/runs/$SHORT.log)" \
+      --as deploy --state "$DEPLOY_STATE/board" >/dev/null 2>&1 || true
+  fi
+}
 stamp() { while IFS= read -r line; do printf '%s %s\n' "$(date +%T)" "$line"; done; }
 # The round's last step (ADR-0211): never fails the round, never counted in its times.
 tidy() { timeout 600 bash deploy/store/housekeeping.sh --quiet 2>&1 | stamp >>"$RUN" || true; }
@@ -271,6 +293,7 @@ if ! "${SETUP[@]}" 2>&1 | stamp >"$RUN"; then
   failed_after=$(($(date +%s) - started))
   tidy
   say "$SHORT: төв систем ТАВИГДСАНГҮЙ ($failed_after сек): runs/$SHORT.log"
+  alarm "Шинэчлэл $SHORT тавигдсангүй ($failed_after сек); өмнөх хувилбар ажиллаж байна"
   exit 0
 fi
 store_done=$(date +%s)
@@ -286,8 +309,11 @@ if [ "$edge_ok" = no ]; then note="$note, КАССЫН СЕРВЕР АЛДААТ
 # After --only-web the api keeps the version it was built at: then the answer only has to be ok.
 if [ "$running" = "$SHORT" ] || { [ "$PLAN" = web ] && printf '%s' "$health" | grep -q '"status":"ok"'; }; then
   say "$SHORT: ажиллаж байна ($note)"
+  if [ "$edge_ok" = no ]; then alarm "Шинэчлэл $SHORT: төв ажиллаж байна, КАССЫН СЕРВЕР АЛДААТАЙ"
+  else github_status success "live ($note)"; fi
 else
   say "$SHORT: тавьсан боловч /health «${running:-хариугүй}» гэж хариулж байна ($note): runs/$SHORT.log"
+  alarm "Шинэчлэл $SHORT тавьсан боловч /health «${running:-хариугүй}» гэж хариулж байна"
 fi
 if [ "$VERDICT" != success ]; then printf '%s\n' "$TARGET" >"$DEPLOY_STATE/auto-ci-watch"; fi
 tidy

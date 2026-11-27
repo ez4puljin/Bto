@@ -86,6 +86,18 @@ expect "the staff app's package.json rebuilds the till server" "$(needs_edge app
 expect "tests and tools are not left behind" \
   "$(left_behind apps/api/test/a.int-spec.ts tools/x.sh apps/api/src/a.spec.ts apps/mobile/src/a.ts | tr '\n' ' ')" ""
 
+# The images install their dependencies from the manifests alone, before the code is copied (the
+# install layer is reused while they stay the same): every workspace package.json must be copied there.
+for dockerfile in apps/api/Dockerfile apps/web/Dockerfile; do
+  for manifest in $(git ls-files 'package.json' '*/package.json' | grep -v node_modules); do
+    dir=$(dirname "$manifest")
+    if [ "$dir" = . ]; then want="COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./"
+    else want="COPY $manifest $dir/"; fi
+    if grep -qxF "$want" "$dockerfile"; then found=yes; else found=no; fi
+    expect "$dockerfile copies $manifest before the install" "$found" "yes"
+  done
+done
+
 if [ "$FAILS" -gt 0 ]; then
   echo "$FAILS failed"
   exit 1

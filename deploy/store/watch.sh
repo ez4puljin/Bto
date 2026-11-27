@@ -8,6 +8,7 @@
 #   bash deploy/store/watch.sh            one round (the bto-watch timer runs exactly this)
 #   bash deploy/store/watch.sh --check    what it sees now; sends nothing, remembers nothing
 #   bash deploy/store/watch.sh --test     sends one test message
+#   bash deploy/store/watch.sh --say <t>  sends one message when Telegram is connected (auto-deploy.sh)
 #
 # Messages go to the owner's Telegram chat through the owner's own bot (alerts-setup.sh asks for
 # its token on the PC; it is kept in deploy/store/.env and never printed). They carry the state of
@@ -326,8 +327,14 @@ main() {
       echo "Илгээж чадсангүй: bash deploy/store/alerts-setup.sh ажиллуулж тохируулна уу." >&2
       return 1
       ;;
+    --say)
+      # One message from another script (auto-deploy.sh: an update that failed). Quiet and 0 when
+      # Telegram is not connected: the caller has other ways to say it.
+      send "$2" || true
+      return 0
+      ;;
     "") ;;
-    *) echo "usage: watch.sh [--check | --test]" >&2; return 64 ;;
+    *) echo "usage: watch.sh [--check | --test | --say <text>]" >&2; return 64 ;;
   esac
   mkdir -p "$STATE_DIR"
   # One round at a time: a slow round is not joined by the next minute's.
