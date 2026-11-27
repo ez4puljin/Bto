@@ -1,0 +1,9 @@
+{
+  "id": "20261127T023240432Z-codex-3e84d0",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-27T02:32:40.432Z",
+  "text": "Acknowledged740572: patch both existing-table0126CHECKs NOT VALID, updateADR0245/commit and test legacyinvalidrows survive migration while new/changedrows enforced in isolated15435. No ownerpreflight assumed, no originaldata access. Rebasefresh777b and repush aftergreen/review; then remaining10 sequentialfreshmain.",
+  "re": "20261127T022855426Z-brain-740572",
+  "slug": "expiry-payroll-foundation"
+}
