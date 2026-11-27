@@ -11,8 +11,8 @@ schema, including expiry sale allocations, before starting the application or cr
 data; missing prerequisites cause refusal. Source publication and fake unit results do not
 establish execution readiness or authorize changing the accepted local history.
 
-This is an isolated, fictional grocery business dataset for a review of Bto. The owner's populated
-`bto_local_shiro` database is never a target. The dedicated target name is
+This is an isolated, fictional grocery business dataset for a review of Bto. The populated operational
+database is never a target. The dedicated target name is
 `bto_qa_six_month_20261124`, on `127.0.0.1:15432` only.
 
 The catalogue has exactly 500 SKUs, 60 suppliers in 20 supplier departments and 80 customers.
@@ -40,8 +40,23 @@ imports from other systems and background workers are excluded. The parent recor
 count/hash under the migrator; the runner uses only app-visible schema checks, never migration
 metadata grants.
 
-After independent review and explicit execution approval, use the installed checkout's portable
-Node and built API dependencies (`--repo`), with the reviewed runner file:
+The tool must never target the real system, including the Ubuntu host. The same exact loopback
+QA URL, client checks, outbound fence and server database/role checks apply on every OS; a different
+host, port, database or URL override is refused. The Windows launchers are optional local wrappers,
+not installation instructions for the real host.
+
+Execution requires an explicit `--repo` with `--apply`. Pre-provision only the tool-owned
+`.data/local-dev/qa-six-month/qa.env`, or supply `BTO_QA_DATABASE_URL` with the exact allowed QA URL.
+An explicitly supplied URL is validated before any file is read; a pre-provisioned QA file is read
+only after validating the explicit checkout, database and run directory, and its URL is validated
+before any directory creation or application bootstrap. The tool never reads `apps/api/.env`.
+The QA administrator defaults to `qa-admin`; an existing nondefault QA administrator must be named
+by `BTO_QA_ADMIN_LOGIN` in the private QA environment. Publishing this code does not modify that
+file or rename any existing account. Changing fictional display names in source does not rewrite
+accepted operation payloads or hashes, and is not permission to rerun the accepted dataset.
+
+After independent review and explicit execution approval, use Node and built API dependencies
+from the explicit checkout (`--repo`), with the reviewed runner file:
 
 ```powershell
 $env:BTO_QA_PASSWORD = '<private QA-only password>'
@@ -72,7 +87,7 @@ Those behaviors have separate integration coverage in
 `apps/api/test/integration/receipts-prices.int-spec.ts` (12 assertions), including line/note
 discount order, discount income, free-goods costing and percentage/amount allocation. All 18
 assertions passed in the actual November 24 integration run, recorded in
-`.data/local-dev/checks/overnight-api-integration-current-20261124.json`; these tests are distinct
+the private historical integration evidence; these tests are distinct
 from the historical fixture. Completed operation payloads are never rewritten to add scenarios.
 
 After historical acceptance, run the separate actual-current-day expiry regression. It removes

@@ -380,7 +380,7 @@ describe('bank statements, «Банкны хуулга хаах»', () => {
     expect(second).toMatchObject({ posted: 0, skipped: 0, failures: [] });
     expect(await finance.invoice(invoiceTwo.id)).toMatchObject({ openAmount: '4000.00' });
 
-    // Posted: an edit marks the line for «Гүйлгээ засах» (ADR-0250); no swap, no delete.
+    // Posted: an edit marks the line for «Гүйлгээ засах» (ADR-0252); no swap, no delete.
     const edit = (await patch(id, income.id, { description: 'засвар' }).expect(200))
       .body as LineJson;
     expect(edit).toMatchObject({ changed: true, paymentId: posted?.paymentId });
@@ -747,7 +747,7 @@ describe('bank statements, «Банкны хуулга хаах»', () => {
     ).body as { data: { entryId: number; party: { code: string | null } | null }[] };
     expect(lines.data.find((row) => row.entryId === entry.id)?.party?.code).toBe(shop.code);
   });
-  it('writes again only the lines edited after posting, and keeps the day’s history (ADR-0250)', async () => {
+  it('writes again only the lines edited after posting, and keeps the day’s history (ADR-0252)', async () => {
     const finance = financeApi(app, accountant);
     const day = addDays(today, -3);
     const uploaded = (

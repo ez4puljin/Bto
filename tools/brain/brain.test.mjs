@@ -913,7 +913,7 @@ test('desk: which kinds a path is part of', () => {
   const kindsOf = (path) =>
     spawnSync('bash', [join(here, 'job.sh'), 'kinds-of', path], {
       encoding: 'utf8',
-      // HEAD, not origin/main: a pull request's CI checkout has no origin/main.
+      // The app's imports are read at HEAD: a pull request's checkout has no origin/main.
       env: { ...process.env, BTO_WORK: work, BTO_BASE_REF: 'HEAD' },
     }).stdout;
   try {
@@ -2638,6 +2638,12 @@ test("review: the verdict is read only from the CLI's structured answer, and nev
             text: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdEFGHijkl',
           },
           { severity: 'MEDIUM', file: 'a.ts', line: 4, text: 'a name is unclear' },
+          {
+            severity: 'HIGH',
+            file: 'apps/api/src/db/migrations/0126_expiry_payroll_foundation.sql',
+            line: 12,
+            text: 'the CHECK in apps/api/src/db/migrations/meta/0126_snapshot.json:40 rejects old rows',
+          },
         ],
       },
     }),
@@ -2645,7 +2651,18 @@ test("review: the verdict is read only from the CLI's structured answer, and nev
   );
   assert.deepEqual(
     leaky.findings.map((f) => f.text),
-    [REMOVED, REMOVED, REMOVED, 'a name is unclear'],
+    [
+      REMOVED,
+      REMOVED,
+      REMOVED,
+      'a name is unclear',
+      'the CHECK in apps/api/src/db/migrations/meta/0126_snapshot.json:40 rejects old rows',
+    ],
+  );
+  // A repository path, however long and full of digits, is not a secret (2026-11-27).
+  assert.equal(
+    leaky.findings[4].file,
+    'apps/api/src/db/migrations/0126_expiry_payroll_foundation.sql',
   );
 });
 
@@ -2811,6 +2828,50 @@ test('review: a head the allow-list does not cover never reaches the suites or t
     // The brain decides by hand.
     assert.equal(inbox.run('reject', 'in/wording', 'wording', 'is', 'the', "owner's").status, 0);
     assert.equal(inbox.run('approve', 'in/schema-add').status, 0);
+  } finally {
+    rmSync(inbox.dir, { recursive: true, force: true });
+  }
+});
+
+test("review: auto all (ADR-0250) takes the owner's areas with the stricter model; a weakened test still waits", () => {
+  const inbox = makeInbox();
+  try {
+    assert.match(inbox.run('auto', 'all').stdout, /owner's areas too/);
+    assert.match(inbox.run('auto', 'status').stdout, /scope: all/);
+    inbox.push('schema-add', {
+      'apps/api/src/modules/reporting/r.ts': 'export const r = 7;\n',
+      'apps/api/src/db/migrations/0300_add.sql': 'ALTER TABLE x ADD COLUMN y text;\n',
+    });
+    inbox.run('tick');
+    assert.equal(inbox.item('schema-add').state, 'WAITING-REVIEW');
+    assert.match(inbox.run('review', '--dry-run').stdout, /reviewed here, auto all/);
+    const pass = inbox.run('review');
+    assert.equal(pass.status, 0, pass.stderr + pass.stdout);
+    assert.match(pass.stdout, /the owner's areas \(migration[^)]*\): reviewed here/);
+    assert.equal(inbox.item('schema-add').review, 'approved');
+    const argv = readFileSync(join(inbox.dir, 'claude-argv'), 'utf8').split('\0');
+    assert.equal(argv[argv.indexOf('--model') + 1], 'opus');
+    assert.match(argv[argv.indexOf('-p') + 1], /ADR-0250/);
+    assert.match(readFileSync(join(inbox.dir, 'suites'), 'utf8'), /--integrity/);
+    inbox.run('tick');
+    assert.equal(inbox.item('schema-add').state, 'LANDED');
+    inbox.push('add-test', {
+      'apps/api/src/modules/sales/s.spec.ts': "it('a', () => {});\nit('b', () => {});\n",
+    });
+    inbox.run('tick');
+    inbox.run('tick');
+    inbox.run('review');
+    inbox.run('tick');
+    assert.equal(inbox.item('add-test').state, 'LANDED');
+    inbox.push('skip-test', {
+      'apps/api/src/modules/sales/s.spec.ts': "it('a', () => {});\nit.skip('b', () => {});\n",
+    });
+    inbox.run('tick');
+    inbox.run('review');
+    assert.equal(inbox.item('skip-test').review, 'owner');
+    assert.match(inbox.item('skip-test').review_why, /tests-weakened/);
+    assert.match(inbox.run('auto', 'allowlist').stdout, /allow-list/);
+    assert.match(inbox.run('auto', 'status').stdout, /scope: allow-list/);
   } finally {
     rmSync(inbox.dir, { recursive: true, force: true });
   }

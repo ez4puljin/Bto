@@ -127,7 +127,7 @@ export class BankStatementsController {
     });
   }
 
-  /** «Сарын хөл дүн»: each bank account's month by the lines' own dates (ADR-0250). */
+  /** «Сарын хөл дүн»: each bank account's month by the lines' own dates (ADR-0252). */
   @Get('month-totals')
   @RequirePermission(READ)
   @ApiOkResponse({ type: [BankMonthTotalDto] })
@@ -145,7 +145,7 @@ export class BankStatementsController {
     }));
   }
 
-  /** Every change of the lines of a day's statements, newest first (ADR-0250). */
+  /** Every change of the lines of a day's statements, newest first (ADR-0252). */
   @Get('history')
   @RequirePermission(READ)
   @ApiOkResponse({ type: [BankHistoryEntryDto] })

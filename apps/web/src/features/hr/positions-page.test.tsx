@@ -107,6 +107,44 @@ describe('position salary and access catalog', () => {
     });
   });
 
+  it('explains an own-position role refusal without exposing the raw field path', async () => {
+    const fetchMock = signedIn(ADMIN_ME, {
+      ...routes,
+      'PUT /api/v1/hr/positions/1': () =>
+        json(
+          {
+            type: 'about:blank',
+            title: 'Validation failed',
+            status: 422,
+            code: 'VALIDATION_FAILED',
+            errors: [
+              {
+                path: 'roleIds',
+                constraint: 'ownPositionRoles',
+                message: 'another ADMIN must change the roles of your own position',
+              },
+            ],
+          },
+          422,
+        ),
+    });
+    renderApp('/hr/positions', fetchMock);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', {
+        name: mn.hr.positions.editFor.replace('{{name}}', POSITION.name),
+      }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.click(await dialog.findByRole('checkbox', { name: mn.roles.system.WAREHOUSE }));
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    expect(await dialog.findByText(mn.errors.fields.roleIds.ownPositionRoles)).toBeInTheDocument();
+    expect(dialog.queryByText(/roleIds:/)).toBeNull();
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/hr/positions/1')[0])).toMatchObject({
+      roleIds: [],
+    });
+  });
+
   it('keeps HR readers read-only even when create is requested in the URL', async () => {
     renderApp(
       '/hr/positions?new=1',
@@ -178,7 +216,7 @@ describe('position salary and access catalog', () => {
     ).toBeInTheDocument();
   });
 
-  it('makes assigned payroll salary read-only while saving KPI and insurance changes', async () => {
+  it('prefills the next position salary without freezing it when only insurance changes', async () => {
     const terms: Schemas['PayrollTerms'] = {
       userId: 7,
       fullName: 'Assigned employee',
@@ -192,6 +230,11 @@ describe('position salary and access catalog', () => {
       baseSalary: '1000000.00',
       nextBaseSalary: '1200000.00',
       nextEffectiveMonth: '2026-12',
+      salarySource: 'POSITION',
+      nextSalarySource: 'POSITION',
+      positionBaseSalary: '1000000.00',
+      positionNextBaseSalary: '1200000.00',
+      positionNextEffectiveMonth: '2026-12',
       paysSocialInsurance: true,
       templateId: null,
       templateName: null,
@@ -209,8 +252,10 @@ describe('position salary and access catalog', () => {
     renderApp('/hr/payroll/terms?user=7', fetchMock);
     const user = userEvent.setup();
     const dialog = within(await screen.findByRole('dialog'));
-    expect(dialog.queryByRole('textbox', { name: mn.payroll.web.terms.salary })).toBeNull();
-    expect(dialog.getByText('1,000,000')).toBeInTheDocument();
+    expect(dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary })).toBeEnabled();
+    expect(dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary })).toHaveValue(
+      '1,200,000',
+    );
     await user.click(dialog.getByRole('switch', { name: mn.payroll.web.terms.insured }));
     await user.click(dialog.getByRole('button', { name: mn.common.save }));
     await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/7')).toHaveLength(1));

@@ -52,7 +52,7 @@ export interface BankRules {
   feeAction: BankLineAction;
   feeExportType: BankExportType;
   partyCode: string;
-  /** The Erkhet party a fee and a settlement line are filled with (ADR-0250); '' follows `partyCode`. */
+  /** The Erkhet party a fee and a settlement line are filled with (ADR-0252); '' follows `partyCode`. */
   feePartyCode: string;
   settlementPartyCode: string;
   counterAccountIds: number[];
@@ -77,7 +77,7 @@ export interface BankStatementSummary {
   totalDebit: Decimal;
   filledCount: number;
   postedCount: number;
-  /** Lines in the books edited since: «Гүйлгээ засах» writes them again (ADR-0250). */
+  /** Lines in the books edited since: «Гүйлгээ засах» writes them again (ADR-0252). */
   changedCount: number;
   missing: Record<BankLineMissing, number>;
 }
@@ -135,7 +135,7 @@ export interface BankLinePatch {
   exportType?: BankExportType | null;
 }
 
-/** One change of a day's lines, newest first (ADR-0250): who, when, which line, what moved. */
+/** One change of a day's lines, newest first (ADR-0252): who, when, which line, what moved. */
 export interface BankHistoryEntry {
   id: number;
   occurredAt: Date;
@@ -150,7 +150,7 @@ export interface BankHistoryEntry {
   changes: { field: string; before: string | null; after: string | null }[];
 }
 
-/** A month's totals of one bank account, by the lines' own dates (ADR-0250, «Сарын хөл дүн»). */
+/** A month's totals of one bank account, by the lines' own dates (ADR-0252, «Сарын хөл дүн»). */
 export interface BankMonthTotal {
   accountNumber: string;
   accountCode: string | null;
@@ -172,7 +172,7 @@ export interface BankPostFailure {
 
 export interface BankPostResult {
   posted: number;
-  /** Lines in the books written again because they were edited (ADR-0250). */
+  /** Lines in the books written again because they were edited (ADR-0252). */
   updated: number;
   skipped: number;
   failures: BankPostFailure[];
@@ -217,7 +217,7 @@ function postedFieldsOf(line: LineRow): PostedFields {
   };
 }
 
-/** A line in the books whose fields have moved since it was written (ADR-0250). */
+/** A line in the books whose fields have moved since it was written (ADR-0252). */
 export function isChanged(line: LineRow): boolean {
   if (line.postedAt === null || line.kind !== 'NORMAL') return false;
   const held = line.postedFields as Partial<PostedFields> | null;
@@ -652,7 +652,7 @@ export class BankStatementsService {
    * Writes the ready lines to the books, each in its own transaction, so one refused line (a closed
    * month, an inactive customer) leaves the others in. A statement's fees of a day are one entry, as
    * the old fee export summed them. Lines still lacking something are only counted. A line in the
-   * books edited since is written again on its own (ADR-0250, «Гүйлгээ засах»): its document is
+   * books edited since is written again on its own (ADR-0252, «Гүйлгээ засах»): its document is
    * reversed and the new one posted in one transaction; every other line in the books stays as it is.
    */
   async post(
@@ -780,7 +780,7 @@ export class BankStatementsService {
   }
 
   /**
-   * «Гүйлгээ засах» for one edited line in the books (ADR-0250): its document's own reversal and the
+   * «Гүйлгээ засах» for one edited line in the books (ADR-0252): its document's own reversal and the
    * new document in one transaction, under the line's next source key. False when the line is no
    * longer changed (another press wrote it, or the edit was taken back).
    */
@@ -1079,7 +1079,7 @@ export class BankStatementsService {
 
   // ---- The day's history and the month's totals ----
 
-  /** Every change of the lines of a day's statements, newest first (ADR-0250). */
+  /** Every change of the lines of a day's statements, newest first (ADR-0252). */
   async dayHistory(date: string): Promise<BankHistoryEntry[]> {
     const rows = await this.linesOfDate(date);
     if (rows.length === 0) return [];
@@ -1152,7 +1152,7 @@ export class BankStatementsService {
 
   /**
    * «Сарын хөл дүн»: each bank account's lines of a month by their own date, the money in and out,
-   * the net and the fees among the money out (ADR-0250).
+   * the net and the fees among the money out (ADR-0252).
    */
   async monthTotals(from: string, to: string): Promise<BankMonthTotal[]> {
     const books = await this.books();
@@ -1594,7 +1594,7 @@ function ruleParty(
   return { rulePartyCode: rule.code || null, rulePartyName: rule.name };
 }
 
-/** The fields an edit moved, before and after, for the day's history (ADR-0250). */
+/** The fields an edit moved, before and after, for the day's history (ADR-0252). */
 function changeOf(
   before: LineRow,
   after: LineRow,
@@ -1643,7 +1643,7 @@ function moneyCells(
   ];
 }
 
-/** A fee and a settlement follow the rules; any other line is edited, in the books or not (ADR-0250). */
+/** A fee and a settlement follow the rules; any other line is edited, in the books or not (ADR-0252). */
 function assertEditable(line: LineRow): void {
   if (line.kind !== 'NORMAL') {
     throw new AppError('BANK_LINE_LOCKED', `line ${line.lineNo} follows the settings`, {

@@ -179,7 +179,7 @@ describe('«Банкны хуулга хаах» (ADR-0169)', () => {
       '/finance/journal?entry=500',
     );
     expect(screen.getByRole('button', { name: '2-р мөрийг дэвтрээс буцаах' })).toBeInTheDocument();
-    // A posted line is edited too, «Гүйлгээ засах» writes it again (ADR-0250).
+    // A posted line is edited too, «Гүйлгээ засах» writes it again (ADR-0252).
     expect(
       screen.getByRole('textbox', { name: `2-р мөрийн ${TEXT.columns.description}` }),
     ).toBeInTheDocument();
@@ -286,7 +286,7 @@ describe('«Банкны хуулга хаах» (ADR-0169)', () => {
     expect(posted?.headers.get('Idempotency-Key')).toMatch(UUID);
   });
 
-  it('offers «Гүйлгээ засах» for a line edited after posting (ADR-0250)', async () => {
+  it('offers «Гүйлгээ засах» for a line edited after posting (ADR-0252)', async () => {
     const user = userEvent.setup();
     const edited = line({
       id: 75,

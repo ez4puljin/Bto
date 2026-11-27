@@ -93,7 +93,7 @@ export function BankStatementPanel(props: { id: number; onClose: () => void }) {
 
   const lines = statement.data?.lines ?? [];
   const visible = lines.filter((line) => (line.kind === 'FEE') === (view === 'fees'));
-  // A line in the books is edited too: «Гүйлгээ засах» then writes only it again (ADR-0250).
+  // A line in the books is edited too: «Гүйлгээ засах» then writes only it again (ADR-0252).
   const editable = (line: BankLine) => canWork && line.kind === 'NORMAL';
   const bankAccountId = statement.data?.moneyAccountId ?? null;
 

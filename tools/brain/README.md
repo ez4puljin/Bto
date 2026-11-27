@@ -190,6 +190,7 @@ bash tools/brain/inbox.sh classify <path>…        the rule alone, per path
 bash tools/brain/inbox.sh review [--dry-run]      one automatic review (the timer bto-brain-review, ADR-0249)
 bash tools/brain/inbox.sh review --again <branch> forget the automatic review's result; the next pass reviews it
 bash tools/brain/inbox.sh auto on|off|status      the automatic review's switch (on unless turned off)
+bash tools/brain/inbox.sh auto all|allowlist      all: it also lands the owner's areas (ADR-0250); allowlist: back to ADR-0249
 ```
 
 - **`tick`** (the user timer `bto-brain-inbox.timer`, every 20 seconds, `nice 15`, installed by
@@ -374,6 +375,13 @@ run, so the 20-second tick is as fast as before.
    brain as before; `auto on` again. `review --dry-run` prints, per waiting head, the owner-only
    rules, the suites and whether it would review, and runs neither. `review --again in/<slug>`
    forgets a verdict so the next pass reviews the head again.
+11. **All (ADR-0250, owner 2026-11-26):** `inbox.sh auto all` (a file `inbox/auto-review.all`) lets
+   the pass take a head the owner-only rules hold (migrations, schema, money, rights, tools, ADRs):
+   its suites run as usual (a migration adds `--integrity`), then the reviewer runs with
+   `BTO_REVIEW_MODEL_GUARDED` (default `opus`) and a prompt that names those areas and asks for a
+   BLOCK on any doubt. A weakened test and an unsure rule test still wait for the brain; the tick's
+   guard rails are refused as before. drizzle's `meta/*_snapshot.json` is left out of the patch.
+   `inbox.sh auto allowlist` goes back.
 
 **Trust:** the reviewer reads a trusted collaborator's code, but a diff could still talk an AI round.
 The hard rails are the script's: the guard rails, the allow-list and the diff rules, `check:fast` and

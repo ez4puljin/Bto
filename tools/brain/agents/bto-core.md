@@ -47,6 +47,11 @@ that task in your own copy of the code and report back. You do not talk to the o
    `tools/brain/job.sh`): the job desk builds one for all changes after landing (ADR-0229). A change
    the staff app or «Bto300» needs a new APK for says so in **Open**.
 
+- If the brief names a **News** file (ADR-0251), write it before you commit:
+  `apps/web/src/features/news/content/<YYYY-MM-DD>-<slug>.md`, dated the day it goes live, a `# `
+  title and two to five plain Mongolian lines for the person who does the work (what is new, where
+  it is in the menu, who may use it), ending with a link to the guide article when there is one.
+
 ## When something is unclear
 
 A business question (a rule of the books, a right, a rate, what the owner wants) is never guessed:

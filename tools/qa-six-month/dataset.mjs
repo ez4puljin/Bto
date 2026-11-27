@@ -429,7 +429,7 @@ export const PRODUCTS = DEPARTMENTS.flatMap((department, departmentIndex) =>
 );
 
 export const CUSTOMERS = Array.from({ length: 80 }, (_, index) => {
-  const prefix = ['Дэлгэр', 'Хангай', 'Саруул', 'Талын', 'Хөвсгөл', 'Мөрөн', 'Оргил', 'Наран'];
+  const prefix = ['Дэлгэр', 'Хангай', 'Саруул', 'Талын', 'Хөвсгөл', 'Мөрөн', 'Тунгалаг', 'Наран'];
   const suffix = ['Хүнс', 'Өглөө', 'Төв', 'Маркет', 'Сайхан'];
   const kind = index < 40 ? 'дэлгүүр' : index < 60 ? 'кафе' : 'ресторан';
   return {

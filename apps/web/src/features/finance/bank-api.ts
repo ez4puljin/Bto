@@ -65,7 +65,7 @@ export function useBankStatement(id: number | null) {
   });
 }
 
-/** Every change of the lines of a day's statements, newest first (ADR-0250). */
+/** Every change of the lines of a day's statements, newest first (ADR-0252). */
 export function useBankHistory(date: string, enabled: boolean) {
   const api = useApiClient();
   return useQuery({
@@ -81,7 +81,7 @@ export function useBankHistory(date: string, enabled: boolean) {
   });
 }
 
-/** «Сарын хөл дүн»: each bank account's month (ADR-0250). */
+/** «Сарын хөл дүн»: each bank account's month (ADR-0252). */
 export function useBankMonthTotals(month: string, enabled: boolean) {
   const api = useApiClient();
   return useQuery({

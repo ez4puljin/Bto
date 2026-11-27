@@ -280,7 +280,7 @@ function MonthCalendar(props: {
   );
 }
 
-/** «Сарын хөл дүн» (ADR-0250): each bank account's month in one table, the sum of all in its foot. */
+/** «Сарын хөл дүн» (ADR-0252): each bank account's month in one table, the sum of all in its foot. */
 function MonthTotalsDialog(props: { open: boolean; month: string; onClose: () => void }) {
   const { t } = useTranslation();
   const [month, setMonth] = useState(props.month);
@@ -860,7 +860,7 @@ function FeeExportDialog(props: { open: boolean; date: string; onClose: () => vo
   );
 }
 
-/** Every change of the day's lines, newest first (ADR-0250): who, when, which line, what moved. */
+/** Every change of the day's lines, newest first (ADR-0252): who, when, which line, what moved. */
 function HistoryDialog(props: { open: boolean; date: string; onClose: () => void }) {
   const { t } = useTranslation();
   const history = useBankHistory(props.date, props.open);

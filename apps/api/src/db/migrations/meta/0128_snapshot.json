@@ -1,6 +1,6 @@
 {
-  "id": "c3c53b20-fa9c-4103-8650-6178cd35c66f",
-  "prevId": "fa6f4e92-e821-4cc2-b327-e3ad76f39203",
+  "id": "48f60975-ab82-4949-891e-7438d426a977",
+  "prevId": "f9631914-1b66-4e70-a245-b092567bacdf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -25716,6 +25716,94 @@
         "payroll_runs_note": {
           "name": "payroll_runs_note",
           "value": "\"payroll_runs\".\"note\" IS NULL OR length(\"payroll_runs\".\"note\") BETWEEN 1 AND 300"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payroll_salary_overrides": {
+      "name": "payroll_salary_overrides",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "effective_month": {
+          "name": "effective_month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_salary": {
+          "name": "base_salary",
+          "type": "numeric(14, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "payroll_salary_overrides_user_id_users_id_fk": {
+          "name": "payroll_salary_overrides_user_id_users_id_fk",
+          "tableFrom": "payroll_salary_overrides",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "payroll_salary_overrides_updated_by_users_id_fk": {
+          "name": "payroll_salary_overrides_updated_by_users_id_fk",
+          "tableFrom": "payroll_salary_overrides",
+          "tableTo": "users",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "payroll_salary_overrides_user_id_effective_month_pk": {
+          "name": "payroll_salary_overrides_user_id_effective_month_pk",
+          "columns": [
+            "user_id",
+            "effective_month"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "payroll_salary_overrides_month": {
+          "name": "payroll_salary_overrides_month",
+          "value": "\"payroll_salary_overrides\".\"effective_month\" ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'"
+        },
+        "payroll_salary_overrides_nonnegative": {
+          "name": "payroll_salary_overrides_nonnegative",
+          "value": "\"payroll_salary_overrides\".\"base_salary\" >= 0 AND \"payroll_salary_overrides\".\"base_salary\" <> 'NaN'::numeric"
         }
       },
       "isRLSEnabled": false

@@ -1,4 +1,4 @@
--- ADR-0250. A posted bank line keeps what the books hold of it, so an edit after posting is seen and
+-- ADR-0252. A posted bank line keeps what the books hold of it, so an edit after posting is seen and
 -- «Гүйлгээ засах» writes only the changed lines again; a fee's and a settlement's own Erkhet party.
 ALTER TABLE "bank_statement_lines" ADD COLUMN "posted_fields" jsonb;--> statement-breakpoint
 ALTER TABLE "bank_statement_settings" ADD COLUMN "fee_party_code" text;--> statement-breakpoint

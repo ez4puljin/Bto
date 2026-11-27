@@ -8071,7 +8071,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** «Сарын хөл дүн»: each bank account's month by the lines' own dates (ADR-0250). */
+        /** «Сарын хөл дүн»: each bank account's month by the lines' own dates (ADR-0252). */
         get: operations["BankStatements_monthTotals"];
         put?: never;
         post?: never;
@@ -8088,7 +8088,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every change of the lines of a day's statements, newest first (ADR-0250). */
+        /** Every change of the lines of a day's statements, newest first (ADR-0252). */
         get: operations["BankStatements_history"];
         put?: never;
         post?: never;
@@ -19690,6 +19690,13 @@ export interface components {
              * @example 300000.00
              */
             baseSalary: string;
+            /** @enum {string} */
+            salarySource: "POSITION" | "PERSONAL" | "LEGACY";
+            /** @enum {string|null} */
+            nextSalarySource: "POSITION" | "PERSONAL" | "LEGACY" | null;
+            positionBaseSalary: string | null;
+            positionNextBaseSalary: string | null;
+            positionNextEffectiveMonth: string | null;
             nextBaseSalary: string | null;
             nextEffectiveMonth: string | null;
             paysSocialInsurance: boolean;
@@ -19794,6 +19801,13 @@ export interface components {
              * @example 300000.00
              */
             baseSalary: string;
+            /** @enum {string} */
+            salarySource: "POSITION" | "PERSONAL" | "LEGACY";
+            /** @enum {string|null} */
+            nextSalarySource: "POSITION" | "PERSONAL" | "LEGACY" | null;
+            positionBaseSalary: string | null;
+            positionNextBaseSalary: string | null;
+            positionNextEffectiveMonth: string | null;
             nextBaseSalary: string | null;
             nextEffectiveMonth: string | null;
             paysSocialInsurance: boolean;
@@ -19810,10 +19824,12 @@ export interface components {
         };
         PayrollTermsRequest: {
             /**
-             * @description Omit for employees assigned to a position
+             * @description For assigned staff, schedules an employee-only override next month; omit to preserve inheritance
              * @example 300000.00
              */
             baseSalary?: string;
+            /** @description Resume the position salary next month; cannot accompany baseSalary */
+            usePositionSalary?: boolean;
             paysSocialInsurance: boolean;
             /** @description The template the sheet came from */
             templateId?: number | null;
@@ -23122,7 +23138,7 @@ export interface components {
             totalDebit: string;
             filledCount: number;
             postedCount: number;
-            /** @description Lines in the books edited since (ADR-0250) */
+            /** @description Lines in the books edited since (ADR-0252) */
             changedCount: number;
             missing: components["schemas"]["BankStatementMissing"];
         };
@@ -23171,7 +23187,7 @@ export interface components {
             paymentId: number | null;
             journalEntryId: number | null;
             postedAt: string | null;
-            /** @description In the books and edited since (ADR-0250) */
+            /** @description In the books and edited since (ADR-0252) */
             changed: boolean;
             rulePartyCode: string | null;
             rulePartyName: string | null;
@@ -23200,7 +23216,7 @@ export interface components {
             totalDebit: string;
             filledCount: number;
             postedCount: number;
-            /** @description Lines in the books edited since (ADR-0250) */
+            /** @description Lines in the books edited since (ADR-0252) */
             changedCount: number;
             missing: components["schemas"]["BankStatementMissing"];
             lines: components["schemas"]["BankStatementLine"][];
@@ -23244,7 +23260,7 @@ export interface components {
         };
         BankStatementPostResult: {
             posted: number;
-            /** @description Edited lines in the books written again (ADR-0250) */
+            /** @description Edited lines in the books written again (ADR-0252) */
             updated: number;
             /** @description Lines still lacking something */
             skipped: number;

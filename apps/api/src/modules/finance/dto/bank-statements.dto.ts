@@ -73,7 +73,7 @@ export class BankStatementDto {
   @ApiProperty({ example: '2180000.00' }) totalDebit: string;
   @ApiProperty() filledCount: number;
   @ApiProperty() postedCount: number;
-  @ApiProperty({ description: 'Lines in the books edited since (ADR-0250)' }) changedCount: number;
+  @ApiProperty({ description: 'Lines in the books edited since (ADR-0252)' }) changedCount: number;
   @ApiProperty({ type: BankStatementMissingDto }) missing: BankStatementMissingDto;
 }
 
@@ -105,7 +105,7 @@ export class BankStatementLineDto {
   @ApiProperty({ type: Number, nullable: true }) paymentId: number | null;
   @ApiProperty({ type: Number, nullable: true }) journalEntryId: number | null;
   @ApiProperty({ type: String, nullable: true }) postedAt: string | null;
-  @ApiProperty({ description: 'In the books and edited since (ADR-0250)' }) changed: boolean;
+  @ApiProperty({ description: 'In the books and edited since (ADR-0252)' }) changed: boolean;
   @ApiProperty({ type: String, nullable: true }) rulePartyCode: string | null;
   @ApiProperty({ type: String, nullable: true }) rulePartyName: string | null;
   @ApiProperty({ enum: BANK_LINE_MISSING, enumName: 'BankLineMissing', isArray: true })
@@ -243,7 +243,7 @@ export class BankPostFailureDto {
 @ApiSchema({ name: 'BankStatementPostResult' })
 export class BankStatementPostResultDto {
   @ApiProperty() posted: number;
-  @ApiProperty({ description: 'Edited lines in the books written again (ADR-0250)' })
+  @ApiProperty({ description: 'Edited lines in the books written again (ADR-0252)' })
   updated: number;
   @ApiProperty({ description: 'Lines still lacking something' }) skipped: number;
   @ApiProperty({ type: [BankPostFailureDto] }) failures: BankPostFailureDto[];
@@ -348,7 +348,7 @@ export class BankHistoryChangeDto {
   @ApiProperty({ type: String, nullable: true }) after: string | null;
 }
 
-/** One change of a day's lines (ADR-0250). */
+/** One change of a day's lines (ADR-0252). */
 @ApiSchema({ name: 'BankHistoryEntry' })
 export class BankHistoryEntryDto {
   @ApiProperty() id: number;
@@ -363,7 +363,7 @@ export class BankHistoryEntryDto {
   @ApiProperty({ type: [BankHistoryChangeDto] }) changes: BankHistoryChangeDto[];
 }
 
-/** «Сарын хөл дүн»: one bank account's month (ADR-0250). */
+/** «Сарын хөл дүн»: one bank account's month (ADR-0252). */
 @ApiSchema({ name: 'BankMonthTotal' })
 export class BankMonthTotalDto {
   @ApiProperty() accountNumber: string;

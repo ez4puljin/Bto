@@ -1,4 +1,5 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { focusManager } from '@tanstack/react-query';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { components } from '@tugeel/api-client';
 import mn from '@tugeel/shared/i18n/mn.json';
@@ -162,7 +163,205 @@ const routes = (scored: boolean) => ({
   'POST /api/v1/payroll/runs/3/approve': () => json(run(true)),
 });
 
+const payTerms = (changes: Partial<Schemas['PayrollTerms']> = {}): Schemas['PayrollTerms'] => ({
+  userId: 5,
+  fullName: 'Кассчин Сараа',
+  positionId: 2,
+  positionSalaryEffectiveMonth: '2026-11',
+  position: 'Кассчин',
+  divisionId: null,
+  divisionName: null,
+  left: false,
+  hasTerms: true,
+  active: true,
+  baseSalary: '1000000.00',
+  nextBaseSalary: null,
+  nextEffectiveMonth: null,
+  salarySource: 'POSITION',
+  nextSalarySource: null,
+  positionBaseSalary: '1000000.00',
+  positionNextBaseSalary: null,
+  positionNextEffectiveMonth: null,
+  paysSocialInsurance: true,
+  templateId: null,
+  templateName: null,
+  items: [],
+  kpiTotal: '0.00',
+  updatedAt: null,
+  ...changes,
+});
+const termsRoutes = (terms: Schemas['PayrollTerms']) => ({
+  'GET /api/v1/payroll/terms': () => json([terms]),
+  'GET /api/v1/hr/divisions': () => json([]),
+  'GET /api/v1/payroll/templates': () => json([]),
+  'PUT /api/v1/payroll/terms/5': () => json(terms),
+});
+
 describe('payroll pages (ADR-0235)', () => {
+  it('prefills the position salary and saves a changed amount only for this employee', async () => {
+    const fetchMock = signedIn(HR, termsRoutes(payTerms()));
+    renderApp('/hr/payroll/terms?user=5', fetchMock);
+    const dialog = within(await screen.findByRole('dialog'));
+    const salary = dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary });
+    expect(salary).toHaveValue('1,000,000');
+    expect(salary).toBeEnabled();
+    const user = userEvent.setup();
+    await user.clear(salary);
+    await user.type(salary, '1250000');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')[0])).toMatchObject({
+      baseSalary: '1250000',
+    });
+    expect(calls(fetchMock, 'PUT', '/api/v1/hr/positions/2')).toHaveLength(0);
+  });
+
+  it('does not create an override when the salary is restored to the same decimal amount', async () => {
+    const fetchMock = signedIn(HR, termsRoutes(payTerms()));
+    renderApp('/hr/payroll/terms?user=5', fetchMock);
+    const dialog = within(await screen.findByRole('dialog'));
+    const salary = dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary });
+    const user = userEvent.setup();
+    await user.clear(salary);
+    await user.type(salary, '1000000.00');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')[0])).not.toHaveProperty(
+      'baseSalary',
+    );
+  });
+
+  it('does not freeze an untouched salary when position pay refreshes while the dialog is open', async () => {
+    let current = payTerms();
+    const fetchMock = signedIn(HR, {
+      ...termsRoutes(current),
+      'GET /api/v1/payroll/terms': () => json([current]),
+    });
+    renderApp('/hr/payroll/terms?user=5', fetchMock);
+    const dialog = within(await screen.findByRole('dialog'));
+    const salary = dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary });
+    expect(salary).toHaveValue('1,000,000');
+    current = payTerms({
+      nextBaseSalary: '1200000.00',
+      nextEffectiveMonth: '2026-12',
+      nextSalarySource: 'POSITION',
+      positionNextBaseSalary: '1200000.00',
+      positionNextEffectiveMonth: '2026-12',
+    });
+    try {
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      expect(
+        await dialog.findByText(
+          mn.payroll.web.terms.positionScheduled
+            .replace('{{amount}}', '1,200,000')
+            .replace('{{month}}', '2026-12'),
+        ),
+      ).toBeInTheDocument();
+      // A refetch updates the hints while preserving the user's in-progress form draft.
+      expect(salary).toHaveValue('1,000,000');
+      const user = userEvent.setup();
+      await user.click(dialog.getByRole('switch', { name: mn.payroll.web.terms.insured }));
+      await user.click(dialog.getByRole('button', { name: mn.common.save }));
+      await waitFor(() =>
+        expect(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')).toHaveLength(1),
+      );
+      const body = await bodyOf(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')[0]);
+      expect(body).toHaveProperty('paysSocialInsurance', false);
+      expect(body).not.toHaveProperty('baseSalary');
+      expect(body).not.toHaveProperty('usePositionSalary');
+    } finally {
+      focusManager.setFocused(undefined);
+    }
+  });
+
+  it('reopens with the scheduled personal salary while showing the current salary separately', async () => {
+    const terms = payTerms({
+      nextBaseSalary: '1800000.00',
+      nextEffectiveMonth: '2026-12',
+      nextSalarySource: 'PERSONAL',
+    });
+    const fetchMock = signedIn(HR, termsRoutes(terms));
+    renderApp('/hr/payroll/terms?user=5', fetchMock);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary })).toHaveValue(
+      '1,800,000',
+    );
+    expect(
+      dialog.getByText(mn.payroll.web.terms.currentSalary.replace('{{amount}}', '1,000,000')),
+    ).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(dialog.getByRole('switch', { name: mn.payroll.web.terms.insured }));
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')).toHaveLength(1));
+    expect(await bodyOf(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')[0])).not.toHaveProperty(
+      'baseSalary',
+    );
+  });
+
+  it('restores next-month position inheritance without sending a conflicting salary', async () => {
+    const terms = payTerms({
+      salarySource: 'PERSONAL',
+      baseSalary: '1800000.00',
+      positionNextBaseSalary: '1200000.00',
+      positionNextEffectiveMonth: '2026-12',
+    });
+    const fetchMock = signedIn(HR, termsRoutes(terms));
+    renderApp('/hr/payroll/terms?user=5', fetchMock);
+    const dialog = within(await screen.findByRole('dialog'));
+    const user = userEvent.setup();
+    await user.click(dialog.getByRole('button', { name: mn.payroll.web.terms.usePositionSalary }));
+    expect(dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary })).toHaveValue(
+      '1,200,000',
+    );
+    expect(dialog.getByText(mn.payroll.web.terms.resetSalaryHint)).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')).toHaveLength(1));
+    const body = await bodyOf(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')[0]);
+    expect(body).toHaveProperty('usePositionSalary', true);
+    expect(body).not.toHaveProperty('baseSalary');
+  });
+
+  it('lets editing after a reset select a personal zero salary instead', async () => {
+    const fetchMock = signedIn(HR, termsRoutes(payTerms({ salarySource: 'PERSONAL' })));
+    renderApp('/hr/payroll/terms?user=5', fetchMock);
+    const dialog = within(await screen.findByRole('dialog'));
+    const user = userEvent.setup();
+    await user.click(dialog.getByRole('button', { name: mn.payroll.web.terms.usePositionSalary }));
+    const salary = dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary });
+    await user.clear(salary);
+    await user.type(salary, '0');
+    await user.click(dialog.getByRole('button', { name: mn.common.save }));
+    await waitFor(() => expect(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')).toHaveLength(1));
+    const body = await bodyOf(calls(fetchMock, 'PUT', '/api/v1/payroll/terms/5')[0]);
+    expect(body).toHaveProperty('baseSalary', '0');
+    expect(body).not.toHaveProperty('usePositionSalary');
+  });
+
+  it('keeps a scheduled zero visible and disables salary edits for payroll readers', async () => {
+    const viewer: Me = { ...HR, permissions: ['hr.payroll.view'] };
+    const fetchMock = signedIn(
+      viewer,
+      termsRoutes(
+        payTerms({
+          nextBaseSalary: '0.00',
+          nextEffectiveMonth: '2026-12',
+          nextSalarySource: 'PERSONAL',
+        }),
+      ),
+    );
+    renderApp('/hr/payroll/terms?user=5', fetchMock);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary })).toHaveValue('0');
+    expect(dialog.getByRole('textbox', { name: mn.payroll.web.terms.salary })).toBeDisabled();
+    expect(dialog.queryByRole('button', { name: mn.common.save })).toBeNull();
+    expect(
+      dialog.queryByRole('button', { name: mn.payroll.web.terms.usePositionSalary }),
+    ).toBeNull();
+  });
+
   it('shows a scorer only «KPI үнэлгээ» in the menu', async () => {
     renderApp('/hr/payroll/scoring', signedIn(SCORER, routes(false)));
     const sidebar = within(await findSidebar());

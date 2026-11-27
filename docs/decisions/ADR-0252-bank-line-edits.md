@@ -1,4 +1,4 @@
-# ADR-0250: A bank line in the books is edited, and «Гүйлгээ засах» writes only the changed lines again
+# ADR-0252: A bank line in the books is edited, and «Гүйлгээ засах» writes only the changed lines again
 
 - Status: Accepted
 - Date: 2026-11-26

@@ -10,3 +10,9 @@ export const BINS_SOON = true;
  * the data and the accountant fills them by category on the readiness page.
  */
 export const EBARIMT_PER_PRODUCT = false;
+
+/**
+ * The «Шинэ өөрчлөлт» dialog on sign-in (ADR-0251). Tests run with it off (`src/test/setup.ts`)
+ * so that it never covers the page a test reads; its own test renders it directly.
+ */
+export const NEWS_DIALOG = true;
