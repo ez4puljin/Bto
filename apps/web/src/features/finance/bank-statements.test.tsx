@@ -209,7 +209,7 @@ describe('«Банкны хуулга хаах» (ADR-0169)', () => {
     };
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...routes(),
-      'GET /api/v1/customers': () => list([{ ...party, id: 9, name: 'Номин дэлгүүр' }]),
+      'GET /api/v1/customers/lookup': () => json([{ id: 9, code: 'C-1', name: 'Номин дэлгүүр' }]),
       'GET /api/v1/suppliers': () =>
         list([{ ...party, id: 4, code: 'S-1', name: 'Номин нийлүүлэгч' }]),
       'PATCH /api/v1/finance/bank-statements/7/lines/71': () => json(line({ supplierId: 4 })),
