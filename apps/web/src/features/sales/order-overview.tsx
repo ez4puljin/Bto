@@ -79,8 +79,11 @@ export function OrderOverview({
   const erxesCreator = useErxesCreatorName(order.id);
   const facts: { label: string; value: ReactNode }[] = [
     { label: t('sales.order.customer'), value: `${order.customerName} · ${order.customerCode}` },
-    { label: t('sales.order.deliveryDate'), value: order.deliveryDate },
     { label: t('sales.order.fulfilment'), value: t(`sales.fulfilments.${order.fulfilment}`) },
+    // A pickup has no delivery date to show (owner 2026-11-27).
+    ...(order.fulfilment === 'DELIVERY'
+      ? [{ label: t('sales.order.deliveryDate'), value: order.deliveryDate }]
+      : []),
     { label: t('sales.order.paymentMethod'), value: <PaymentLabel method={order.paymentMethod} /> },
     ...(branch ? [{ label: t('sales.panel.branch'), value: branch }] : []),
     ...(order.pipelineName

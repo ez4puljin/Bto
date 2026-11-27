@@ -154,7 +154,13 @@ describe('sales orders', () => {
       errors: [{ path: 'addressId', constraint: 'required' }],
     });
     expect(
-      await refuse(orderBody(shop.id, [], { deliveryDate: addDays(today, -1) })),
+      await refuse(
+        orderBody(shop.id, [], {
+          fulfilment: 'DELIVERY',
+          addressId,
+          deliveryDate: addDays(today, -1),
+        }),
+      ),
     ).toMatchObject({ errors: [{ path: 'deliveryDate', constraint: 'notPast' }] });
     expect(await refuse(orderBody(shop.id, [], { contactPhone: '123' }))).toMatchObject({
       errors: [{ path: 'contactPhone', constraint: 'phone' }],

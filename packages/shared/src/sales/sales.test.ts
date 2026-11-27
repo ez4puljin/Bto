@@ -86,6 +86,14 @@ describe('order header', () => {
     ]);
   });
 
+  it('never refuses a pickup for a past date', () => {
+    const pickup = { ...ok, fulfilment: 'PICKUP' as const, addressId: null };
+    expect(orderHeaderIssues({ ...pickup, deliveryDate: '2026-10-01' }, '2026-10-15')).toEqual([]);
+    expect(orderHeaderIssues({ ...pickup, deliveryDate: '16/10' }, '2026-10-15')).toEqual([
+      { path: 'deliveryDate', code: 'isDate' },
+    ]);
+  });
+
   it('needs an address for a delivery only and a mobile number when a phone is given', () => {
     expect(orderHeaderIssues({ ...ok, addressId: null }, '2026-10-15')).toEqual([
       { path: 'addressId', code: 'required' },

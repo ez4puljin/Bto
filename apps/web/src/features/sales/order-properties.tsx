@@ -1,5 +1,6 @@
 import { normalizeMnPhone } from '@tugeel/shared/phone';
 import {
+  defaultDeliveryDate,
   FULFILMENTS,
   type Fulfilment,
   isEditable,
@@ -321,9 +322,14 @@ function PropertiesForm({
           <NativeSelect
             id={`${id}-fulfilment`}
             value={fulfilment}
-            onChange={(event) =>
-              setFulfilment(event.target.value === 'DELIVERY' ? 'DELIVERY' : 'PICKUP')
-            }
+            onChange={(event) => {
+              const next = event.target.value === 'DELIVERY' ? 'DELIVERY' : 'PICKUP';
+              setFulfilment(next);
+              // A pickup kept no date: a delivery made of it starts from tomorrow, not the past.
+              if (next === 'DELIVERY' && deliveryDate < businessDate()) {
+                setDeliveryDate(defaultDeliveryDate());
+              }
+            }}
           >
             {FULFILMENTS.map((value) => (
               <option key={value} value={value}>
@@ -332,17 +338,19 @@ function PropertiesForm({
             ))}
           </NativeSelect>
         </FormField>
-        <FormField
-          label={t('sales.order.deliveryDate')}
-          htmlFor={`${id}-date`}
-          error={issueOf('deliveryDate')}
-        >
-          <DateInput
-            id={`${id}-date`}
-            value={deliveryDate}
-            onChange={(value) => setDeliveryDate(value)}
-          />
-        </FormField>
+        {fulfilment === 'DELIVERY' ? (
+          <FormField
+            label={t('sales.order.deliveryDate')}
+            htmlFor={`${id}-date`}
+            error={issueOf('deliveryDate')}
+          >
+            <DateInput
+              id={`${id}-date`}
+              value={deliveryDate}
+              onChange={(value) => setDeliveryDate(value)}
+            />
+          </FormField>
+        ) : null}
         {fulfilment === 'DELIVERY' ? (
           <FormField
             label={t('sales.order.address')}
