@@ -168,6 +168,11 @@ services:
     environment:
       <<: *app-env
       ROLE: worker
+      # The worker's module graph builds the tills' PinHasher since the expiry sale ports bound pos
+      # into it (a74545b6), and PinHasher refuses to start without its key: the same keys as the
+      # api, as the production compose's shared env file gives every process.
+      AUTH_PEPPER: ${AUTH_PEPPER:?set AUTH_PEPPER in deploy/store/.env}
+      POS_PIN_PEPPER: ${POS_PIN_PEPPER:?set POS_PIN_PEPPER in deploy/store/.env}
       # worker 2 + pg-boss 2; health on loopback only, no published port.
       DB_POOL_MAX: '${STORE_WORKER_DB_POOL_MAX:-2}'
     mem_limit: ${STORE_WORKER_MEMORY:-768m}
