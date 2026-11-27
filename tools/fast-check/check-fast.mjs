@@ -67,6 +67,11 @@ function git(...argv) {
 }
 
 const base = option('--base') ?? (git('merge-base', 'HEAD', 'origin/main') || 'HEAD');
+// A base that does not exist would compare with nothing and pass: say so and stop (CI, ADR-0256).
+if (!git('rev-parse', '--verify', '--quiet', `${base}^{commit}`)) {
+  console.error(`check:fast: the base «${base}» is not a commit here (fetch it first)`);
+  process.exit(1);
+}
 const changed = [
   ...new Set(
     [git('diff', '--name-only', base), git('ls-files', '--others', '--exclude-standard')]

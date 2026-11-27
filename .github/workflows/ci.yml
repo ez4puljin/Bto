@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           # A pull request compares itself with its base (the scope step and check:fast).
-          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -61,7 +61,10 @@ jobs:
           full=yes
           if [ "${{ github.event_name }}" = pull_request ]; then
             base="origin/${{ github.base_ref }}"
-            if git diff --name-only "$base"...HEAD |
+            git fetch --no-tags origin "+refs/heads/${{ github.base_ref }}:refs/remotes/$base"
+            # A diff that cannot be made is never a reason for the fast check.
+            changed=$(git diff --name-only "$base"...HEAD) || { echo "no diff: the full check"; changed=.github/; }
+            if printf '%s\n' "$changed" |
               grep -qE '^(apps/api/src/db/|\.github/|tools/fast-check/|ci/|eslint\.config|pnpm-lock\.yaml|pnpm-workspace\.yaml|(.*/)?package\.json$|(.*/)?tsconfig[^/]*\.json$)'; then
               echo "This pull request changes the schema, a migration, a dependency or a check: the full check."
             else
