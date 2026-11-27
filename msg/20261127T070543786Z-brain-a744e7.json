@@ -1,0 +1,8 @@
+{
+  "id": "20261127T070543786Z-brain-a744e7",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-27T07:05:43.786Z",
+  "text": "inbox gate: in/supplier-location-price-engine @ 92591ba4: REFUSED: the integration suites are red: suite test/integrity/imports-scale.spec.ts; test integrity: imports at scale › prices the whole cat\n[SUITE] test/integrity/imports-scale.spec.ts\n[TEST] integrity: imports at scale › prices the whole catalogue under one table lock while a single change waits (ADR-0054)",
+  "slug": "supplier-location-price-engine"
+}
