@@ -810,10 +810,13 @@ function LedgerDetail(props: {
     <>
       {lines.data.data.map((line) => {
         const party = line.party?.name ?? null;
-        const description = withoutNumber(line.lineDescription ?? line.entryDescription, [
-          line.documentNumber,
-          line.entryNumber,
-        ]);
+        // A voucher's own text (гүйлгээний утга) first: its entry is named only by the party.
+        const description =
+          line.memo ??
+          withoutNumber(line.lineDescription ?? line.entryDescription, [
+            line.documentNumber,
+            line.entryNumber,
+          ]);
         const parts = detailParts(
           null,
           [line.entryDate, party, description === party ? null : description],

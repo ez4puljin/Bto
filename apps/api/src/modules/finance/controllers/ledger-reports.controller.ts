@@ -15,6 +15,7 @@ import {
   LedgerReportDto,
   LedgerReportQueryDto,
 } from '../dto/ledger-reports.dto';
+import { VOUCHER_MEMO } from '../services/fin-books';
 import { LedgerReportsService } from '../services/ledger-reports.service';
 import { money } from './mappers';
 
@@ -86,6 +87,7 @@ export class LedgerReportsController {
         entryDate: row.entryDate,
         entryDescription: row.entryDescription,
         lineDescription: row.lineDescription,
+        memo: row.documentAttributes[VOUCHER_MEMO]?.trim() || null,
         system: row.system,
         sourceDocType: row.sourceDocType,
         sourceDocId: row.sourceDocId,

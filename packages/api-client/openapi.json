@@ -86623,6 +86623,11 @@
             "type": "string",
             "nullable": true
           },
+          "memo": {
+            "type": "string",
+            "nullable": true,
+            "description": "The voucher's own text (гүйлгээний утга) when the entry is a voucher's"
+          },
           "system": {
             "type": "string",
             "example": "BTO"
@@ -86679,6 +86684,7 @@
           "entryDate",
           "entryDescription",
           "lineDescription",
+          "memo",
           "system",
           "sourceDocType",
           "sourceDocId",
