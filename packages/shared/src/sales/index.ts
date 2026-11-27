@@ -617,8 +617,10 @@ export type OrderHeaderIssue =
   | { path: 'contactPhone'; code: 'phone' };
 
 /**
- * What is wrong with an order header: a delivery date that is not a date or lies in the past, a
- * delivery without an address, a contact phone that is not a Mongolian mobile number.
+ * What is wrong with an order header: a delivery date that is not a date, a delivery's date that
+ * lies in the past, a delivery without an address, a contact phone that is not a Mongolian mobile
+ * number. A pickup has no delivery date to keep: its stored date is never refused as past
+ * (owner 2026-11-27), so a pickup draft of an earlier day still submits.
  */
 export function orderHeaderIssues(
   input: OrderHeaderInput,
@@ -626,7 +628,9 @@ export function orderHeaderIssues(
 ): OrderHeaderIssue[] {
   const issues: OrderHeaderIssue[] = [];
   if (!isIsoDate(input.deliveryDate)) issues.push({ path: 'deliveryDate', code: 'isDate' });
-  else if (input.deliveryDate < today) issues.push({ path: 'deliveryDate', code: 'notPast' });
+  else if (input.fulfilment === 'DELIVERY' && input.deliveryDate < today) {
+    issues.push({ path: 'deliveryDate', code: 'notPast' });
+  }
   if (input.fulfilment === 'DELIVERY' && input.addressId === null) {
     issues.push({ path: 'addressId', code: 'required' });
   }
