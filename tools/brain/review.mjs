@@ -543,10 +543,22 @@ export function envSecrets(copy) {
   return [...values];
 }
 
+/**
+ * A path of this repository (apps/…, packages/…, a file name with its extension): never a secret,
+ * though a long one with digits looks like one to the «long random» pattern (2026-11-27 a finding on
+ * `apps/api/src/db/migrations/0126_….sql` was blanked).
+ */
+const REPO_PATH =
+  /(?:^|(?<=[\s(`'"«:,]))(?:(?:apps|packages|tools|docs|deploy|ci|scripts|\.github)\/)?(?:[\w@.-]+\/)*[\w@.-]+\.[A-Za-z]{1,5}(?::\d+)?(?=$|[\s)`'"»:,;.])/g;
+
 /** True when the text holds a value of the .env files or looks like a secret. */
 export function looksSecret(text, secrets = []) {
   const t = String(text);
-  return secrets.some((v) => t.includes(v)) || SECRET_PATTERNS.some((re) => re.test(t));
+  if (secrets.some((v) => t.includes(v))) return true;
+  // Only the «long random» pattern (the last) reads the text without the repository's paths.
+  const last = SECRET_PATTERNS.length - 1;
+  if (SECRET_PATTERNS.slice(0, last).some((re) => re.test(t))) return true;
+  return SECRET_PATTERNS[last].test(t.replace(REPO_PATH, ' '));
 }
 
 export const scrub = (text, secrets = []) => (looksSecret(text, secrets) ? REMOVED : String(text));

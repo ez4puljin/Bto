@@ -2638,6 +2638,12 @@ test("review: the verdict is read only from the CLI's structured answer, and nev
             text: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdEFGHijkl',
           },
           { severity: 'MEDIUM', file: 'a.ts', line: 4, text: 'a name is unclear' },
+          {
+            severity: 'HIGH',
+            file: 'apps/api/src/db/migrations/0126_expiry_payroll_foundation.sql',
+            line: 12,
+            text: 'the CHECK in apps/api/src/db/migrations/meta/0126_snapshot.json:40 rejects old rows',
+          },
         ],
       },
     }),
@@ -2645,7 +2651,18 @@ test("review: the verdict is read only from the CLI's structured answer, and nev
   );
   assert.deepEqual(
     leaky.findings.map((f) => f.text),
-    [REMOVED, REMOVED, REMOVED, 'a name is unclear'],
+    [
+      REMOVED,
+      REMOVED,
+      REMOVED,
+      'a name is unclear',
+      'the CHECK in apps/api/src/db/migrations/meta/0126_snapshot.json:40 rejects old rows',
+    ],
+  );
+  // A repository path, however long and full of digits, is not a secret (2026-11-27).
+  assert.equal(
+    leaky.findings[4].file,
+    'apps/api/src/db/migrations/0126_expiry_payroll_foundation.sql',
   );
 });
 
