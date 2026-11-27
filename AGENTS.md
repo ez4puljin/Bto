@@ -45,7 +45,9 @@ You never push to `main` (it is protected). The owner's PC lands your work throu
    there too) and, on GitHub, the commit status `bto/inbox-gate` and commit comment on the branch's
    head. Within about half a minute it says one of:
    - `LANDED <sha>`: it is on main; the `in/` branch is deleted and your claim released by itself.
-     Start the next change from main.
+     Start the next change from main. A few minutes later the commit status `bto-deploy` on that
+     commit says whether it went live on app.puljika.site; a failed update is also said on the board
+     by `deploy` with the log's error lines (ADR-0255): fix it at once with a new `in/` branch.
    - `WAITING-REVIEW`: a GUARDED change, checked green; the automatic review takes it next (below).
    - `WAITING`: a task on the owner's PC is changing the same files; it goes on by itself.
    - `REFUSED <reason>`: fix what it says and push again to the same `in/<slug>` (a new head is a

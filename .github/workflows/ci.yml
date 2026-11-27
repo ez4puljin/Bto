@@ -39,6 +39,9 @@ jobs:
       AI_DATABASE_URL: postgres://ai_reader:ai_reader_ci_pw@localhost:15432/tugeel
     steps:
       - uses: actions/checkout@v7
+        with:
+          # A pull request compares itself with its base (the scope step and check:fast).
+          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -47,7 +50,30 @@ jobs:
           cache: true
       - run: node --version && pnpm --version
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
+      # ADR-0256: a pull request that changes no schema, no migration, no dependency and no check
+      # gets the fast check (pnpm check:fast against its base, a few minutes) and merges on it; the
+      # full `pnpm check` runs on main after the merge, and auto-deploy rolls a red main back
+      # (ADR-0204). A push to main, a manual run and a pull request touching any of those run the
+      # full check before the merge, as before.
+      - name: scope
+        id: scope
+        run: |
+          full=yes
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            base="origin/${{ github.base_ref }}"
+            if git diff --name-only "$base"...HEAD |
+              grep -qE '^(apps/api/src/db/|\.github/|tools/fast-check/|ci/|eslint\.config|pnpm-lock\.yaml|pnpm-workspace\.yaml|(.*/)?package\.json$|(.*/)?tsconfig[^/]*\.json$)'; then
+              echo "This pull request changes the schema, a migration, a dependency or a check: the full check."
+            else
+              full=no
+              echo "No schema, migration, dependency or check change: the fast check (ADR-0256)."
+            fi
+          fi
+          echo "full=$full" >>"$GITHUB_OUTPUT"
+      - if: steps.scope.outputs.full == 'yes'
+        run: pnpm check
+      - if: steps.scope.outputs.full == 'no'
+        run: pnpm build:packages && pnpm check:fast --base "origin/${{ github.base_ref }}"
       - name: generated files are committed
         run: |
           git status --porcelain
