@@ -8,6 +8,7 @@ import { PayrollPeopleService } from './services/payroll-people.service';
 import { PayrollRunsService } from './services/payroll-runs.service';
 import { PayrollSettingsService } from './services/payroll-settings.service';
 import { PayrollTermsService } from './services/payroll-terms.service';
+import { PayrollSourceDeductionsService } from './services/payroll-source-deductions.service';
 
 /**
  * Payroll with KPI evaluation (docs/modules/payroll.md, ADR-0235): the rates, KPI templates, each
@@ -22,12 +23,14 @@ import { PayrollTermsService } from './services/payroll-terms.service';
     PayrollTermsService,
     PayrollRunsService,
     PayrollAdvancesService,
+    PayrollSourceDeductionsService,
   ],
   exports: [
     PayrollSettingsService,
     PayrollTermsService,
     PayrollRunsService,
     PayrollAdvancesService,
+    PayrollSourceDeductionsService,
   ],
 })
 export class PayrollModule {}

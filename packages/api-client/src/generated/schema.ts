@@ -5494,6 +5494,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payroll/source-deductions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Payroll_sourceDeductions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payroll/source-deductions/{id}/month": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Payroll_assignSourceMonth"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payroll/me/payslips": {
         parameters: {
             query?: never;
@@ -19520,6 +19552,48 @@ export interface components {
             email: string | null;
             photoUrl: string | null;
         };
+        PayrollSourceSettlement: {
+            id: number;
+            runId: number;
+            /**
+             * @description Money as text, «300000» or «300000.50»
+             * @example 300000.00
+             */
+            amount: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            releasedAt: string | null;
+        };
+        PayrollSourceDeduction: {
+            id: number;
+            name: string;
+            /** @enum {string} */
+            sourceKind: "EXPIRY_SALE" | "EXPIRY_RETURN";
+            sourceReference: string;
+            /**
+             * @description Positive deduction or negative untaxed refund
+             * @example 300000.00
+             */
+            amount: string;
+            sourceKey: string;
+            userId: number;
+            requestedMonth: string | null;
+            assignedMonth: string | null;
+            reversesId: number | null;
+            /** @enum {string} */
+            state: "NEEDS_MONTH" | "WAITING_RUN" | "MONTH_CLOSED" | "MISSING_LINE" | "READY" | "SETTLED";
+            /** Format: date-time */
+            createdAt: string;
+            settlements: components["schemas"]["PayrollSourceSettlement"][];
+        };
+        PayrollSourceMonthRequest: {
+            /**
+             * @description Chosen payroll month with no approved run
+             * @example 2026-12
+             */
+            month: string;
+        };
         /** @enum {string} */
         PayrollRunStatus: "DRAFT" | "APPROVED";
         /** @enum {string} */
@@ -19576,6 +19650,18 @@ export interface components {
             paidOn: string;
             note: string | null;
         };
+        PayrollSourcePayslipEntry: {
+            id: number;
+            name: string;
+            /** @enum {string} */
+            sourceKind: "EXPIRY_SALE" | "EXPIRY_RETURN";
+            sourceReference: string;
+            /**
+             * @description Positive deduction or negative untaxed refund
+             * @example 300000.00
+             */
+            amount: string;
+        };
         PayrollPayslip: {
             id: number;
             runId: number;
@@ -19611,6 +19697,7 @@ export interface components {
             items: components["schemas"]["PayrollPayslipItem"][];
             adjustments: components["schemas"]["PayrollPayslipAdjustment"][];
             advances: components["schemas"]["PayrollPayslipAdvance"][];
+            sourceDeductions?: components["schemas"]["PayrollSourcePayslipEntry"][];
             unscoredCount: number;
             /**
              * @description Money as text, «300000» or «300000.50»
@@ -20045,6 +20132,7 @@ export interface components {
             items: components["schemas"]["PayrollPayslipItem"][];
             adjustments: components["schemas"]["PayrollPayslipAdjustment"][];
             advances: components["schemas"]["PayrollPayslipAdvance"][];
+            sourceDeductions?: components["schemas"]["PayrollSourcePayslipEntry"][];
             unscoredCount: number;
             /**
              * @description Money as text, «300000» or «300000.50»
@@ -43371,6 +43459,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HrDirectoryEntry"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_sourceDeductions: {
+        parameters: {
+            query?: {
+                sourceReference?: string;
+                sourceKey?: string;
+                userId?: number;
+                month?: string;
+                pendingOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollSourceDeduction"][];
+                };
+            };
+            /** @description RFC 9457 problem details */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    Payroll_assignSourceMonth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollSourceMonthRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollSourceDeduction"][];
                 };
             };
             /** @description RFC 9457 problem details */

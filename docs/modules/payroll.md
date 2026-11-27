@@ -36,7 +36,73 @@ The last three are a draft's working paper (`REVOKE TRUNCATE` only); the trigger
 - `PayrollRunsService`: `list()`, `get(id)`, `line(runId, lineId)`, `create(ctx, { month, note })`, `recompute(ctx, id, refreshTerms)`, `score(ctx, id, scores)`, `addAdjustment` / `removeAdjustment`, `approve(ctx, id)`, `reopen(ctx, id, reason)`, `scoringRuns(ctx)`, `scoring(ctx, id)`, `myPayslips(ctx)`, `myPayslip(ctx, month)`, `advanceChangedInTx(tx, month, userId)`.
 - `PayrollExportsService.runWorkbook(id)` (api only). `PayrollPeopleService` reads hr's staff list and each person's week plan (`HrSettingsService.employees`).
 
-`modules/payroll/index.ts` exports the two Nest modules and the three right codes. Nobody imports payroll; it imports `identity` and `hr` (`WorkforceService`, `HrReportsService`, `HrSettingsService`, `PositionsService`). Salary assignments and rates are resolved through `PositionsService.baseSalariesForUsers(tx, userIds, month)`, never through HR tables. Current pay terms also read `salarySchedulesForUsers` to show an upcoming assignment or rate even when the employee has no current salary assignment yet.
+`modules/payroll/index.ts` exports the two Nest modules, the three right codes, and the trusted `PayrollSourceDeductionsService` source port. Expiry imports that public port; payroll still depends only on `identity` and `hr` (`WorkforceService`, `HrReportsService`, `HrSettingsService`, `PositionsService`). Salary assignments and rates are resolved through `PositionsService.baseSalariesForUsers(tx, userIds, month)`, never through HR tables. Current pay terms also read `salarySchedulesForUsers` to show an upcoming assignment or rate even when the employee has no current salary assignment yet.
+
+### Durable expiry sale deductions (ADR-0245)
+
+`payroll_source_deductions` owns immutable source kind/key/reference, employee, signed money,
+original requested month and an optional original allocation (`reverses_id`). Only the assigned
+month and its actor/time can change. `(source_kind, source_key, user_id)` is unique. The source
+module supplies the already calculated VAT-exclusive actual-sale loss and frozen employee split;
+payroll never reads expiry/receipt/cost tables or recalculates those prices. Sale allocations are
+nonnegative; return allocations are nonpositive and cannot cumulatively exceed the original
+employee's sale allocation. Finite NUMERIC(14,2), immutable identity/amount and cumulative return
+checks also hold in PostgreSQL. Neither source rows nor settlement history can be deleted or
+truncated by the application.
+
+`PayrollSourceDeductionsService.recordInTx(tx, actor: Actor, input)` is a server-only port, with
+`{ sourceKind: 'EXPIRY_SALE' | 'EXPIRY_RETURN', sourceKey, sourceReference, requestedMonth,
+reversesSourceKey?, allocations: { userId, amount: string }[] }`. It writes in the caller's sale
+transaction and needs no payroll permission. Exact immutable payload replay returns the same
+rows; a changed payload conflicts. IDs must be unique per request and money must be finite text
+with no more than two decimals. There is no HTTP endpoint for creating arbitrary source charges.
+Commerce calls `lockInTx(tx)` once for the whole batch before its first expiry financial row
+lock, following the stock posting flow's existing order for stock locks. The port reacquires
+that transaction-reentrant gate defensively on each allocation write.
+
+The operator chooses any writable month, including a past DRAFT month. A future chosen month
+can wait for its run; future run creation remains prohibited. Missing runs, missing/ineligible
+payroll lines and approved months retain
+their sources without rejecting a completed sale or choosing another month. Read states are
+`NEEDS_MONTH`, `WAITING_RUN`, `MONTH_CLOSED`, `MISSING_LINE`, `READY`, `SETTLED`. Pending sources
+are independent of draft lines, so `recompute(refreshTerms: true)` can remove and later restore
+an employee without losing an obligation. Every draft recompute derives source totals afresh.
+Positive source money adds to deductions after SI/PIT; negative money adds to untaxed additions,
+leaving gross and the tax basis unchanged. The existing negative-net policy remains unchanged.
+
+Before settlement, returns inherit the original allocation's assigned month. After an approved
+settlement, a return becomes an unassigned credit and needs an explicitly chosen writable
+month; the approved payslip is unchanged. Reassigning a pending source moves that employee's
+pending sale and pending returns together, while settled sources cannot move. No other month
+is selected automatically.
+
+`payroll_source_settlements` freezes each exact source amount and run on approval, with one active
+settlement per source. Reopening first makes the run DRAFT, then releases its settlements while
+preserving their history and recalculates the draft. Reapproval appends fresh settlement rows;
+it never pays or deducts the same source twice. Source writes enter a transaction-scoped source
+batch gate before source keys and sorted payroll months, so repeated calls for a multi-line sale
+cannot invert source/month locks. Approval/recompute/reopen use the same month locks and take
+neither source locks nor the batch gate.
+
+| Route | Right | Contract |
+|---|---|---|
+| `GET /source-deductions?sourceReference=&sourceKey=&userId=&month=&pendingOnly=` | view | up to 2000 newest source allocations, state and settlement/release history |
+| `PUT /source-deductions/:id/month` | manage | `{ month: 'YYYY-MM' }`; choose any month with no APPROVED run, returning the pending employee group |
+
+`Payslip` / `Line` additionally carry `sourceDeductions[] = { id, name, sourceKind,
+sourceReference, amount }`; the signed amount is only that employee's allocation. The transparent
+label is **Хугацааны хямдралын алданги**. An employee's own approved payslip contains no source
+key, purchase/receipt cost, other employee's allocation or employer cost. Score-only users see
+no source amounts. Protected source reads require payroll view, month assignment requires
+manage. New source audit payloads contain IDs, month and state metadata only; approval audit
+also omits monetary totals because generic audit readers need not hold payroll rights.
+
+`apps/api/test/integration/expiry-payroll.int-spec.ts` covers exact/concurrent replay, invalid
+money and duplicate employees, sale rollback, chosen future and past DRAFT months, pending and settled returns,
+explicit credit assignment, draft projection and unchanged tax basis, recompute/removed line
+durability, protected reads, employee isolation, approval/reopen history, and SQL immutability.
+`apps/api/test/integrity/expiry-payroll-races.spec.ts` covers cumulative concurrent returns,
+database over-reversal/NaN guards and approval racing a finalized sale without losing its debt.
 
 ## 4. REST (`/api/v1/payroll/…`)
 

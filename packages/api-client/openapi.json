@@ -21988,6 +21988,147 @@
         ]
       }
     },
+    "/api/v1/payroll/source-deductions": {
+      "get": {
+        "operationId": "Payroll_sourceDeductions",
+        "parameters": [
+          {
+            "name": "sourceReference",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 160,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceKey",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 160,
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pendingOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollSourceDeduction"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
+    "/api/v1/payroll/source-deductions/{id}/month": {
+      "put": {
+        "operationId": "Payroll_assignSourceMonth",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayrollSourceMonthRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PayrollSourceDeduction"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "RFC 9457 problem details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "payroll"
+        ]
+      }
+    },
     "/api/v1/payroll/me/payslips": {
       "get": {
         "operationId": "Payroll_myPayslips",
@@ -74748,6 +74889,131 @@
           "photoUrl"
         ]
       },
+      "PayrollSourceSettlement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "runId": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Money as text, «300000» or «300000.50»",
+            "example": "300000.00"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "releasedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "amount",
+          "createdAt",
+          "releasedAt"
+        ]
+      },
+      "PayrollSourceDeduction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceKind": {
+            "enum": [
+              "EXPIRY_SALE",
+              "EXPIRY_RETURN"
+            ],
+            "type": "string"
+          },
+          "sourceReference": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Positive deduction or negative untaxed refund",
+            "example": "300000.00"
+          },
+          "sourceKey": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "number"
+          },
+          "requestedMonth": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedMonth": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversesId": {
+            "type": "number",
+            "nullable": true
+          },
+          "state": {
+            "enum": [
+              "NEEDS_MONTH",
+              "WAITING_RUN",
+              "MONTH_CLOSED",
+              "MISSING_LINE",
+              "READY",
+              "SETTLED"
+            ],
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "settlements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollSourceSettlement"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sourceKind",
+          "sourceReference",
+          "amount",
+          "sourceKey",
+          "userId",
+          "requestedMonth",
+          "assignedMonth",
+          "reversesId",
+          "state",
+          "createdAt",
+          "settlements"
+        ]
+      },
+      "PayrollSourceMonthRequest": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "Chosen payroll month with no approved run",
+            "example": "2026-12"
+          }
+        },
+        "required": [
+          "month"
+        ]
+      },
       "PayrollRunStatus": {
         "type": "string",
         "enum": [
@@ -74907,6 +75173,39 @@
           "note"
         ]
       },
+      "PayrollSourcePayslipEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceKind": {
+            "enum": [
+              "EXPIRY_SALE",
+              "EXPIRY_RETURN"
+            ],
+            "type": "string"
+          },
+          "sourceReference": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Positive deduction or negative untaxed refund",
+            "example": "300000.00"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sourceKind",
+          "sourceReference",
+          "amount"
+        ]
+      },
       "PayrollPayslip": {
         "type": "object",
         "properties": {
@@ -75001,6 +75300,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PayrollPayslipAdvance"
+            }
+          },
+          "sourceDeductions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollSourcePayslipEntry"
             }
           },
           "unscoredCount": {
@@ -76161,6 +76466,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PayrollPayslipAdvance"
+            }
+          },
+          "sourceDeductions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayrollSourcePayslipEntry"
             }
           },
           "unscoredCount": {

@@ -341,6 +341,56 @@ export class PayrollPayslipAdvanceDto {
   @ApiProperty({ type: String, nullable: true }) note: string | null;
 }
 
+@ApiSchema({ name: 'PayrollSourcePayslipEntry' })
+export class PayrollSourcePayslipEntryDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ enum: ['EXPIRY_SALE', 'EXPIRY_RETURN'] }) sourceKind:
+    'EXPIRY_SALE' | 'EXPIRY_RETURN';
+  @ApiProperty() sourceReference: string;
+  @ApiProperty({ ...AMOUNT, description: 'Positive deduction or negative untaxed refund' })
+  amount: string;
+}
+
+@ApiSchema({ name: 'PayrollSourceSettlement' })
+export class PayrollSourceSettlementDto {
+  @ApiProperty() id: number;
+  @ApiProperty() runId: number;
+  @ApiProperty(AMOUNT) amount: string;
+  @ApiProperty({ format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) releasedAt: string | null;
+}
+
+@ApiSchema({ name: 'PayrollSourceDeduction' })
+export class PayrollSourceDeductionDto extends PayrollSourcePayslipEntryDto {
+  @ApiProperty() sourceKey: string;
+  @ApiProperty() userId: number;
+  @ApiProperty({ type: String, nullable: true }) requestedMonth: string | null;
+  @ApiProperty({ type: String, nullable: true }) assignedMonth: string | null;
+  @ApiProperty({ type: Number, nullable: true }) reversesId: number | null;
+  @ApiProperty({
+    enum: ['NEEDS_MONTH', 'WAITING_RUN', 'MONTH_CLOSED', 'MISSING_LINE', 'READY', 'SETTLED'],
+  })
+  state: 'NEEDS_MONTH' | 'WAITING_RUN' | 'MONTH_CLOSED' | 'MISSING_LINE' | 'READY' | 'SETTLED';
+  @ApiProperty({ format: 'date-time' }) createdAt: string;
+  @ApiProperty({ type: [PayrollSourceSettlementDto] }) settlements: PayrollSourceSettlementDto[];
+}
+
+export class PayrollSourceDeductionsQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) sourceReference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) sourceKey?: string;
+  @ApiPropertyOptional() @IsOptional() @Transform(toInt) @IsInt() @Min(1) userId?: number;
+  @ApiPropertyOptional() @IsOptional() @Matches(PAYROLL_MONTH_PATTERN) month?: string;
+  @ApiPropertyOptional() @IsOptional() @Transform(toBool) @IsBoolean() pendingOnly?: boolean;
+}
+
+@ApiSchema({ name: 'PayrollSourceMonthRequest' })
+export class PayrollSourceMonthRequestDto {
+  @ApiProperty({ description: 'Chosen payroll month with no approved run', example: '2026-12' })
+  @Matches(PAYROLL_MONTH_PATTERN)
+  month: string;
+}
+
 /** A payslip as its employee reads it (ADR-0235 #9): no employer's cost. */
 @ApiSchema({ name: 'PayrollPayslip' })
 export class PayrollPayslipDto {
@@ -385,6 +435,8 @@ export class PayrollPayslipDto {
   @ApiProperty({ type: [PayrollPayslipItemDto] }) items: PayrollPayslipItemDto[];
   @ApiProperty({ type: [PayrollPayslipAdjustmentDto] }) adjustments: PayrollPayslipAdjustmentDto[];
   @ApiProperty({ type: [PayrollPayslipAdvanceDto] }) advances: PayrollPayslipAdvanceDto[];
+  @ApiPropertyOptional({ type: [PayrollSourcePayslipEntryDto] })
+  sourceDeductions?: PayrollSourcePayslipEntryDto[];
   @ApiProperty() unscoredCount: number;
   @ApiProperty(AMOUNT) kpiTotal: string;
   @ApiProperty(AMOUNT) taxableAdditions: string;

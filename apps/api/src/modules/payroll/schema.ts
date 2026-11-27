@@ -6,6 +6,7 @@ import {
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -309,5 +310,77 @@ export const payrollLineAdjustments = pgTable(
     check('payroll_line_adjustments_amount', sql`${t.amount} > 0`),
     check('payroll_line_adjustments_name', sql`length(btrim(${t.name})) BETWEEN 1 AND 80`),
     check('payroll_line_adjustments_taxable', sql`${t.kind} = 'ADDITION' OR NOT ${t.taxable}`),
+  ],
+);
+
+/** Immutable trusted sale/return allocations, independent of disposable draft payroll lines. */
+export const payrollSourceDeductions = pgTable(
+  'payroll_source_deductions',
+  {
+    id: id(),
+    sourceKind: text('source_kind', { enum: ['EXPIRY_SALE', 'EXPIRY_RETURN'] }).notNull(),
+    sourceKey: text('source_key').notNull(),
+    sourceReference: text('source_reference').notNull(),
+    userId: userRef('user_id').notNull(),
+    /** Positive debt, negative untaxed refund; computed by the source module. */
+    amount: money('amount').notNull(),
+    requestedMonth: text('requested_month'),
+    assignedMonth: text('assigned_month'),
+    reversesId: ref('reverses_id').references((): AnyPgColumn => payrollSourceDeductions.id),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    assignedBy: userRef('assigned_by'),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('payroll_source_deductions_source_user_key').on(
+      t.sourceKind,
+      t.sourceKey,
+      t.userId,
+    ),
+    index('payroll_source_deductions_month_user_idx').on(t.assignedMonth, t.userId),
+    index('payroll_source_deductions_reverses_idx').on(t.reversesId),
+    check(
+      'payroll_source_deductions_kind',
+      sql`${t.sourceKind} IN ('EXPIRY_SALE', 'EXPIRY_RETURN')`,
+    ),
+    check(
+      'payroll_source_deductions_keys',
+      sql`length(btrim(${t.sourceKey})) BETWEEN 1 AND 160 AND length(btrim(${t.sourceReference})) BETWEEN 1 AND 160`,
+    ),
+    check(
+      'payroll_source_deductions_month',
+      sql`(${t.requestedMonth} IS NULL OR ${t.requestedMonth} ~ ${MONTH}) AND (${t.assignedMonth} IS NULL OR ${t.assignedMonth} ~ ${MONTH})`,
+    ),
+    check(
+      'payroll_source_deductions_signed',
+      sql`${t.amount} <> 'NaN'::numeric AND ((${t.sourceKind} = 'EXPIRY_SALE' AND ${t.amount} >= 0 AND ${t.reversesId} IS NULL) OR (${t.sourceKind} = 'EXPIRY_RETURN' AND ${t.amount} <= 0 AND ${t.reversesId} IS NOT NULL))`,
+    ),
+  ],
+);
+
+/** Approval history; releasing a settlement on an authorized reopen never deletes its record. */
+export const payrollSourceSettlements = pgTable(
+  'payroll_source_settlements',
+  {
+    id: id(),
+    deductionId: ref('deduction_id')
+      .notNull()
+      .references(() => payrollSourceDeductions.id),
+    runId: ref('run_id')
+      .notNull()
+      .references(() => payrollRuns.id),
+    amount: money('amount').notNull(),
+    createdBy: userRef('created_by'),
+    createdAt: createdAt(),
+    releasedBy: userRef('released_by'),
+    releasedAt: timestamp('released_at', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('payroll_source_settlements_active_key')
+      .on(t.deductionId)
+      .where(sql`${t.releasedAt} IS NULL`),
+    index('payroll_source_settlements_run_idx').on(t.runId),
+    check('payroll_source_settlements_finite', sql`${t.amount} <> 'NaN'::numeric`),
   ],
 );

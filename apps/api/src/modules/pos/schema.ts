@@ -622,6 +622,9 @@ export const posSaleLines = pgTable(
       .default(sql`'[]'::jsonb`),
     /** On a RETURN line: the sold line it takes back. */
     refundsLineId: ref('refunds_line_id').references((): AnyPgColumn => posSaleLines.id),
+    expiryBarcode: text('expiry_barcode'),
+    /** A completed offline sale accepted without proven source capacity; operator must resolve it. */
+    expiryException: text('expiry_exception'),
     /** A returned item that goes to DAMAGED instead of back onto the shelf. */
     damaged: boolean('damaged').notNull().default(false),
     /** On a sold line: base units taken back by returns so far. */

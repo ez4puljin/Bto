@@ -5,7 +5,6 @@ import {
   attendanceCounts,
   attendanceScore,
   isAutomaticKpiSource,
-  isPayrollMonth,
   type KpiSource,
   kpiEarned,
   type PayrollAdjustmentKind,
@@ -30,6 +29,7 @@ import { AppError, invalid, notFound } from '../../../common/errors/app-error';
 import { HrReportsService } from '../../hr';
 import { type AuthContext, AuditService, UserNamesService } from '../../identity';
 import { amountOf, type KpiSheetItem } from '../kpi-sheet';
+import { assertMonth, lockMonth } from '../payroll-month';
 import { assertPayroll, PAYROLL_MANAGE, PAYROLL_SCORE } from '../payroll.rights';
 import {
   payrollAdvances,
@@ -41,6 +41,12 @@ import {
 import { employedIn, PayrollPeopleService, type PayrollPerson } from './payroll-people.service';
 import { PayrollSettingsService, settingsOf } from './payroll-settings.service';
 import { PayrollTermsService } from './payroll-terms.service';
+import {
+  type PayrollSourcePayslipEntry,
+  PayrollSourceDeductionsService,
+} from './payroll-source-deductions.service';
+
+export { assertMonth, lockMonth } from '../payroll-month';
 
 type RunRow = typeof payrollRuns.$inferSelect;
 type LineRow = typeof payrollLines.$inferSelect;
@@ -107,6 +113,7 @@ export interface PayrollLineView {
   items: PayrollItemView[];
   adjustments: PayrollAdjustmentView[];
   advances: PayrollAdvanceBrief[];
+  sourceDeductions: PayrollSourcePayslipEntry[];
   /** MANUAL items without a score. */
   unscoredCount: number;
   kpiTotal: string;
@@ -228,8 +235,6 @@ interface MonthFacts {
   plans: Map<number, WeekPlan>;
 }
 
-/** The advisory-lock space of this module: one lock per payroll month (YYYYMM). */
-const PAYROLL_LOCK_SPACE = 72_026_235;
 const ZERO = new Decimal(0);
 const money = (value: Decimal): string => value.toFixed(2);
 const percentText = (value: Decimal | null): string | null =>
@@ -255,6 +260,7 @@ export class PayrollRunsService {
     private readonly people: PayrollPeopleService,
     private readonly settings: PayrollSettingsService,
     private readonly terms: PayrollTermsService,
+    private readonly sources: PayrollSourceDeductionsService,
   ) {}
 
   // ── reads ─────────────────────────────────────────────────────────────────
@@ -628,6 +634,7 @@ export class PayrollRunsService {
           unscored,
         });
       }
+      await this.sources.settleInTx(tx, ctx, run);
       await tx
         .update(payrollRuns)
         .set({ status: 'APPROVED', approvedBy: ctx.userId, approvedAt: sql`now()` })
@@ -636,7 +643,8 @@ export class PayrollRunsService {
         action: 'APPROVE',
         entity: 'payroll_run',
         entityId: id,
-        after: { month: run.month, lines: lines.length, totals: totalsOf(lines) },
+        // Generic audit readers do not have payroll access. Monetary snapshots stay in payroll.
+        after: { month: run.month, lines: lines.length },
       });
     });
     return this.get(id);
@@ -665,6 +673,14 @@ export class PayrollRunsService {
           reopenReason: text,
         })
         .where(eq(payrollRuns.id, id));
+      await this.sources.releaseInTx(tx, ctx, run);
+      const lines = await tx
+        .select()
+        .from(payrollLines)
+        .where(eq(payrollLines.runId, id))
+        .orderBy(asc(payrollLines.id));
+      for (const line of lines)
+        await this.computeLineInTx(tx, run.month, line, settingsOf(run.settings));
       await this.audit.record(tx, ctx, {
         action: 'REOPEN',
         entity: 'payroll_run',
@@ -904,7 +920,7 @@ export class PayrollRunsService {
     fresh?: LineFacts,
   ): Promise<void> {
     const attendance = fresh?.attendance;
-    const [items, adjustments, advances] = await Promise.all([
+    const [items, adjustments, advances, sourceTotals] = await Promise.all([
       tx.select().from(payrollLineItems).where(eq(payrollLineItems.lineId, line.id)),
       tx.select().from(payrollLineAdjustments).where(eq(payrollLineAdjustments.lineId, line.id)),
       tx
@@ -917,6 +933,7 @@ export class PayrollRunsService {
             isNull(payrollAdvances.voidedAt),
           ),
         ),
+      this.sources.totalsInTx(tx, month, line.userId),
     ]);
     const earned: Decimal[] = [];
     for (const item of items) {
@@ -963,8 +980,8 @@ export class PayrollRunsService {
         baseSalary: salaryPaid,
         kpiEarned: earned,
         taxableAdditions: of('ADDITION', true),
-        otherAdditions: of('ADDITION', false),
-        deductions: of('DEDUCTION', false),
+        otherAdditions: of('ADDITION', false).plus(sourceTotals.refunds),
+        deductions: of('DEDUCTION', false).plus(sourceTotals.deductions),
         advance: sum(advances.map((row) => row.amount)),
         paysSocialInsurance: line.paysSocialInsurance,
       },
@@ -1095,6 +1112,9 @@ export class PayrollRunsService {
     const lineIds = lines.map((line) => line.id);
     const months = [...new Set(runs.map((run) => run.month))];
     const userIds = [...new Set(lines.map((line) => line.userId))];
+    const sourceEntries = new Map<number, (PayrollSourcePayslipEntry & { userId: number })[]>();
+    for (const run of runs)
+      sourceEntries.set(run.id, await this.sources.payslipEntries(executor, run, userIds));
     const items: ItemRow[] = await executor
       .select()
       .from(payrollLineItems)
@@ -1178,6 +1198,9 @@ export class PayrollRunsService {
               paidOn: row.paidOn,
               note: row.note,
             })),
+          sourceDeductions: (sourceEntries.get(run.id) ?? [])
+            .filter((entry) => entry.userId === line.userId)
+            .map(({ userId: _userId, ...entry }) => entry),
           unscoredCount: own.filter((item) => item.scorePercent === null).length,
           kpiTotal: money(line.kpiTotal),
           taxableAdditions: money(line.taxableAdditions),
@@ -1196,16 +1219,6 @@ export class PayrollRunsService {
       })
       .sort((a, b) => (byRunOrder.get(a.runId) ?? 0) - (byRunOrder.get(b.runId) ?? 0));
   }
-}
-
-/** The month's advisory lock, held to the end of the transaction. */
-export async function lockMonth(tx: Tx, month: string): Promise<void> {
-  const key = Number.parseInt(month.replace('-', ''), 10);
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(${PAYROLL_LOCK_SPACE}, ${key})`);
-}
-
-export function assertMonth(month: string, path = 'month'): void {
-  if (!isPayrollMonth(month)) throw invalid(path, 'isMonth', 'YYYY-MM');
 }
 
 /** A trimmed note, null when empty; refused above the limit. */

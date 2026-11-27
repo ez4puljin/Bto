@@ -1,6 +1,8 @@
 # expiry — the register of expiry dates (ADR-0172)
 
-**Status:** built 2026-11-07. **Depends on:** identity, catalog, partners, inventory (public `index.ts` only). **Imported by:** nobody. It never writes the stock ledger; `lots` (ADR-0019) is a different thing.
+**Status:** register built 2026-11-07, commercial approvals added locally 2026-11-22. **Depends on:** identity, catalog, partners, inventory, payroll (public `index.ts` only). **Imported by:** POS and sales through public ports. It never writes the stock ledger; `lots` (ADR-0019) is a different thing.
+
+**Commercial approvals (2026-11-22, ADR-0245).** Sales/POS and expiry consume synchronous transaction-aware ports owned by the consumer. The API/worker composition bridge binds them to `ExpiryCommerceService` and the public payroll source-deduction service; no forbidden module dependency is added. The bridge also supplies named sale contexts through `EXPIRY_SALE_CONTEXTS`. The existing authenticated list/item DTOs stay observation-only. No existing record receives a receipt link, a price or a salary charge automatically.
 
 ## 1. Owned tables (migration `0090_expiry`)
 
@@ -66,3 +68,65 @@ Both clients keep what a person typed: leaving with unsaved values asks first; a
 - Every write is audited in its transaction.
 - A carried author's name is never turned into a Bto user.
 - Real records and names never enter the repo: the dump stays in gitignored `tmp/`.
+
+## 8. Identified commercial expiry units (ADR-0245)
+
+The operator explicitly saves a posted, costed receipt line of the same product and a supported base quantity. `ReceiptsService.expirySources(productId, executor, lineId?, lock?)` is inventory's public provenance read: it returns the actual V1 gross amount and original quantity, discount/free-goods evidence, separately the latest corrected accounting cost and supplier net payable. It never treats `lastPrices` as this batch's purchase. A receipt contains no supplier campaign name or N+M pairing. Missing evidence is null/unavailable. Publishing locks the receipt header against re-costing and freezes the authoritative amount/quantity ratio and version. ADR-0236 discounts remain separate income; free goods cost zero.
+
+| Table (migration `0129`) | Purpose |
+|---|---|
+| `expiry_item_sources` | Explicit receipt line and quantity, optimistic source version; no row for unmatched historic records. Quantity is reserved across records; publication freezes the source. |
+| `expiry_markdowns` | Immutable revision: product/base unit/date, receipt cost version and exact ratio, warehouse/channel/context, fixed gross base-unit price and budget, frozen active liable users and explicit payroll month. |
+| `expiry_markdown_stops` | Append-only stop time; does not rewrite the approval or older sales. |
+| `expiry_markdown_balances` | Actual allocated sold quantity less valid returns, independent of the original observation and stock ledger. |
+| `expiry_sale_allocations` | Immutable finalized sale evidence, actual net revenue, cost/loss and exact employee shares; unique source kind/sale/line. |
+| `expiry_return_allocations` | Immutable source return identity, original sale reference, returned quantity and cumulative employee credits. |
+| `expiry_sale_exceptions` | Durable completed offline sale which could not safely allocate; explicit one-way closure without charge and reason. No automatic retry charging. |
+
+Each approval has its own Code128 `BTOEXP-<id>` label (`formatExpiryBarcode`/`parseExpiryBarcode` in shared expiry). Catalogue barcode registration and a database check reserve this namespace. Normal product pricing and fresh stock are unaffected. Retail and wholesale consumers validate the exact product/unit conversion, warehouse, named context, effective sale time and fixed price, and exclude other programs/manual price overrides. The shared API exposes a cashier-safe offer containing only label/product/unit/price/quantity/context/date/time fields; costs, liable people and payroll details stay on the server.
+
+| Route | Rights and result |
+|---|---|
+| `GET /expiry/items/:id/commerce` | `inventory.costs.manage`; `ExpiryCommerceDto`, explicit source and all immutable approvals plus visible exceptions. Frozen IDs/month are redacted without `expiry.liability.manage`. |
+| `GET /expiry/items/:id/receipt-sources` | `inventory.costs.manage`; `{ data: ExpiryReceiptSourceDto[] }`, up to 200 newest posted lines; explicit chosen historic line reads are not limited by that discovery page. |
+| `GET /expiry/items/:id/prices` | Authenticated; quantity one base unit in its own cart, named retail till/wholesale pipeline+warehouse contexts and actual quote prices. `product_prices.warehousePrice` is global, not a physical warehouse dimension. |
+| `GET /expiry/barcodes/:barcode?pipelineId=` | Authenticated; current eligible wholesale `ExpirySaleOfferDto`, no private cost/payroll fields. |
+| `PUT /expiry/items/:id/source` | Costs + `expiry.items.manage`; `{ expectedVersion: sourceVersion, receiptLineId, qtyBase }`, returns commerce detail; published provenance cannot be edited. |
+| `POST /expiry/items/:id/markdowns` | Costs + liability + `pricing.prices.manage`, warehouse write scope, idempotency; `{ expectedVersion: item.editVersion, expectedSourceVersion, expectedCostingVersion, expectedLiabilityFingerprint, receiptLineId, qtyBase, warehouseId, channel, contextId, unitPrice, payrollMonth? }`, returns commerce detail. All expected values come from the operator's pinned draft basis. Below-cost publication requires active frozen employees and an explicit month. |
+| `POST /expiry/markdowns/:id/stop` | Same three rights/scope and idempotency; stops future use without changing past allocations or payroll. |
+| `POST /expiry/sale-exceptions/:id/resolve` | Same three rights/scope and idempotency; `{ note }` explicitly closes without an employee charge. |
+
+`ExpiryCommerceService.lockInTx(tx)` must be called before source sale/return inventory/finance work. The service then provides `resolveInTx`, `recordSaleInTx` and `recordReturnInTx` through its public index. Finalized sale allocations and `PayrollSourceDeductionsService.recordInTx` share the normal sale transaction. Acquisition loss uses the frozen exact cost ratio and **actual VAT-exclusive sale revenue**, never the ordinary selling-price reduction. Equal deduplicated frozen employees take cents in stable ID order; explicit selected payroll month persists even when no writable payroll exists.
+
+Returns reverse the original allocation's employee shares cumulatively; the final return refunds all original cents, is idempotent and restores only eligible quantity capacity. Re-costing, staff role changes, changing register liability or stopping a label never rewrites past obligations. Late offline sales before a stop may use still-unsold proven global capacity; every replacement offer is capped by shared remaining units. If no supported capacity or correct price/approval exists, the completed POS sale remains visible as an unallocated exception, with no charge beyond the evidence.
+
+Commerce detail's current `liableUsers` and `liabilityFingerprint` preview are redacted without liability permission. A markdown draft pins item/source/cost versions, receipt line and that fingerprint before editing. Source quantity, receipt re-costing, liability changes or active membership drift cause 409 rather than replacing the reviewed basis. The form retains typed money/quantity/month until the operator explicitly reviews current evidence.
+
+New financial audit rows record only identifiers/change flags, without purchase cost, assessed loss or employee deduction amounts. The original floor/warehouse history remains an observation: expiry publication/allocation does not post stock or decrement its counts. An explicit count correction cannot reduce the observation below already allocated sold units. The normal POS/wholesale sale and return modules continue to own stock postings.
+
+
+### Completed POS failure diagnostics
+
+ADR-0245's POS adapter uses a per-marked-line savepoint. An expiry `AppError` rolls back only
+that expiry/payroll work, persists `expiry_pos_exceptions` in the caller transaction and allows
+normal SALE/RETURN posting. Missing item/markdown provenance is supported without mandatory
+expiry foreign keys. Non-domain bugs and PostgreSQL `57014`/`55P03` abort the central document
+and leave the already completed edge event pending retry. Diagnostic-write failure also aborts.
+Wholesale remains strict; ordinary POS returns never enter the expiry fallback.
+
+A failed marked RETURN posts its commercial return but leaves the original employee charge and
+expiry allocation unchanged pending review. Its report label remains `RETURN_REVERSAL_UNRESOLVED`
+after acknowledgement. Acknowledgement creates neither a charge nor a reversal and does not
+restore allocation capacity. Normal central document idempotency and exception line identity
+prevent duplicate posting or automatic repair on replay.
+
+- `GET /expiry/commerce-exceptions`: `inventory.costs.manage`, keyset `{ data, nextCursor }` over
+  legacy sale exceptions and new itemless SALE/RETURN diagnostics. Composite origin/ID identity
+  is mandatory; timestamps retain database precision. Warehouse write scopes do not filter reads.
+- `POST /expiry/commerce-exceptions/:id/acknowledge`: all cost/liability/price rights, warehouse
+  write scope and idempotency; `{ origin, note }`. One acknowledgement only; no financial action.
+
+The expiry register's cost-protected exceptions panel exposes the combined report independently
+of an item detail, with document/original-sale identity, barcode, quantity, warehouse, stable
+reason and unresolved-return warning. The database forbids diagnostic deletion, pre-acknowledged
+inserts and changes to original facts. Error details/stacks and arbitrary parameters are omitted.

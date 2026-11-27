@@ -234,6 +234,8 @@ export {
   payrollLines,
   payrollRuns,
   payrollSalaryOverrides,
+  payrollSourceDeductions,
+  payrollSourceSettlements,
   payrollSettings,
   payrollTerms,
 } from '../modules/payroll/schema';
@@ -311,6 +313,14 @@ export {
   expiryItemRoles,
   expiryItemUsers,
   expiryItems,
+  expiryItemSources,
+  expiryMarkdowns,
+  expiryMarkdownStops,
+  expiryMarkdownBalances,
+  expirySaleAllocations,
+  expiryReturnAllocations,
+  expirySaleExceptions,
+  expiryPosExceptions,
 } from '../modules/expiry/schema';
 export { printJobs, printStations } from '../modules/printing/schema';
 export {

@@ -197,6 +197,7 @@ export const salesOrderLines = pgTable(
   'sales_order_lines',
   {
     id: id(),
+    expiryBarcode: text('expiry_barcode'),
     orderId: ref('order_id')
       .notNull()
       .references(() => salesOrders.id),
@@ -315,6 +316,7 @@ export const salesOrderExcludedLines = pgTable(
   'sales_order_excluded_lines',
   {
     id: id(),
+    expiryBarcode: text('expiry_barcode'),
     orderId: ref('order_id')
       .notNull()
       .references(() => salesOrders.id),

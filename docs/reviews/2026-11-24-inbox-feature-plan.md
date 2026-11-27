@@ -6,6 +6,10 @@ The original linked work covered 284 distinct paths; overlapping paths appear in
 
 The four excluded files remain excluded: `eslint.config.mjs`, `tools/brain/brain.test.mjs`, `docs/STATUS.md`, and `docs/decisions/README.md`. Existing LF policy needs no change. Board claims, inbox reads and number reservations follow ADR-0248; this plan requests no additional numbers.
 
+## 2026-11-27: migration order update
+
+Migration `0128_bank_statement_edits` landed before the remaining expiry and pricing work. With the owner's approval, the board allocated **0129** for expiry (previously reserved 0126) and **0130** for supplier/location pricing (previously reserved 0127). ADR-0245 and ADR-0246 are unchanged. Current/proposed paths, statement labels and migration references below use the new numbers; explicitly obsolete source quotations retain their historical paths. Snapshots and journal entries must be rebuilt after the actual landed predecessor, preserving 0128 and its schema. The two existing-table expiry CHECKs are now `NOT VALID`: no old-row scan, data cleanup or `VALIDATE CONSTRAINT` is part of this delivery; new inserts and updates remain checked. Other prepared counts and policies below are not refreshed by this numbering update.
+
 ## Landing order and file ownership
 
 Existing translation values never ride with functional features: those branches add only genuinely new `mn.json` keys. Existing-value edits are separate wording branches and all four land LAST, serially, after functional, audit and tooling work. The listed wording manifests describe the current prepared paths; any matching literal test/guide follow-up must be inventoried with its final wording branch before push. They do not block HR or expiry. Functional tests and guides retain the accepted current labels; any literal wording expectations move with the later wording branch. New keys already landed by a predecessor are preserved; later branches add only their remaining new keys.
@@ -15,10 +19,10 @@ Existing translation values never ride with functional features: those branches 
 | 1     | `in/low-stock-supplier-status`       |             11 | Existing-value wording removed; fresh current-main revision.        |
 | 2     | `in/hr-position-salary-access`       |             59 | 0124 / ADR-0243; salary audit privacy lands before first exposure.  |
 | 3     | `in/employee-salary-overrides`       |             20 | 0125 / ADR-0244; after HR.                                          |
-| 4     | `in/expiry-payroll-foundation`       |             32 | 0126 / ADR-0245; pure ports and payroll foundation.                 |
+| 4     | `in/expiry-payroll-foundation`       |             32 | 0129 / ADR-0245; pure ports and payroll foundation.                 |
 | 5     | `in/expiry-sale-transactions`        |             58 | Consumers, both root adapters and transaction regressions together. |
 | 6     | `in/expiry-commerce-screens`         |             29 | After transaction behavior.                                         |
-| 7     | `in/supplier-location-price-engine`  |             61 | 0127 / ADR-0246; includes required import lock regression.          |
+| 7     | `in/supplier-location-price-engine`  |             61 | 0130 / ADR-0246; includes required import lock regression.          |
 | 8     | `in/supplier-location-price-screens` |             24 | After pricing engine.                                               |
 | 9     | `in/audit-request-validation`        |             30 | Remaining request validation; privacy already belongs to HR.        |
 | 10    | `in/audit-interface-clarity`         |             27 | Four genuinely new translation keys stay with functionality.        |
@@ -151,13 +155,13 @@ packages/shared/i18n/mn.json
 
 #### 4. expiry-payroll-foundation (32 files)
 
-0126 / ADR-0245; pure ports and payroll foundation.
+0129 / ADR-0245; pure ports and payroll foundation.
 
 ```text
 apps/api/jest.config.js
-apps/api/src/db/migrations/0126_expiry_commerce.sql
+apps/api/src/db/migrations/0129_expiry_commerce.sql
 apps/api/src/db/migrations/meta/_journal.json
-apps/api/src/db/migrations/meta/0126_snapshot.json
+apps/api/src/db/migrations/meta/0129_snapshot.json
 apps/api/src/db/schema.ts
 apps/api/src/modules/expiry/ports.ts
 apps/api/src/modules/expiry/schema.ts
@@ -291,12 +295,12 @@ packages/shared/i18n/mn.json
 
 #### 7. supplier-location-price-engine (61 files)
 
-0127 / ADR-0246; includes required import lock regression.
+0130 / ADR-0246; includes required import lock regression.
 
 ```text
 apps/api/src/app.module.ts
-apps/api/src/db/migrations/0127_supplier_base_location_prices.sql
-apps/api/src/db/migrations/meta/0127_snapshot.json
+apps/api/src/db/migrations/0130_supplier_base_location_prices.sql
+apps/api/src/db/migrations/meta/0130_snapshot.json
 apps/api/src/db/migrations/meta/_journal.json
 apps/api/src/db/schema.ts
 apps/api/src/edge/services/checkout.service.ts
@@ -562,13 +566,13 @@ docs/reviews/2026-11-24-code-audit.md
 | --------------------------- | ---------------------------------------- | ------------------------------------------- |
 | HR positions                | `0124_hr_positions.sql`                  | `ADR-0243-position-salary-access.md`        |
 | Individual salary overrides | `0125_payroll_salary_overrides.sql`      | `ADR-0244-employee-salary-overrides.md`     |
-| Expiry/payroll              | `0126_expiry_commerce.sql`               | `ADR-0245-expiry-markdowns-and-payroll.md`  |
-| Supplier/location prices    | `0127_supplier_base_location_prices.sql` | `ADR-0246-supplier-base-location-prices.md` |
+| Expiry/payroll              | `0129_expiry_commerce.sql`               | `ADR-0245-expiry-markdowns-and-payroll.md`  |
+| Supplier/location prices    | `0130_supplier_base_location_prices.sql` | `ADR-0246-supplier-base-location-prices.md` |
 | Historical QA tools         | none                                     | `ADR-0247-overnight-qa-history.md`          |
 
-These are the previously reserved numbers. Local source migrations 0122–0125 and ADRs 0237–0241 map in order to this table; unrelated newer-main ADRs and migrations with those old numbers are not renamed. Each submitted snapshot/journal must be regenerated or reconciled against its landed predecessor, preserving reporting/VAT and the entire `id`/`prevId` chain. Applied local migrations are not edited or replayed.
+These are the current allocated numbers after the 2026-11-27 update above. Local source migrations 0122–0125 and ADRs 0237–0241 map in order to this table; unrelated newer-main ADRs and migrations with those old numbers are not renamed. Each submitted snapshot/journal must be regenerated or reconciled against its landed predecessor, preserving reporting/VAT and the entire `id`/`prevId` chain. Applied local migrations are not edited or replayed.
 
-One harmless stale source comment inside prepared 0126 still says “append to 0124”; actual foundation assembly corrects that comment to 0126. It does not change any SQL statement.
+The historical preparation under migration 0126 contained a stale source comment saying “append to 0124”; current foundation assembly uses 0129 in that comment. This numbering correction does not change any SQL statement.
 
 ## Module boundaries: synchronous ports, no new forbidden edge
 
@@ -616,19 +620,19 @@ Every guarded feature still needs its own current-main checks, matching stock/mo
 
 ## SQL review: final additive preparation
 
-The inventory below is recomputed from the SQL at local reviewed preparation `46d14bf40e8c93afdd09977c6626f5016770a149`, which includes the nullable HR marker and the final price-notification sidecar. It does not repeat the obsolete notification `DROP CONSTRAINT` as proposed SQL. Source locations use that commit; each full statement below can be compared directly with its file. No SQL was executed for this inventory.
+The inventory below derives from local reviewed preparation `46d14bf40e8c93afdd09977c6626f5016770a149`, which includes the nullable HR marker and the final price-notification sidecar. Current proposed file names and statement labels reflect the 2026-11-27 numbering update; line ranges remain historical review anchors in that source commit. The two existing-table expiry CHECK excerpts and descriptions reflect the subsequently tested `NOT VALID` correction. The obsolete notification `DROP CONSTRAINT` remains excluded from proposed SQL. Historical source names were 0126 for expiry and 0127 for pricing; use that mapping when comparing with the source commit. No SQL was executed for this document update.
 
 No top-level statement performs `DROP`, `RENAME`, `ALTER TYPE`, `SET NOT NULL`, `UPDATE` or `DELETE` of existing rows, and there is no `DO` block. Trigger event lists containing UPDATE/DELETE/TRUNCATE describe future guarded writes, not data changes during migration. Function bodies below are installed, not invoked by their `CREATE FUNCTION`; their row locks and checks run only on a later business write.
 
-Existing-table nullable additions preserve old values as NULL. Two checks also inspect existing non-null fields: barcode namespace and expiry NaN quantities, so installation safety cannot be inferred from nullable-column safety. New checks/triggers are still behavior changes and are explicitly shown; they are retained because removing them would permit inconsistent access, oversold expiry budgets or mutation of posted receipt evidence. The owner reviews these guards with the feature. Foreign keys/checks on newly created tables protect only new feature records.
+Existing-table nullable additions preserve old values as NULL. The barcode-namespace and expiry finite-quantity checks concern existing non-null fields, so both are added `NOT VALID`. Installation does not scan or reject old rows; new inserts and updates must satisfy the checks. This delivery performs no `VALIDATE CONSTRAINT`, cleanup or rewrite of existing rows. New checks/triggers are still behavior changes and are explicitly shown; they are retained because removing them would permit inconsistent access, oversold expiry budgets or mutation of posted receipt evidence. The owner reviews these guards with the feature. Foreign keys/checks on newly created tables protect only new feature records.
 
 The HR legacy marker is added nullable with no initial default, then only that new column gets a future-insert default of false. Existing NULL means legacy; a missing row never does. All three early HR readers/save paths use this distinction. A normal authorized save may normalize the marker to true; migration does not backfill or change a salary.
 
 The price sidecar leaves `user_notifications`, its kind constraint and existing rows unchanged. `user_price_notifications` uses the existing positive-ID sequence without reseeding, permits only payload-column inserts and read-marker updates to `app`, and preserves one numeric-ID cursor across a union of both inbox streams. No old table/column is dropped.
 
-### Owner preflight for existing rows
+### Historical read-only preflight (not required or run for this delivery)
 
-The real database has not been queried by this preparation. Before approving 0126, the owner can run these SELECT-only checks in the intended database using its normal read access. Both counts must be zero; a nonzero result requires a reviewed data decision, not a hidden migration UPDATE or weaker constraint.
+The earlier plan listed the following optional diagnostic queries before the `NOT VALID` correction. They are preserved as historical reference, not an installation prerequisite or an instruction to run them. The real database has not been queried by this preparation or update. Existing matching rows do not block installation; this delivery neither scans them nor validates or cleans them up. Future writes remain checked.
 
 ```sql
 SELECT count(*) AS reserved_expiry_barcode_count
@@ -908,255 +912,255 @@ File: `apps/api/src/db/migrations/0125_payroll_salary_overrides.sql`. Restricts 
 REVOKE DELETE, TRUNCATE ON payroll_salary_overrides FROM app;
 ```
 
-### 0126_expiry_commerce.sql
+### 0129_expiry_commerce.sql
 
 Source SHA-256: `b0783daf75b1334714869f1fdecd08b138f0c5434340370d5d9a7ab1cce7f62e`. 83 complete top-level statements; 63 statement bodies expanded below. Pure new table/index creation not otherwise listed is additive.
 
-#### 0126.1: lines 132–132
+#### 0129.1: lines 132–132
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
 
 ```sql
 ALTER TABLE "pos_sale_lines" ADD COLUMN "expiry_barcode" text;
 ```
 
-#### 0126.2: lines 133–133
+#### 0129.2: lines 133–133
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
 
 ```sql
 ALTER TABLE "pos_sale_lines" ADD COLUMN "expiry_exception" text;
 ```
 
-#### 0126.3: lines 134–134
+#### 0129.3: lines 134–134
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
 
 ```sql
 ALTER TABLE "sales_order_excluded_lines" ADD COLUMN "expiry_barcode" text;
 ```
 
-#### 0126.4: lines 135–135
+#### 0129.4: lines 135–135
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
 
 ```sql
 ALTER TABLE "sales_order_lines" ADD COLUMN "expiry_barcode" text;
 ```
 
-#### 0126.5: lines 136–136
+#### 0129.5: lines 136–136
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_item_sources" ADD CONSTRAINT "expiry_item_sources_item_id_expiry_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."expiry_items"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.6: lines 137–137
+#### 0129.6: lines 137–137
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_item_sources" ADD CONSTRAINT "expiry_item_sources_receipt_line_id_goods_receipt_lines_id_fk" FOREIGN KEY ("receipt_line_id") REFERENCES "public"."goods_receipt_lines"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.7: lines 138–138
+#### 0129.7: lines 138–138
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_item_sources" ADD CONSTRAINT "expiry_item_sources_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.8: lines 139–139
+#### 0129.8: lines 139–139
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdown_balances" ADD CONSTRAINT "expiry_markdown_balances_markdown_id_expiry_markdowns_id_fk" FOREIGN KEY ("markdown_id") REFERENCES "public"."expiry_markdowns"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.9: lines 140–140
+#### 0129.9: lines 140–140
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdown_stops" ADD CONSTRAINT "expiry_markdown_stops_markdown_id_expiry_markdowns_id_fk" FOREIGN KEY ("markdown_id") REFERENCES "public"."expiry_markdowns"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.10: lines 141–141
+#### 0129.10: lines 141–141
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdown_stops" ADD CONSTRAINT "expiry_markdown_stops_stopped_by_users_id_fk" FOREIGN KEY ("stopped_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.11: lines 142–142
+#### 0129.11: lines 142–142
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdowns" ADD CONSTRAINT "expiry_markdowns_item_id_expiry_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."expiry_items"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.12: lines 143–143
+#### 0129.12: lines 143–143
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdowns" ADD CONSTRAINT "expiry_markdowns_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.13: lines 144–144
+#### 0129.13: lines 144–144
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdowns" ADD CONSTRAINT "expiry_markdowns_product_unit_id_product_units_id_fk" FOREIGN KEY ("product_unit_id") REFERENCES "public"."product_units"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.14: lines 145–145
+#### 0129.14: lines 145–145
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdowns" ADD CONSTRAINT "expiry_markdowns_receipt_line_id_goods_receipt_lines_id_fk" FOREIGN KEY ("receipt_line_id") REFERENCES "public"."goods_receipt_lines"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.15: lines 146–146
+#### 0129.15: lines 146–146
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdowns" ADD CONSTRAINT "expiry_markdowns_warehouse_id_warehouses_id_fk" FOREIGN KEY ("warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.16: lines 147–147
+#### 0129.16: lines 147–147
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_markdowns" ADD CONSTRAINT "expiry_markdowns_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.17: lines 148–148
+#### 0129.17: lines 148–148
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_return_allocations" ADD CONSTRAINT "expiry_return_allocations_sale_allocation_id_expiry_sale_allocations_id_fk" FOREIGN KEY ("sale_allocation_id") REFERENCES "public"."expiry_sale_allocations"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.18: lines 149–149
+#### 0129.18: lines 149–149
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_sale_allocations" ADD CONSTRAINT "expiry_sale_allocations_markdown_id_expiry_markdowns_id_fk" FOREIGN KEY ("markdown_id") REFERENCES "public"."expiry_markdowns"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.19: lines 150–150
+#### 0129.19: lines 150–150
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_sale_exceptions" ADD CONSTRAINT "expiry_sale_exceptions_markdown_id_expiry_markdowns_id_fk" FOREIGN KEY ("markdown_id") REFERENCES "public"."expiry_markdowns"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.20: lines 151–151
+#### 0129.20: lines 151–151
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "expiry_sale_exceptions" ADD CONSTRAINT "expiry_sale_exceptions_resolved_by_users_id_fk" FOREIGN KEY ("resolved_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.21: lines 152–152
+#### 0129.21: lines 152–152
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_deductions" ADD CONSTRAINT "payroll_source_deductions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.22: lines 153–153
+#### 0129.22: lines 153–153
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_deductions" ADD CONSTRAINT "payroll_source_deductions_reverses_id_payroll_source_deductions_id_fk" FOREIGN KEY ("reverses_id") REFERENCES "public"."payroll_source_deductions"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.23: lines 154–154
+#### 0129.23: lines 154–154
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_deductions" ADD CONSTRAINT "payroll_source_deductions_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.24: lines 155–155
+#### 0129.24: lines 155–155
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_deductions" ADD CONSTRAINT "payroll_source_deductions_assigned_by_users_id_fk" FOREIGN KEY ("assigned_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.25: lines 156–156
+#### 0129.25: lines 156–156
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_settlements" ADD CONSTRAINT "payroll_source_settlements_deduction_id_payroll_source_deductions_id_fk" FOREIGN KEY ("deduction_id") REFERENCES "public"."payroll_source_deductions"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.26: lines 157–157
+#### 0129.26: lines 157–157
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_settlements" ADD CONSTRAINT "payroll_source_settlements_run_id_payroll_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."payroll_runs"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.27: lines 158–158
+#### 0129.27: lines 158–158
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_settlements" ADD CONSTRAINT "payroll_source_settlements_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.28: lines 159–159
+#### 0129.28: lines 159–159
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "payroll_source_settlements" ADD CONSTRAINT "payroll_source_settlements_released_by_users_id_fk" FOREIGN KEY ("released_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0126.29: lines 173–174
+#### 0129.29: lines 173–174
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Existing barcode namespace check: existing BTOEXP-prefixed codes would block installation. The owner must run the read-only preflight in this section and resolve any conflict before applying; no automatic rename or delete is proposed.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Existing barcode namespace check added NOT VALID: existing BTOEXP-prefixed rows are not scanned or rejected during installation. New inserts and updates must satisfy the namespace guard. No preflight query, VALIDATE, rename, delete or cleanup is part of this delivery.
 
 ```sql
 ALTER TABLE product_barcodes ADD CONSTRAINT product_barcodes_expiry_namespace
-CHECK (upper(code) NOT LIKE 'BTOEXP-%');
+CHECK (upper(code) NOT LIKE 'BTOEXP-%') NOT VALID;
 ```
 
-#### 0126.30: lines 175–176
+#### 0129.30: lines 175–176
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Existing expiry quantity check: existing NaN values would block installation. The owner must run the read-only preflight in this section; this plan neither silently changes quantities nor weakens validation.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Existing expiry quantity check added NOT VALID: existing NaN rows are not scanned or rejected during installation. New inserts and updates must have finite quantities. No preflight query, VALIDATE or quantity cleanup is part of this delivery.
 
 ```sql
 ALTER TABLE expiry_items ADD CONSTRAINT expiry_items_finite_quantities
-CHECK (qty_floor <> 'NaN'::numeric AND qty_warehouse <> 'NaN'::numeric);
+CHECK (qty_floor <> 'NaN'::numeric AND qty_warehouse <> 'NaN'::numeric) NOT VALID;
 ```
 
-#### 0126.31: lines 178–182
+#### 0129.31: lines 178–182
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_commerce_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1166,98 +1170,98 @@ END;
 $$;
 ```
 
-#### 0126.32: lines 183–184
+#### 0129.32: lines 183–184
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_markdowns_immutable BEFORE UPDATE OR DELETE ON expiry_markdowns
 FOR EACH ROW EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.33: lines 185–186
+#### 0129.33: lines 185–186
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_markdown_stops_immutable BEFORE UPDATE OR DELETE ON expiry_markdown_stops
 FOR EACH ROW EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.34: lines 187–188
+#### 0129.34: lines 187–188
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_sale_allocations_immutable BEFORE UPDATE OR DELETE ON expiry_sale_allocations
 FOR EACH ROW EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.35: lines 189–190
+#### 0129.35: lines 189–190
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_return_allocations_immutable BEFORE UPDATE OR DELETE ON expiry_return_allocations
 FOR EACH ROW EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.36: lines 191–192
+#### 0129.36: lines 191–192
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_markdowns_no_truncate BEFORE TRUNCATE ON expiry_markdowns
 FOR EACH STATEMENT EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.37: lines 193–194
+#### 0129.37: lines 193–194
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_markdown_stops_no_truncate BEFORE TRUNCATE ON expiry_markdown_stops
 FOR EACH STATEMENT EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.38: lines 195–196
+#### 0129.38: lines 195–196
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_sale_allocations_no_truncate BEFORE TRUNCATE ON expiry_sale_allocations
 FOR EACH STATEMENT EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.39: lines 197–198
+#### 0129.39: lines 197–198
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_return_allocations_no_truncate BEFORE TRUNCATE ON expiry_return_allocations
 FOR EACH STATEMENT EXECUTE FUNCTION expiry_commerce_immutable();
 ```
 
-#### 0126.40: lines 199–200
+#### 0129.40: lines 199–200
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
 
 ```sql
 REVOKE UPDATE, DELETE, TRUNCATE ON expiry_markdowns, expiry_markdown_stops,
   expiry_sale_allocations, expiry_return_allocations FROM app;
 ```
 
-#### 0126.41: lines 201–201
+#### 0129.41: lines 201–201
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
 
 ```sql
 REVOKE DELETE, TRUNCATE ON expiry_item_sources, expiry_markdown_balances, expiry_sale_exceptions FROM app;
 ```
 
-#### 0126.42: lines 203–224
+#### 0129.42: lines 203–224
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_source_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1284,18 +1288,18 @@ END;
 $$;
 ```
 
-#### 0126.43: lines 225–226
+#### 0129.43: lines 225–226
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_source_guard BEFORE INSERT OR UPDATE ON expiry_item_sources
 FOR EACH ROW EXECUTE FUNCTION expiry_source_guard();
 ```
 
-#### 0126.44: lines 228–257
+#### 0129.44: lines 228–257
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_markdown_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1330,18 +1334,18 @@ END;
 $$;
 ```
 
-#### 0126.45: lines 258–259
+#### 0129.45: lines 258–259
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_markdown_guard BEFORE INSERT ON expiry_markdowns
 FOR EACH ROW EXECUTE FUNCTION expiry_markdown_guard();
 ```
 
-#### 0126.46: lines 261–279
+#### 0129.46: lines 261–279
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_balance_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1365,18 +1369,18 @@ END;
 $$;
 ```
 
-#### 0126.47: lines 280–281
+#### 0129.47: lines 280–281
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_balance_guard BEFORE INSERT OR UPDATE ON expiry_markdown_balances
 FOR EACH ROW EXECUTE FUNCTION expiry_balance_guard();
 ```
 
-#### 0126.48: lines 283–299
+#### 0129.48: lines 283–299
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_sale_allocation_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1398,18 +1402,18 @@ END;
 $$;
 ```
 
-#### 0126.49: lines 300–301
+#### 0129.49: lines 300–301
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_sale_allocation_guard BEFORE INSERT ON expiry_sale_allocations
 FOR EACH ROW EXECUTE FUNCTION expiry_sale_allocation_guard();
 ```
 
-#### 0126.50: lines 303–327
+#### 0129.50: lines 303–327
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_return_allocation_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1439,18 +1443,18 @@ END;
 $$;
 ```
 
-#### 0126.51: lines 328–329
+#### 0129.51: lines 328–329
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_return_allocation_guard BEFORE INSERT ON expiry_return_allocations
 FOR EACH ROW EXECUTE FUNCTION expiry_return_allocation_guard();
 ```
 
-#### 0126.52: lines 333–352
+#### 0129.52: lines 333–352
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_allocation_consistency() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1475,27 +1479,27 @@ END;
 $$;
 ```
 
-#### 0126.53: lines 353–354
+#### 0129.53: lines 353–354
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE CONSTRAINT TRIGGER expiry_sale_allocation_consistency AFTER INSERT ON expiry_sale_allocations
 DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION expiry_allocation_consistency();
 ```
 
-#### 0126.54: lines 355–356
+#### 0129.54: lines 355–356
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE CONSTRAINT TRIGGER expiry_return_allocation_consistency AFTER INSERT ON expiry_return_allocations
 DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION expiry_allocation_consistency();
 ```
 
-#### 0126.55: lines 358–367
+#### 0129.55: lines 358–367
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_exception_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1510,18 +1514,18 @@ END;
 $$;
 ```
 
-#### 0126.56: lines 368–369
+#### 0129.56: lines 368–369
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_exception_guard BEFORE UPDATE ON expiry_sale_exceptions
 FOR EACH ROW EXECUTE FUNCTION expiry_exception_guard();
 ```
 
-#### 0126.57: lines 371–381
+#### 0129.57: lines 371–381
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION expiry_count_commerce_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1537,26 +1541,26 @@ END;
 $$;
 ```
 
-#### 0126.58: lines 382–383
+#### 0129.58: lines 382–383
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Existing-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Existing-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER expiry_count_commerce_guard BEFORE UPDATE OF qty_floor,qty_warehouse ON expiry_items
 FOR EACH ROW EXECUTE FUNCTION expiry_count_commerce_guard();
 ```
 
-#### 0126.59: lines 387–387
+#### 0129.59: lines 387–387
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
 
 ```sql
 REVOKE DELETE, TRUNCATE ON payroll_source_deductions, payroll_source_settlements FROM app;
 ```
 
-#### 0126.60: lines 389–414
+#### 0129.60: lines 389–414
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION payroll_source_deductions_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1587,17 +1591,17 @@ END;
 $$;
 ```
 
-#### 0126.61: lines 415–415
+#### 0129.61: lines 415–415
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER payroll_source_deductions_guard BEFORE INSERT OR UPDATE ON payroll_source_deductions FOR EACH ROW EXECUTE FUNCTION payroll_source_deductions_guard();
 ```
 
-#### 0126.62: lines 417–441
+#### 0129.62: lines 417–441
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. Installs a future-write validation function; no body is executed during migration. Enforces the named expiry provenance, quantity, allocation/reversal or payroll settlement invariant; locks and checks remain inside the later caller transaction.
 
 ```sql
 CREATE FUNCTION payroll_source_settlements_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1627,133 +1631,133 @@ END;
 $$;
 ```
 
-#### 0126.63: lines 442–442
+#### 0129.63: lines 442–442
 
-File: `apps/api/src/db/migrations/0126_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0129_expiry_commerce.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER payroll_source_settlements_guard BEFORE INSERT OR UPDATE ON payroll_source_settlements FOR EACH ROW EXECUTE FUNCTION payroll_source_settlements_guard();
 ```
 
-### 0127_supplier_base_location_prices.sql
+### 0130_supplier_base_location_prices.sql
 
 Source SHA-256: `a7425e3e30e8e265775b6d00fd5a28515373fbff0cff68b4a05ab4beb0417dad`. 47 complete top-level statements; 37 statement bodies expanded below. Pure new table/index creation not otherwise listed is additive.
 
-#### 0127.1: lines 88–88
+#### 0130.1: lines 88–88
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "base_price_events" ADD CONSTRAINT "base_price_events_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.2: lines 89–89
+#### 0130.2: lines 89–89
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "base_price_events" ADD CONSTRAINT "base_price_events_receipt_id_goods_receipts_id_fk" FOREIGN KEY ("receipt_id") REFERENCES "public"."goods_receipts"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.3: lines 90–90
+#### 0130.3: lines 90–90
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "base_price_events" ADD CONSTRAINT "base_price_events_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
 ```
 
-#### 0127.4: lines 91–91
+#### 0130.4: lines 91–91
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "base_price_states" ADD CONSTRAINT "base_price_states_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.5: lines 92–92
+#### 0130.5: lines 92–92
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "base_price_states" ADD CONSTRAINT "base_price_states_last_receipt_id_goods_receipts_id_fk" FOREIGN KEY ("last_receipt_id") REFERENCES "public"."goods_receipts"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.6: lines 93–93
+#### 0130.6: lines 93–93
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "base_price_states" ADD CONSTRAINT "base_price_states_last_event_id_base_price_events_id_fk" FOREIGN KEY ("last_event_id") REFERENCES "public"."base_price_events"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.7: lines 94–94
+#### 0130.7: lines 94–94
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "location_price_rule_versions" ADD CONSTRAINT "location_price_rule_versions_warehouse_id_warehouses_id_fk" FOREIGN KEY ("warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.8: lines 95–95
+#### 0130.8: lines 95–95
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "location_price_rule_versions" ADD CONSTRAINT "location_price_rule_versions_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
 ```
 
-#### 0127.9: lines 96–96
+#### 0130.9: lines 96–96
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "location_price_rules" ADD CONSTRAINT "location_price_rules_warehouse_id_warehouses_id_fk" FOREIGN KEY ("warehouse_id") REFERENCES "public"."warehouses"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.10: lines 97–97
+#### 0130.10: lines 97–97
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "location_price_rules" ADD CONSTRAINT "location_price_rules_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
 ```
 
-#### 0127.11: lines 98–98
+#### 0130.11: lines 98–98
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "supplier_price_rules" ADD CONSTRAINT "supplier_price_rules_supplier_id_suppliers_id_fk" FOREIGN KEY ("supplier_id") REFERENCES "public"."suppliers"("id") ON DELETE no action ON UPDATE no action;
 ```
 
-#### 0127.12: lines 99–99
+#### 0130.12: lines 99–99
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE "supplier_price_rules" ADD CONSTRAINT "supplier_price_rules_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
 ```
 
-#### 0127.13: lines 104–104
+#### 0130.13: lines 104–104
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
 
 ```sql
 ALTER TABLE goods_receipt_lines ADD COLUMN printed_unit_price numeric(14, 2);
 ```
 
-#### 0127.14: lines 106–106
+#### 0130.14: lines 106–106
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New nullable column on an existing table; old rows remain NULL and old columns stay in place.
 
 ```sql
 ALTER TABLE goods_receipt_lines ADD COLUMN printed_price_factor numeric(18, 6);
 ```
 
-#### 0127.15: lines 108–110
+#### 0130.15: lines 108–110
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Check on an existing table for the new nullable feature fields; old NULL rows satisfy it. Retained to reject invalid future values rather than weaken the invariant.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Check on an existing table for the new nullable feature fields; old NULL rows satisfy it. Retained to reject invalid future values rather than weaken the invariant.
 
 ```sql
 ALTER TABLE goods_receipt_lines ADD CONSTRAINT goods_receipt_lines_printed_price_basis
@@ -1761,18 +1765,18 @@ ALTER TABLE goods_receipt_lines ADD CONSTRAINT goods_receipt_lines_printed_price
     AND (printed_price_factor IS NULL OR (printed_price_factor > 0 AND printed_price_factor < 'Infinity'::numeric)));
 ```
 
-#### 0127.16: lines 112–113
+#### 0130.16: lines 112–113
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Check on an existing table for the new nullable feature fields; old NULL rows satisfy it. Retained to reject invalid future values rather than weaken the invariant.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Check on an existing table for the new nullable feature fields; old NULL rows satisfy it. Retained to reject invalid future values rather than weaken the invariant.
 
 ```sql
 ALTER TABLE goods_receipt_lines ADD CONSTRAINT goods_receipt_lines_printed_price
   CHECK (printed_unit_price IS NULL OR (printed_unit_price >= 0 AND printed_unit_price < 'Infinity'::numeric));
 ```
 
-#### 0127.17: lines 117–126
+#### 0130.17: lines 117–126
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Additive sidecar replaces the rejected old-kind constraint replacement, preserving old table/data and using a shared ID sequence.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Additive sidecar replaces the rejected old-kind constraint replacement, preserving old table/data and using a shared ID sequence.
 
 ```sql
 CREATE TABLE user_price_notifications (
@@ -1787,85 +1791,85 @@ CREATE TABLE user_price_notifications (
 );
 ```
 
-#### 0127.18: lines 132–132
+#### 0130.18: lines 132–132
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
 
 ```sql
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON user_price_notifications FROM app;
 ```
 
-#### 0127.19: lines 134–134
+#### 0130.19: lines 134–134
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Allows only the new sidecar payload INSERT and read_at UPDATE; ID, timestamp and immutable payload rewrites remain denied.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Allows only the new sidecar payload INSERT and read_at UPDATE; ID, timestamp and immutable payload rewrites remain denied.
 
 ```sql
 GRANT INSERT (user_id, price_change_key, payload), UPDATE (read_at) ON user_price_notifications TO app;
 ```
 
-#### 0127.20: lines 136–136
+#### 0130.20: lines 136–136
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Allows the new sidecar to consume the existing inbox sequence, preserving global positive numeric IDs without reseeding it.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Allows the new sidecar to consume the existing inbox sequence, preserving global positive numeric IDs without reseeding it.
 
 ```sql
 GRANT USAGE ON SEQUENCE user_notifications_id_seq TO app;
 ```
 
-#### 0127.21: lines 138–138
+#### 0130.21: lines 138–138
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
 
 ```sql
 REVOKE UPDATE, DELETE, TRUNCATE ON base_price_events, location_price_rule_versions FROM app;
 ```
 
-#### 0127.22: lines 140–140
+#### 0130.22: lines 140–140
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Restricts app writes to the newly introduced feature tables, preserving immutable evidence/history; no existing row is changed.
 
 ```sql
 REVOKE DELETE, TRUNCATE ON supplier_price_rules, location_price_rules, base_price_states FROM app;
 ```
 
-#### 0127.23: lines 142–143
+#### 0130.23: lines 142–143
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER base_price_events_append_only BEFORE UPDATE OR DELETE ON base_price_events
   FOR EACH ROW EXECUTE FUNCTION forbid_update_delete();
 ```
 
-#### 0127.24: lines 145–146
+#### 0130.24: lines 145–146
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER base_price_events_no_truncate BEFORE TRUNCATE ON base_price_events
   FOR EACH STATEMENT EXECUTE FUNCTION forbid_update_delete();
 ```
 
-#### 0127.25: lines 148–149
+#### 0130.25: lines 148–149
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER location_price_rule_versions_append_only BEFORE UPDATE OR DELETE ON location_price_rule_versions
   FOR EACH ROW EXECUTE FUNCTION forbid_update_delete();
 ```
 
-#### 0127.26: lines 151–152
+#### 0130.26: lines 151–152
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER location_price_rule_versions_no_truncate BEFORE TRUNCATE ON location_price_rule_versions
   FOR EACH STATEMENT EXECUTE FUNCTION forbid_update_delete();
 ```
 
-#### 0127.27: lines 154–174
+#### 0130.27: lines 154–174
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Installs a future-write validation function; no body is executed during migration. Protects rule version progression, product/event ownership or posted printed-price evidence.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Installs a future-write validation function; no body is executed during migration. Protects rule version progression, product/event ownership or posted printed-price evidence.
 
 ```sql
 CREATE FUNCTION supplier_price_rule_revision_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1891,27 +1895,27 @@ END;
 $$;
 ```
 
-#### 0127.28: lines 176–177
+#### 0130.28: lines 176–177
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER supplier_price_rules_revision BEFORE INSERT OR UPDATE ON supplier_price_rules
   FOR EACH ROW EXECUTE FUNCTION supplier_price_rule_revision_guard();
 ```
 
-#### 0127.29: lines 179–180
+#### 0130.29: lines 179–180
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER location_price_rules_revision BEFORE INSERT OR UPDATE ON location_price_rules
   FOR EACH ROW EXECUTE FUNCTION supplier_price_rule_revision_guard();
 ```
 
-#### 0127.30: lines 182–191
+#### 0130.30: lines 182–191
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Installs a future-write validation function; no body is executed during migration. Protects rule version progression, product/event ownership or posted printed-price evidence.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Installs a future-write validation function; no body is executed during migration. Protects rule version progression, product/event ownership or posted printed-price evidence.
 
 ```sql
 CREATE FUNCTION base_price_state_event_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1926,18 +1930,18 @@ END;
 $$;
 ```
 
-#### 0127.31: lines 193–194
+#### 0130.31: lines 193–194
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. New-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER base_price_states_event BEFORE INSERT OR UPDATE ON base_price_states
   FOR EACH ROW EXECUTE FUNCTION base_price_state_event_guard();
 ```
 
-#### 0127.32: lines 196–214
+#### 0130.32: lines 196–214
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Installs a future-write validation function; no body is executed during migration. Protects rule version progression, product/event ownership or posted printed-price evidence.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Installs a future-write validation function; no body is executed during migration. Protects rule version progression, product/event ownership or posted printed-price evidence.
 
 ```sql
 CREATE FUNCTION receipt_printed_price_guard() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -1961,34 +1965,34 @@ END;
 $$;
 ```
 
-#### 0127.33: lines 216–217
+#### 0130.33: lines 216–217
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Existing-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Existing-table future-write guard: attaches the named validation/immutability function. Installation does not invoke it or rewrite existing rows; retain to enforce the stated invariant on subsequent writes.
 
 ```sql
 CREATE TRIGGER goods_receipt_lines_printed_price_immutable BEFORE UPDATE ON goods_receipt_lines
   FOR EACH ROW EXECUTE FUNCTION receipt_printed_price_guard();
 ```
 
-#### 0127.34: lines 220–220
+#### 0130.34: lines 220–220
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Nullable extension of a table created in this same migration; no preexisting business data.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Nullable extension of a table created in this same migration; no preexisting business data.
 
 ```sql
 ALTER TABLE base_price_events ADD COLUMN printed_price_amount numeric(14, 2);
 ```
 
-#### 0127.35: lines 222–222
+#### 0130.35: lines 222–222
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Nullable extension of a table created in this same migration; no preexisting business data.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Nullable extension of a table created in this same migration; no preexisting business data.
 
 ```sql
 ALTER TABLE base_price_events ADD COLUMN printed_price_qty_base numeric(18, 6);
 ```
 
-#### 0127.36: lines 224–227
+#### 0130.36: lines 224–227
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Constraint on a table created in this same migration: establishes referential or value integrity for new feature records, without modifying preexisting table rows.
 
 ```sql
 ALTER TABLE base_price_events ADD CONSTRAINT base_price_events_printed_ratio
@@ -1997,9 +2001,9 @@ ALTER TABLE base_price_events ADD CONSTRAINT base_price_events_printed_ratio
       AND printed_price_qty_base > 0 AND printed_price_qty_base < 'Infinity'::numeric)));
 ```
 
-#### 0127.37: lines 233–233
+#### 0130.37: lines 233–233
 
-File: `apps/api/src/db/migrations/0127_supplier_base_location_prices.sql`. Nullable extension of a table created in this same migration; no preexisting business data.
+File: `apps/api/src/db/migrations/0130_supplier_base_location_prices.sql`. Nullable extension of a table created in this same migration; no preexisting business data.
 
 ```sql
 ALTER TABLE base_price_events ADD COLUMN rule_snapshot jsonb;

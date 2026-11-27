@@ -4,6 +4,8 @@ export { SalesHttpModule, SalesLiveModule, SalesModule } from './sales.module';
 export { LiveStockHub, type LiveStockMessage, streamDuration } from './services/live-stock.hub';
 export {
   type BackorderedLine,
+  EXPIRY_SALE_POSTING,
+  type ExpirySalePosting,
   CREDIT_CHECKER,
   type CreditChecker,
   type CreditCheckInput,

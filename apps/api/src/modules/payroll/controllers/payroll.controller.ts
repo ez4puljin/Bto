@@ -42,6 +42,9 @@ import {
   PayrollScoringDto,
   PayrollScoringRunDto,
   PayrollSettingsDto,
+  PayrollSourceDeductionDto,
+  PayrollSourceDeductionsQueryDto,
+  PayrollSourceMonthRequestDto,
   PayrollTemplateApplyRequestDto,
   PayrollTermsDto,
   PayrollTermsRequestDto,
@@ -62,6 +65,10 @@ import {
   type PayTerms,
   PayrollTermsService,
 } from '../services/payroll-terms.service';
+import {
+  type PayrollSourceDeductionView,
+  PayrollSourceDeductionsService,
+} from '../services/payroll-source-deductions.service';
 
 const iso = (at: Date | null): string | null => at?.toISOString() ?? null;
 
@@ -75,6 +82,15 @@ const toAdvance = (row: PayrollAdvance): PayrollAdvanceDto => ({
   ...row,
   createdAt: row.createdAt.toISOString(),
   voidedAt: iso(row.voidedAt),
+});
+const toSource = (row: PayrollSourceDeductionView): PayrollSourceDeductionDto => ({
+  ...row,
+  createdAt: row.createdAt.toISOString(),
+  settlements: row.settlements.map((entry) => ({
+    ...entry,
+    createdAt: entry.createdAt.toISOString(),
+    releasedAt: iso(entry.releasedAt),
+  })),
 });
 
 /**
@@ -116,6 +132,7 @@ const toPayslip = (line: PayrollLineView): PayrollPayslipDto => ({
   })),
   adjustments: line.adjustments.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
   advances: line.advances,
+  sourceDeductions: line.sourceDeductions,
   unscoredCount: line.unscoredCount,
   kpiTotal: line.kpiTotal,
   taxableAdditions: line.taxableAdditions,
@@ -179,7 +196,29 @@ export class PayrollController {
     private readonly advances: PayrollAdvancesService,
     private readonly runs: PayrollRunsService,
     private readonly exports: PayrollExportsService,
+    private readonly sources: PayrollSourceDeductionsService,
   ) {}
+
+  @Get('source-deductions')
+  @RequirePermission(PAYROLL_VIEW)
+  @ApiOkResponse({ type: [PayrollSourceDeductionDto] })
+  async sourceDeductions(
+    @CurrentUser() ctx: AuthContext,
+    @Query() query: PayrollSourceDeductionsQueryDto,
+  ): Promise<PayrollSourceDeductionDto[]> {
+    return (await this.sources.list(ctx, query)).map(toSource);
+  }
+
+  @Put('source-deductions/:id/month')
+  @RequirePermission(PAYROLL_MANAGE)
+  @ApiOkResponse({ type: [PayrollSourceDeductionDto] })
+  async assignSourceMonth(
+    @CurrentUser() ctx: AuthContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: PayrollSourceMonthRequestDto,
+  ): Promise<PayrollSourceDeductionDto[]> {
+    return (await this.sources.assignMonth(ctx, id, body.month)).map(toSource);
+  }
 
   // the caller's own side
   @Get('me/payslips')

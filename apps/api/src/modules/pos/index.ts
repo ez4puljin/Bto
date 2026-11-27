@@ -64,3 +64,5 @@ export {
   type VoucherCodeView,
   type VoucherUseView,
 } from './services/pos-vouchers.service';
+
+export { POS_EXPIRY_OFFERS, type PosExpiryOffers } from './expiry-offers';

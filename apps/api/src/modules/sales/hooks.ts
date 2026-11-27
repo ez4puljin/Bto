@@ -1,4 +1,5 @@
 import type { Decimal } from '@tugeel/shared/money';
+import type { ExpirySaleInput, ExpiryReturnInput } from '@tugeel/shared/expiry';
 import type { PriceBasis } from '@tugeel/shared/pricing';
 import type { Fulfilment, OrderChannel, PaymentMethod } from '@tugeel/shared/sales';
 import type { Tx } from '../../common/db/db.types';
@@ -178,3 +179,20 @@ export interface OrderListener {
 }
 
 export const ORDER_LISTENER = Symbol('ORDER_LISTENER');
+
+/** Optional feature binding, required synchronously whenever a line has an expiry barcode.
+ * It shares the caller's transaction and fails closed if application composition omitted it. */
+export const EXPIRY_SALE_POSTING = Symbol('EXPIRY_SALE_POSTING');
+export interface ExpirySalePosting {
+  lockInTx(tx: Tx): Promise<void>;
+  recordSaleInTx(
+    tx: Tx,
+    actor: Actor,
+    input: ExpirySaleInput,
+  ): Promise<{
+    allocationId: number | null;
+    allocated: boolean;
+    reason?: string;
+  }>;
+  recordReturnInTx(tx: Tx, actor: Actor, input: ExpiryReturnInput): Promise<void>;
+}
