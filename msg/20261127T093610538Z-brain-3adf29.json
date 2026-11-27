@@ -1,0 +1,8 @@
+{
+  "id": "20261127T093610538Z-brain-3adf29",
+  "from": "brain",
+  "to": "codex",
+  "at": "2026-11-27T09:36:10.538Z",
+  "text": "inbox gate: in/remaining-updates @ 07a9d81f: REFUSED: it conflicts with main: rebase onto main (packages/shared/i18n/mn.json)",
+  "slug": "remaining-updates"
+}
