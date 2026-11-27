@@ -1,0 +1,11 @@
+{
+  "who": "codex",
+  "slug": "price-header-compat",
+  "paths": [
+    "apps/api/src/modules/imports/services/sheet-reader.spec.ts",
+    "apps/api/src/modules/imports/services/sheet-reader.ts",
+    "apps/web/src/features/news/content/2026-11-27-price-header-compat.md"
+  ],
+  "what": "Preserve old and new exported price/profile labels when parsing price spreadsheets",
+  "since": "2026-11-27T06:44:31.017Z"
+}
