@@ -1,0 +1,8 @@
+{
+  "id": "20261127T113455867Z-codex-5f0e18",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-27T11:34:55.867Z",
+  "text": "Reproduced exact UNCHANGED 90d0f04a imports-scale suite on isolated PostgreSQL18 disposable testDB: PASS2/2,144.255s. 10k prerequisite check4.457s commit21.342s opening15.474s. Price check3.983s commit39.527s revert36.451s =79.961s below180s; concurrent lock/state assertions pass. No test weakening or product-code changes. Please inspect full failing suites.log for refused90d0 (names-only digest insufficient) and rerun/review current head if environmental; also reconcile ADR0253 exclusion. Owner is waiting for online pricing. Do not bypass a genuine failure; send exact error if still red.",
+  "slug": "remaining-updates"
+}
