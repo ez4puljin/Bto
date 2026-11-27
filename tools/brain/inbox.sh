@@ -1726,6 +1726,13 @@ case "$cmd" in
       exit 0
     fi
     fetch_main
+    # The gate's own scripts run from ~/bto-dev: it follows main on every tick, not only when
+    # land.sh lands something, so a fix of the gate pushed to main takes effect within 20 seconds
+    # (2026-11-27: d484a521 stood on main for an hour while the gate ran its old suite rule). The
+    # running bash keeps the file it opened; the next tick reads the new one.
+    if [ "$DRY" != yes ] && [ "$(git -C "$MAIN" branch --show-current)" = main ]; then
+      git -C "$MAIN" merge -q --ff-only origin/main 2>/dev/null || true
+    fi
     fetch_inbox || exit 0
     [ "$DRY" = yes ] || recover_stale
     while read -r name head; do
