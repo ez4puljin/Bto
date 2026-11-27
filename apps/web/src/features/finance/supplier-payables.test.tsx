@@ -1,8 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import mn from '@tugeel/shared/i18n/mn.json';
 import { describe, expect, it } from 'vitest';
-import { ACCOUNTANT_ME, bodyOf, calls, list, UUID } from '@/test/inventory-fixtures';
+import { ACCOUNTANT_ME, calls, list } from '@/test/inventory-fixtures';
 import { choose } from '@/test/choose';
 import { findSidebar, json, renderApp, signedIn } from '@/test/render-app';
 import type { PayableEntry, PayableOpenItem, SupplierBalance } from './api';
@@ -16,7 +16,13 @@ const SUPPLIER: SupplierBalance = {
   status: 'ACTIVE',
   balance: '26400.00',
   oldestBillDate: '2026-10-18',
+  latestBillDate: '2026-11-20',
   updatedAt: STAMP,
+};
+const LISTED = {
+  ...SUPPLIER,
+  categoryPath: 'Архи',
+  segments: [{ id: 9, name: 'Том нийлүүлэгч' }],
 };
 const LEDGER: PayableEntry[] = [
   {
@@ -30,6 +36,7 @@ const LEDGER: PayableEntry[] = [
     credit: '0.00',
     balanceAfter: '26400.00',
     createdAt: STAMP,
+    confirmedBy: null,
   },
   {
     id: 91,
@@ -42,6 +49,7 @@ const LEDGER: PayableEntry[] = [
     credit: '36400.00',
     balanceAfter: '36400.00',
     createdAt: STAMP,
+    confirmedBy: 'Б. Нягтлан',
   },
 ];
 const item = (
@@ -70,7 +78,7 @@ const OPEN_ITEMS: PayableOpenItem[] = [
 ];
 
 const routes = () => ({
-  'GET /api/v1/supplier-balances': () => list([SUPPLIER]),
+  'GET /api/v1/supplier-balances': () => list([LISTED]),
   'GET /api/v1/supplier-balances/5': () => json(SUPPLIER),
   'GET /api/v1/supplier-balances/5/ledger': () =>
     json({ data: LEDGER, nextCursor: null, opening: '0.00' }),
@@ -119,52 +127,72 @@ describe('supplier payables (F3, ADR-0091)', () => {
       'href',
       '/inventory/receipts/7',
     );
-    expect(screen.getByText(mn.finance.payables.howToPay)).toBeInTheDocument();
+    expect(screen.getByText(mn.finance.payables.howToPayDirect)).toBeInTheDocument();
   });
 
-  it('pairs a payment with the supplier’s bills oldest first', async () => {
-    const user = userEvent.setup();
+  it('filters by category and segment and shows the owner’s columns', async () => {
     const fetchMock = signedIn(ACCOUNTANT_ME, {
       ...routes(),
-      'POST /api/v1/finance/allocations': () =>
-        json(
+      'GET /api/v1/supplier-categories': () =>
+        json([
           {
-            id: 611,
-            number: 'Х-20261020-0002',
-            date: '2026-10-20',
-            customerId: null,
-            supplierId: 5,
-            amount: '10000.00',
-            pairs: [],
+            id: 4,
+            parentId: null,
+            name: 'Архи',
+            path: 'Архи',
+            active: true,
+            sort: 0,
+            supplierCount: 1,
           },
-          201,
-        ),
+        ]),
+      'GET /api/v1/segments': () =>
+        list([
+          {
+            id: 9,
+            entity: 'SUPPLIER',
+            kind: 'RULES',
+            name: 'Том нийлүүлэгч',
+            description: null,
+            definition: { match: 'ALL', groups: [] },
+            appPosition: null,
+            archivedAt: null,
+            createdAt: STAMP,
+            updatedAt: STAMP,
+          },
+        ]),
     });
-    renderApp('/finance/suppliers/5?allocate=1', fetchMock);
-    const dialog = within(
-      await screen.findByRole('dialog', { name: mn.finance.allocations.title }),
+    renderApp('/finance/suppliers?category=4&segment=9', fetchMock);
+    const row = await screen.findByRole('row', { name: /МСМ ХХК/ });
+    expect(within(row).getByText('010')).toBeInTheDocument();
+    expect(within(row).getByText('Архи')).toBeInTheDocument();
+    expect(within(row).getByText('Том нийлүүлэгч')).toBeInTheDocument();
+    expect(within(row).getByText('2026-11-20')).toBeInTheDocument();
+    for (const name of ['code', 'name', 'category', 'segment', 'balance', 'latestBill'] as const) {
+      expect(
+        screen.getByRole('columnheader', { name: mn.finance.payables[name] }),
+      ).toBeInTheDocument();
+    }
+    const request = calls(fetchMock, 'GET', '/api/v1/supplier-balances')[0];
+    const query = new URL(request?.url ?? '').searchParams;
+    expect(query.get('categoryId')).toBe('4');
+    expect(query.get('segmentId')).toBe('9');
+  });
+
+  it('names the accountant who confirmed each receipt and has no separate matching', async () => {
+    renderApp('/finance/suppliers/5', signedIn(ACCOUNTANT_ME, routes()));
+    const bill = await screen.findByRole('row', { name: /GR-20261018-0001/ });
+    expect(within(bill).getByText('Б. Нягтлан')).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: mn.finance.payables.confirmedBy }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: mn.finance.allocations.action }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: mn.finance.payables.pendingReceipts })).toHaveAttribute(
+      'href',
+      '/inventory/receipts?supplierId=5&costing=pending',
     );
-    // The lone payment is chosen already; the bills are what it pays.
-    expect(await dialog.findByRole('radio', { name: 'Ж-20261020-0002' })).toBeChecked();
-    expect(dialog.getByText(mn.finance.payables.allocation.debits)).toBeInTheDocument();
-    await user.click(dialog.getByRole('button', { name: mn.finance.allocations.oldestFirst }));
-    const amount = (number: string) =>
-      dialog.getByLabelText(`${mn.finance.allocations.amount}: ${number}`);
-    expect(amount('GR-20261015-0004')).toHaveValue('10,000');
-    expect(amount('GR-20261018-0001')).toHaveValue('');
-    await user.click(dialog.getByRole('button', { name: mn.finance.allocations.submit }));
-    await waitFor(() =>
-      expect(calls(fetchMock, 'POST', '/api/v1/finance/allocations')).toHaveLength(1),
-    );
-    const request = calls(fetchMock, 'POST', '/api/v1/finance/allocations')[0];
-    expect(await bodyOf(request)).toEqual({
-      supplierId: 5,
-      date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      description: null,
-      pairs: [{ debitItemId: 703, creditItemId: 702, amount: '10000' }],
-    });
-    expect(request?.headers.get('Idempotency-Key')).toMatch(UUID);
-  }, 15_000);
+  });
 
   it('asks for the supplier of a manual line on the payables account', async () => {
     const user = userEvent.setup();

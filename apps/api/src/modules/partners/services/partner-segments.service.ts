@@ -36,4 +36,24 @@ export class PartnerSegmentsService implements OnModuleInit {
     }
     return this.resolver.ids(ctx, entity, segmentId);
   }
+
+  /** The live segments each record is in, by name ({} without the segments module). */
+  async namesOf(
+    ctx: AuthContext,
+    entity: PartnerSetEntity,
+    recordIds: readonly number[],
+  ): Promise<Map<number, { id: number; name: string }[]>> {
+    const result = new Map<number, { id: number; name: string }[]>();
+    if (!this.resolver || recordIds.length === 0) return result;
+    const wanted = new Set(recordIds);
+    for (const segment of await this.resolver.memberships(ctx, entity)) {
+      for (const id of segment.ids) {
+        if (!wanted.has(id)) continue;
+        const names = result.get(id) ?? [];
+        names.push({ id: segment.id, name: segment.name });
+        result.set(id, names);
+      }
+    }
+    return result;
+  }
 }

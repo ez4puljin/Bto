@@ -194,6 +194,11 @@ describe('segmentIssue', () => {
     ).toBeNull();
     expect(segmentIssue('CUSTOMER', one({ field: 'creditHold', op: 'YES' }))).toBeNull();
     expect(segmentIssue('SUPPLIER', one({ field: 'products', op: 'NONE' }))).toBeNull();
+    expect(segmentIssue('SUPPLIER', one({ field: 'supplier', op: 'IN', ids: [3, 7] }))).toBeNull();
+    expect(
+      segmentIssue('SUPPLIER', one({ field: 'supplierCategory', op: 'NOT_IN', ids: [2] })),
+    ).toBeNull();
+    expect(segmentIssue('SUPPLIER', one({ field: 'supplierCategory', op: 'NONE' }))).toBeNull();
     expect(segmentIssue('SUPPLIER', one({ field: 'category', op: 'IN', ids: [1] }))).toEqual({
       issue: 'FIELD_NOT_ALLOWED',
       path: 'groups.0.conditions.0.field',

@@ -111,6 +111,8 @@ export interface FinPartyBalanceRow {
   net: Decimal;
   overdue: Decimal;
   oldestDueDate: string | null;
+  /** The newest owed item's date, open or settled (a bill on the payables, an invoice on the receivables). */
+  latestItemDate: string | null;
   updatedAt: Date | null;
 }
 
@@ -237,6 +239,10 @@ export class FinReader {
                  WHERE i.company_id = ${scope.companyId} AND i.party_id = pb.party_id
                    AND ia.control = 'PAYABLE' AND i.side = 'CREDIT' AND i.open_amount > 0)::text`
         : sql`min(pb.oldest_due_date)::text`;
+    const latest = sql`(SELECT max(i.item_date) FROM fin.open_items i
+                  JOIN fin.accounts ia ON ia.company_id = i.company_id AND ia.id = i.account_id
+                 WHERE i.company_id = ${scope.companyId} AND i.party_id = pb.party_id
+                   AND ia.control = ${control} AND i.side = ${side})::text`;
     const filters: SQL[] = [sql`TRUE`];
     if (query.partyIds) {
       if (query.partyIds.length === 0) return [];
@@ -256,7 +262,7 @@ export class FinReader {
     const result = await this.db.execute<Row>(sql`
       WITH b AS (
         SELECT pb.party_id, sum(pb.open_debit) AS open_debit, sum(pb.open_credit) AS open_credit,
-               ${net} AS net, ${oldest} AS oldest,
+               ${net} AS net, ${oldest} AS oldest, ${latest} AS latest,
                max(pb.updated_at) AS updated_at,
                (SELECT coalesce(sum(i.open_amount), 0) FROM fin.open_items i
                   JOIN fin.accounts ia ON ia.company_id = i.company_id AND ia.id = i.account_id
@@ -277,6 +283,7 @@ export class FinReader {
       net: dec(row.net),
       overdue: dec(row.overdue),
       oldestDueDate: strOrNull(row.oldest),
+      latestItemDate: strOrNull(row.latest),
       updatedAt: row.updated_at === null ? null : date(row.updated_at),
     }));
   }
@@ -300,6 +307,7 @@ export class FinReader {
         net: new Decimal(0),
         overdue: new Decimal(0),
         oldestDueDate: null,
+        latestItemDate: null,
         updatedAt: null,
       }
     );

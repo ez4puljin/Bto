@@ -112,6 +112,8 @@ export const DRAFT: Schemas['ReceiptDetail'] = {
   origin: 'MANUAL',
   originRef: null,
   confirmations: [],
+  costedBy: null,
+  costedAt: null,
 };
 export const BOX_LINE: Schemas['ReceiptLine'] = {
   id: 1,

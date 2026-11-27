@@ -33776,6 +33776,26 @@
               "maxLength": 100,
               "type": "string"
             }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "The supplier category and everything below it",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "segmentId",
+            "required": false,
+            "in": "query",
+            "description": "A saved SUPPLIER segment",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -62416,6 +62436,16 @@
               "$ref": "#/components/schemas/ReceiptConfirmation"
             }
           },
+          "costedBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "The accountant who last confirmed the prices; null while they wait"
+          },
+          "costedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
           "discounts": {
             "description": "Cost holders only",
             "type": "array",
@@ -62467,7 +62497,9 @@
           "hasNotePhoto",
           "origin",
           "originRef",
-          "confirmations"
+          "confirmations",
+          "costedBy",
+          "costedAt"
         ]
       },
       "ReceiptLineRequest": {
@@ -88519,6 +88551,107 @@
           "reason"
         ]
       },
+      "SupplierBalanceSegment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SupplierBalanceListItem": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "number"
+          },
+          "code": {
+            "type": "string",
+            "example": "0012"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "balance": {
+            "type": "string",
+            "example": "150000.00",
+            "description": "What the company owes; negative = paid ahead"
+          },
+          "oldestBillDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-10-20"
+          },
+          "latestBillDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-20",
+            "description": "The newest bill's date, paid or not"
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "categoryPath": {
+            "type": "string",
+            "nullable": true,
+            "description": "The supplier's category path"
+          },
+          "segments": {
+            "description": "Live segments it is in",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierBalanceSegment"
+            }
+          }
+        },
+        "required": [
+          "supplierId",
+          "code",
+          "name",
+          "status",
+          "balance",
+          "oldestBillDate",
+          "latestBillDate",
+          "updatedAt",
+          "categoryPath",
+          "segments"
+        ]
+      },
+      "SupplierBalancesPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierBalanceListItem"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
       "SupplierBalance": {
         "type": "object",
         "properties": {
@@ -88549,6 +88682,12 @@
             "nullable": true,
             "example": "2026-10-20"
           },
+          "latestBillDate": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-11-20",
+            "description": "The newest bill's date, paid or not"
+          },
           "updatedAt": {
             "type": "string",
             "nullable": true,
@@ -88562,26 +88701,8 @@
           "status",
           "balance",
           "oldestBillDate",
+          "latestBillDate",
           "updatedAt"
-        ]
-      },
-      "SupplierBalancesPage": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SupplierBalance"
-            }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "data",
-          "nextCursor"
         ]
       },
       "PayableEntry": {
@@ -88637,6 +88758,11 @@
             "type": "string",
             "format": "date-time"
           },
+          "confirmedBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "A receipt's line: the accountant who confirmed its prices"
+          },
           "erkhet": {
             "nullable": true,
             "description": "Set when the line is a copy of Erkhet's books (ADR-0219); always sent",
@@ -88658,7 +88784,8 @@
           "debit",
           "credit",
           "balanceAfter",
-          "createdAt"
+          "createdAt",
+          "confirmedBy"
         ]
       },
       "SupplierLedgerPage": {

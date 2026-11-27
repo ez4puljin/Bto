@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { useCategories } from '@/features/catalog/api';
 import { categoryPaths } from '@/features/catalog/category-tree';
 import { useWarehouses } from '@/features/identity/api';
-import { useSuppliersByIds } from '@/features/partners/api';
+import { useSupplierCategories, useSuppliersByIds } from '@/features/partners/api';
 import { usePriceProfileChoices } from '@/features/pricing/api';
 
 type Fields = (typeof mn)['segments']['fields'];
@@ -44,6 +44,7 @@ export function useIdNames(field: string, ids: readonly number[]): string[] | nu
   const warehouses = useWarehouses();
   const suppliers = useSuppliersByIds(field === 'supplier' ? ids : NO_IDS);
   const profiles = usePriceProfileChoices();
+  const supplierCategories = useSupplierCategories({ enabled: field === 'supplierCategory' });
   const paths = useMemo(() => categoryPaths(categories.data ?? []), [categories.data]);
   const named = (rows: readonly { id: number; name: string }[] | undefined) => {
     if (!rows) return null;
@@ -55,6 +56,11 @@ export function useIdNames(field: string, ids: readonly number[]): string[] | nu
       return categories.data ? ids.map((id) => paths.get(id) ?? `#${id}`) : null;
     case 'supplier':
       return ids.length === 0 ? [] : named(suppliers.data);
+    case 'supplierCategory': {
+      if (!supplierCategories.data) return null;
+      const names = new Map(supplierCategories.data.map((row) => [row.id, row.path]));
+      return ids.map((id) => names.get(id) ?? `#${id}`);
+    }
     case 'homeWarehouse':
     case 'stock':
       return named(warehouses.data);

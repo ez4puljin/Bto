@@ -1416,7 +1416,28 @@ export class SupplierBalanceDto {
   balance: string;
   @ApiProperty({ type: String, nullable: true, example: '2026-10-20' }) oldestBillDate:
     string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '2026-11-20',
+    description: "The newest bill's date, paid or not",
+  })
+  latestBillDate: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt: string | null;
+}
+
+@ApiSchema({ name: 'SupplierBalanceSegment' })
+export class SupplierBalanceSegmentDto {
+  @ApiProperty() id: number;
+  @ApiProperty() name: string;
+}
+
+@ApiSchema({ name: 'SupplierBalanceListItem' })
+export class SupplierBalanceListItemDto extends SupplierBalanceDto {
+  @ApiProperty({ type: String, nullable: true, description: "The supplier's category path" })
+  categoryPath: string | null;
+  @ApiProperty({ type: [SupplierBalanceSegmentDto], description: 'Live segments it is in' })
+  segments: SupplierBalanceSegmentDto[];
 }
 
 @ApiSchema({ name: 'SupplierBalancesQuery' })
@@ -1427,11 +1448,25 @@ export class SupplierBalancesQueryDto extends PageQueryDto {
   @IsString()
   @MaxLength(100)
   q?: string;
+
+  @ApiPropertyOptional({ description: 'The supplier category and everything below it' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  categoryId?: number;
+
+  @ApiPropertyOptional({ description: 'A saved SUPPLIER segment' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  segmentId?: number;
 }
 
 @ApiSchema({ name: 'SupplierBalancesPage' })
 export class SupplierBalancesPageDto {
-  @ApiProperty({ type: [SupplierBalanceDto] }) data: SupplierBalanceDto[];
+  @ApiProperty({ type: [SupplierBalanceListItemDto] }) data: SupplierBalanceListItemDto[];
   @ApiProperty({ type: String, nullable: true }) nextCursor: string | null;
 }
 
@@ -1449,6 +1484,12 @@ export class PayableEntryDto {
   @ApiProperty({ example: '150000.00', description: 'What is owed after this line' })
   balanceAfter: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: "A receipt's line: the accountant who confirmed its prices",
+  })
+  confirmedBy: string | null;
   @ApiPropertyOptional({
     type: LedgerErkhetEntryDto,
     nullable: true,

@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Truck } from 'lucide-react';
+import { ClipboardCheck, Plus, Truck } from 'lucide-react';
 import { useDeferredValue, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -24,7 +24,9 @@ import type { ColumnSpec } from '@/lib/column-layout';
 import { formatMnt, formatTugrik } from '@/lib/money';
 import { problemFromError } from '@/lib/problem';
 import { useSetParam } from '@/lib/search-params';
-import { AllocationDialog } from './allocation-dialog';
+import { NativeSelect } from '@/components/native-select';
+import { useSupplierCategories } from '@/features/partners/api';
+import { SegmentFilter } from '@/features/segments/segment-filter';
 import {
   type PayableEntry,
   type SupplierBalance,
@@ -36,43 +38,74 @@ import { erkhetKeysOf, useErkhetLinks } from '@/features/erkhet/api';
 import { ErkhetDocument, ErkhetKind } from '@/features/erkhet/erkhet-entry';
 import { DateRangeFilter } from './date-range-filter';
 
-/** The balances' columns (ADR-0119): the supplier, what is owed, the oldest bill's date. */
+/**
+ * The balances' columns (ADR-0119; owner 2026-11-27): code, name, the supplier's category, its
+ * segments, what is owed and the newest bill's date.
+ */
 const BALANCE_COLUMNS: readonly ColumnSpec[] = [
-  { key: 'supplier', kind: 'text', weight: 3, min: 14 },
-  { key: 'owed', kind: 'money', width: 10 },
-  { key: 'oldestBill', kind: 'date' },
+  { key: 'code', kind: 'code' },
+  { key: 'name', kind: 'text', weight: 3, min: 12 },
+  { key: 'category', kind: 'text', weight: 2, min: 8, drop: 2 },
+  { key: 'segment', kind: 'text', weight: 2, min: 8, drop: 1 },
+  { key: 'balance', kind: 'money', width: 10 },
+  { key: 'latestBill', kind: 'date', width: 8.5 },
   { key: 'chevron', kind: 'chevron' },
 ];
 
-/** The ledger's columns: date, kind, document number, two sides, owed after. */
+/** The ledger's columns: date, kind, document, who confirmed it, two sides, owed after. */
 const LEDGER_COLUMNS: readonly ColumnSpec[] = [
   { key: 'date', kind: 'date' },
   { key: 'kind', kind: 'text', weight: 1 },
   { key: 'document', kind: 'number' },
+  { key: 'confirmedBy', kind: 'text', weight: 1, min: 8, drop: 1 },
   { key: 'debit', kind: 'money' },
   { key: 'credit', kind: 'money' },
   { key: 'owedAfter', kind: 'money', width: 10 },
 ];
 
+/** A positive id from the URL, else undefined. */
+function idParam(params: URLSearchParams, name: string): number | undefined {
+  const value = Number.parseInt(params.get(name) ?? '', 10);
+  return Number.isNaN(value) || value <= 0 ? undefined : value;
+}
+
 /**
- * «Нийлүүлэгчийн тооцоо» (F3, ADR-0091): every supplier with payables, largest owed first, with the
- * date of its oldest open bill; a row opens the supplier's ledger.
+ * «Нийлүүлэгчийн тооцоо» (F3, ADR-0091): every supplier with payables, largest owed first, found
+ * by name or code and narrowed by its category and segment; a row opens the supplier's ledger.
  */
 export function SupplierBalancesPage() {
   const { t } = useTranslation();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const setParam = useSetParam();
+  const canManageSegments = useHasPermission('segments.manage');
   const [search, setSearch] = useState(params.get('q') ?? '');
   const q = useDeferredValue(search.trim());
-  const balances = useSupplierBalances({ q });
+  const categoryId = idParam(params, 'category');
+  const segmentId = idParam(params, 'segment');
+  const categories = useSupplierCategories();
+  const balances = useSupplierBalances({ q, categoryId, segmentId });
   const rows = balances.data?.pages.flatMap((page) => page.data) ?? [];
+  const filtered = Boolean(q || categoryId || segmentId);
 
   return (
     <div>
-      <PageHeader title={t('finance.payables.title')} />
+      <PageHeader
+        title={t('finance.payables.title')}
+        actions={
+          canManageSegments ? (
+            <Button variant="outline" asChild>
+              <Link to="/segments/new?entity=SUPPLIER">
+                <Plus />
+                {t('finance.payables.createSegment')}
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
       <FilterBar>
         <SearchField
-          aria-label={t('common.search')}
+          className="sm:w-60"
+          aria-label={t('finance.fields.supplier')}
           placeholder={t('finance.payables.searchPlaceholder')}
           value={search}
           onChange={(event) => {
@@ -80,41 +113,86 @@ export function SupplierBalancesPage() {
             setParam('q', event.target.value.trim());
           }}
         />
+        <NativeSelect
+          variant="filter"
+          aria-label={t('finance.payables.category')}
+          value={categoryId ?? ''}
+          onChange={(event) => setParam('category', event.target.value)}
+        >
+          <option value="">{t('partners.suppliers.allCategories')}</option>
+          {(categories.data ?? []).map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.path}
+            </option>
+          ))}
+        </NativeSelect>
+        <SegmentFilter
+          entity="SUPPLIER"
+          value={segmentId}
+          onChange={(id) => setParam('segment', id ? String(id) : '')}
+        />
       </FilterBar>
       <ProblemAlert problem={problemFromError(balances.error)} onRetry={balances.refetch} />
       <ListCard scroll>
         <ListTable columns={BALANCE_COLUMNS}>
           <TableHeader>
             <TableRow>
-              <TableHead>{t('finance.fields.supplier')}</TableHead>
-              <TableHead className="text-right">{t('finance.payables.owed')}</TableHead>
-              <TableHead className="text-right">{t('finance.payables.oldestBill')}</TableHead>
+              <TableHead>{t('finance.payables.code')}</TableHead>
+              <TableHead>{t('finance.payables.name')}</TableHead>
+              <TableHead>{t('finance.payables.category')}</TableHead>
+              <TableHead>{t('finance.payables.segment')}</TableHead>
+              <TableHead className="text-right">{t('finance.payables.balance')}</TableHead>
+              <TableHead className="text-right" title={t('finance.payables.latestBillHint')}>
+                {t('finance.payables.latestBill')}
+              </TableHead>
               <ChevronHead />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {balances.isPending ? <SkeletonRows columns={4} /> : null}
-            {rows.map((row) => (
-              <LinkRow key={row.supplierId} to={`/finance/suppliers/${row.supplierId}`}>
-                <TruncateCell text={`${row.name} · ${row.code}`}>
-                  <Link
-                    to={`/finance/suppliers/${row.supplierId}`}
-                    className="font-medium underline-offset-4 hover:underline"
-                  >
-                    {row.name}
-                  </Link>
-                  <span className="ml-2 font-mono text-muted-foreground">{row.code}</span>
-                </TruncateCell>
-                <TableCell className="text-right font-mono">{formatTugrik(row.balance)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">
-                  {row.oldestBillDate ?? ''}
-                </TableCell>
-              </LinkRow>
-            ))}
+            {balances.isPending ? <SkeletonRows columns={7} /> : null}
+            {rows.map((row) => {
+              const segments = row.segments.map((segment) => segment.name).join(', ');
+              return (
+                <LinkRow key={row.supplierId} to={`/finance/suppliers/${row.supplierId}`}>
+                  <TableCell className="font-mono text-muted-foreground">{row.code}</TableCell>
+                  <TruncateCell text={row.name}>
+                    <Link
+                      to={`/finance/suppliers/${row.supplierId}`}
+                      className="font-medium underline-offset-4 hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                  </TruncateCell>
+                  <TruncateCell text={row.categoryPath ?? ''}>
+                    <span className="text-muted-foreground">{row.categoryPath ?? ''}</span>
+                  </TruncateCell>
+                  <TruncateCell text={segments}>
+                    <span className="text-muted-foreground">{segments}</span>
+                  </TruncateCell>
+                  <TableCell className="text-right font-mono">
+                    {formatTugrik(row.balance)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-muted-foreground">
+                    {row.latestBillDate ?? ''}
+                  </TableCell>
+                </LinkRow>
+              );
+            })}
           </TableBody>
         </ListTable>
         {!balances.isPending && rows.length === 0 ? (
-          <EmptyState icon={Truck} title={t('finance.payables.empty')} />
+          <EmptyState
+            icon={Truck}
+            title={t('finance.payables.empty')}
+            {...(filtered
+              ? {
+                  onClearFilters: () => {
+                    setSearch('');
+                    setParams(new URLSearchParams(), { replace: true });
+                  },
+                }
+              : {})}
+          />
         ) : null}
         <LoadMore query={balances} />
       </ListCard>
@@ -125,18 +203,18 @@ export function SupplierBalancesPage() {
 /**
  * One supplier's payables (F3, ADR-0091): what the company owes, then the ledger newest first
  * (receipts' bills and their price corrections, returns, manual entries) with what is owed after
- * each line; «Тулгалт хийх» pairs a payment or a return with the open bills (`?allocate=1`).
- * Payments are manual journal entries (owner, 2026-10-20), which the card says.
+ * each line and, on a receipt's line, the accountant who confirmed its prices. There is no
+ * separate matching step (owner 2026-11-27): a bill is made when the accountant confirms the
+ * receipt's prices on the receipt itself, and a payment lowers what is owed when it is posted;
+ * «Үнэ батлаагүй орлого» opens the supplier's receipts still waiting for that confirmation.
  */
 export function SupplierLedgerPage() {
   const { t } = useTranslation();
   const supplierId = Number.parseInt(useParams().id ?? '', 10);
-  const canRecord = useHasPermission('finance.payments.record');
   const [params] = useSearchParams();
   const setParam = useSetParam();
   const from = params.get('from') ?? undefined;
   const to = params.get('to') ?? undefined;
-  const allocating = params.get('allocate') === '1';
   const balance = useSupplierBalance(supplierId);
   const ledger = useSupplierLedger(supplierId, { from, to });
   const rows = ledger.data?.pages.flatMap((page) => page.data) ?? [];
@@ -175,12 +253,12 @@ export function SupplierLedgerPage() {
           </>
         }
         actions={
-          canRecord ? (
-            <Button variant="outline" onClick={() => setParam('allocate', '1')}>
-              <ArrowLeftRight />
-              {t('finance.allocations.action')}
-            </Button>
-          ) : null
+          <Button variant="outline" asChild>
+            <Link to={`/inventory/receipts?supplierId=${supplierId}&costing=pending`}>
+              <ClipboardCheck />
+              {t('finance.payables.pendingReceipts')}
+            </Link>
+          </Button>
         }
       />
       <PayableCard balance={summary} />
@@ -210,13 +288,14 @@ export function SupplierLedgerPage() {
                 <TableHead>{t('finance.fields.date')}</TableHead>
                 <TableHead>{t('finance.fields.kind')}</TableHead>
                 <TableHead>{t('finance.balances.document')}</TableHead>
+                <TableHead>{t('finance.payables.confirmedBy')}</TableHead>
                 <TableHead className="text-right">{t('finance.fields.debit')}</TableHead>
                 <TableHead className="text-right">{t('finance.fields.credit')}</TableHead>
                 <TableHead className="text-right">{t('finance.payables.owedAfter')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ledger.isPending ? <SkeletonRows columns={6} /> : null}
+              {ledger.isPending ? <SkeletonRows columns={7} /> : null}
               {rows.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell className="font-mono">{entry.entryDate}</TableCell>
@@ -238,6 +317,9 @@ export function SupplierLedgerPage() {
                       <DocumentLink entry={entry} />
                     )}
                   </TableCell>
+                  <TruncateCell text={entry.confirmedBy ?? ''}>
+                    {entry.confirmedBy ?? ''}
+                  </TruncateCell>
                   <TableCell className="text-right font-mono">
                     {entry.debit === '0.00' ? '' : formatMnt(entry.debit)}
                   </TableCell>
@@ -257,16 +339,11 @@ export function SupplierLedgerPage() {
           <LoadMore query={ledger} />
         </ListCard>
       </section>
-      <AllocationDialog
-        open={canRecord && allocating}
-        party={{ kind: 'supplier', id: summary.supplierId }}
-        onClose={() => setParam('allocate', null)}
-      />
     </div>
   );
 }
 
-/** What the company owes the supplier, the oldest open bill, and how a payment is recorded. */
+/** What the company owes the supplier, its newest bill, and how a bill and a payment are made. */
 function PayableCard({ balance }: { balance: SupplierBalance }) {
   const { t } = useTranslation();
   const titleId = useId();
@@ -288,13 +365,13 @@ function PayableCard({ balance }: { balance: SupplierBalance }) {
             ) : null}
           </div>
           <div className="min-w-0 rounded-lg border border-border px-3 py-2">
-            <dt className="text-xs text-muted-foreground">{t('finance.payables.oldestBill')}</dt>
+            <dt className="text-xs text-muted-foreground">{t('finance.payables.latestBill')}</dt>
             <dd className="truncate font-mono text-[0.9375rem] font-semibold">
-              {balance.oldestBillDate ?? '—'}
+              {balance.latestBillDate ?? '—'}
             </dd>
           </div>
         </dl>
-        <p className="text-sm text-muted-foreground">{t('finance.payables.howToPay')}</p>
+        <p className="text-sm text-muted-foreground">{t('finance.payables.howToPayDirect')}</p>
       </CardContent>
     </Card>
   );

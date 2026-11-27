@@ -24,6 +24,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatUbMinute } from '@/lib/dayjs';
 import { Link, useNavigate } from 'react-router';
 import { useHasPermission } from '@/app/auth-context';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -197,6 +198,20 @@ function ReadOnlyHeader({ detail }: { detail: ReceiptDetail }) {
         ? (detail.counterAccountName ?? t('inventory.receipt.paymentMethods.CREDIT'))
         : (detail.moneyAccountName ?? none),
     ],
+    // The accountant who confirmed the prices (the supplier's bill), owner 2026-11-27.
+    ...(detail.status === 'POSTED'
+      ? [
+          [
+            t('inventory.receipt.costedBy'),
+            detail.costedBy && detail.costedAt
+              ? t('inventory.receipt.costedByAt', {
+                  name: detail.costedBy,
+                  date: formatUbMinute(detail.costedAt),
+                })
+              : t('inventory.receipt.costedByPending'),
+          ] as [string, ReactNode],
+        ]
+      : []),
   ];
   return (
     <HeaderCard note={<VatNote detail={detail} />}>

@@ -280,7 +280,11 @@ describe('finance payables', () => {
       name: 'НӨАТ Нийлүүлэгч АП',
       balance: '26400.00',
       oldestBillDate: today,
+      latestBillDate: today,
     });
+    // The accountant who confirmed the prices is named on the receipt and on its ledger line.
+    const confirmedBy = (posted as ReceiptJson & { costedBy: string | null }).costedBy;
+    expect(confirmedBy).toEqual(expect.any(String));
     expect(await ledger(vatSupplier)).toEqual([
       expect.objectContaining({
         kind: 'BILL',
@@ -289,6 +293,7 @@ describe('finance payables', () => {
         docNumber: posted.number,
         credit: '26400.00',
         balanceAfter: '26400.00',
+        confirmedBy,
       }),
     ]);
     const list = (
@@ -299,6 +304,122 @@ describe('finance payables', () => {
         .expect(200)
     ).body as { data: BalanceJson[] };
     expect(list.data).toEqual([expect.objectContaining({ supplierId: vatSupplier })]);
+  });
+
+  it('narrows the balances by category and segment, naming both on each row (owner 2026-11-27)', async () => {
+    const category = (
+      await http()
+        .post('/api/v1/supplier-categories')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({ name: 'Архи АП' })
+        .expect(201)
+    ).body as { id: number; path: string };
+    const spirits = (
+      await http()
+        .post('/api/v1/suppliers')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({ name: 'Архи Нийлүүлэгч АП', categoryId: category.id })
+        .expect(201)
+    ).body as { id: number };
+    const other = await supplier('Сегментгүй Нийлүүлэгч АП');
+    for (const id of [spirits.id, other]) {
+      await billed(id, [
+        { productUnitId: unitOf(water, 'PCS').id, enteredQty: '1', docUnitPrice: '1100' },
+      ]);
+    }
+    const segment = (
+      await http()
+        .post('/api/v1/segments')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          entity: 'SUPPLIER',
+          name: 'Сонгосон АП',
+          definition: {
+            match: 'ALL',
+            groups: [
+              { match: 'ALL', conditions: [{ field: 'supplier', op: 'IN', ids: [spirits.id] }] },
+            ],
+          },
+        })
+        .expect(201)
+    ).body as { id: number };
+    const rows = async (query: Record<string, unknown>) =>
+      (
+        (
+          await http()
+            .get('/api/v1/supplier-balances')
+            .query(query)
+            .set(bearer(accountant))
+            .expect(200)
+        ).body as {
+          data: (BalanceJson & {
+            categoryPath: string | null;
+            segments: { id: number; name: string }[];
+          })[];
+        }
+      ).data;
+    const bySegment = await rows({ segmentId: segment.id });
+    expect(bySegment).toEqual([
+      expect.objectContaining({
+        supplierId: spirits.id,
+        categoryPath: category.path,
+        segments: [{ id: segment.id, name: 'Сонгосон АП' }],
+        latestBillDate: today,
+      }),
+    ]);
+    expect((await rows({ categoryId: category.id })).map((row) => row.supplierId)).toEqual([
+      spirits.id,
+    ]);
+    expect(await rows({ q: 'Сегментгүй Нийлүүлэгч АП' })).toEqual([
+      expect.objectContaining({ supplierId: other, categoryPath: null, segments: [] }),
+    ]);
+    // Within a segment, the search still applies.
+    expect(await rows({ segmentId: segment.id, q: 'Сегментгүй' })).toEqual([]);
+    // A category condition keeps the suppliers of that category too.
+    const byCategory = (
+      await http()
+        .post('/api/v1/segments')
+        .set(bearer(admin))
+        .set(idempotency())
+        .send({
+          entity: 'SUPPLIER',
+          name: 'Архины АП',
+          definition: {
+            match: 'ALL',
+            groups: [
+              {
+                match: 'ALL',
+                conditions: [{ field: 'supplierCategory', op: 'IN', ids: [category.id] }],
+              },
+            ],
+          },
+        })
+        .expect(201)
+    ).body as { id: number };
+    expect((await rows({ segmentId: byCategory.id })).map((row) => row.supplierId)).toEqual([
+      spirits.id,
+    ]);
+    await http()
+      .post('/api/v1/segments')
+      .set(bearer(admin))
+      .set(idempotency())
+      .send({
+        entity: 'SUPPLIER',
+        name: 'Буруу АП',
+        definition: {
+          match: 'ALL',
+          groups: [
+            {
+              match: 'ALL',
+              conditions: [{ field: 'supplierCategory', op: 'IN', ids: [999_999_999] }],
+            },
+          ],
+        },
+      })
+      .expect(422);
   });
 
   it('books a pending receipt when it is costed, then each re-costing’s difference', async () => {
