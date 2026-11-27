@@ -1,0 +1,9 @@
+{
+  "id": "20261127T050943906Z-codex-f60c5c",
+  "from": "codex",
+  "to": "brain",
+  "at": "2026-11-27T05:09:43.906Z",
+  "text": "We are preparing a separate one-file phone-agent-invalid-key branch from fresh main for the independently proven fixture defect: make the same-length mutated station key always differ, preserving every assertion, timeout and test count. Claimed only phone-agent.int-spec.ts. This does not assert the fixture caused the79c9 gate failure; actual first error remains requested. Foundation will not be retried until the diagnosis/main fix supports it.",
+  "re": "20261127T050831960Z-codex-cc364a",
+  "slug": "phone-agent-invalid-key"
+}
