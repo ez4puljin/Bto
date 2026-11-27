@@ -22,6 +22,7 @@ import {
   useLedgerAccounts,
   useLedgerLines,
   useLedgerReport,
+  usePrefetchLedgerLines,
 } from './book-api';
 import {
   addMoney,
@@ -548,7 +549,7 @@ function SixHead() {
   );
 }
 
-/** «Авлага өглөгийн тайлан»: groups of account (or party), their rows, the lines on a double click. */
+/** «Авлага өглөгийн тайлан»: groups of account (or party), their rows, the lines on a click. */
 function PartyTable(props: {
   rows: readonly LedgerRow[] | null;
   totals: Totals | null;
@@ -559,6 +560,7 @@ function PartyTable(props: {
 }) {
   const { t } = useTranslation();
   const drill = useDrill();
+  const prefetch = usePrefetchLedgerLines(props.query);
   const byAccount = props.grouping === 'ACCOUNT_PARTY';
   const groups = useMemo(() => {
     const map = new Map<string, LedgerRow[]>();
@@ -617,7 +619,17 @@ function PartyTable(props: {
                   : { code: row.code, name: row.name };
                 return (
                   <Fragment key={rowKey}>
-                    <DrillRow expanded={expanded} onToggle={toggle} drillable={drillable}>
+                    <DrillRow
+                      expanded={expanded}
+                      onToggle={toggle}
+                      drillable={drillable}
+                      onPrefetch={() =>
+                        prefetch({
+                          accountId: row.accountId,
+                          partyId: row.party?.partyId ?? 'none',
+                        })
+                      }
+                    >
                       <DrillCell
                         expanded={expanded}
                         onToggle={toggle}
@@ -672,7 +684,7 @@ function MoneyHead() {
   );
 }
 
-/** «Мөнгөн хөрөнгийн тайлан»: one row per cash or bank account, its lines on a double click. */
+/** «Мөнгөн хөрөнгийн тайлан»: one row per cash or bank account, its lines on a click. */
 function MoneyTable(props: {
   rows: readonly LedgerRow[] | null;
   totals: Totals | null;
@@ -681,6 +693,7 @@ function MoneyTable(props: {
   onPrompt: () => void;
 }) {
   const drill = useDrill();
+  const prefetch = usePrefetchLedgerLines(props.query);
   if (props.rows === null || props.totals === null) {
     return (
       <BookTable columns={MONEY_COLUMNS}>
@@ -721,7 +734,12 @@ function MoneyTable(props: {
           const drillable = moved(row);
           return (
             <Fragment key={key}>
-              <DrillRow expanded={expanded} onToggle={toggle} drillable={drillable}>
+              <DrillRow
+                expanded={expanded}
+                onToggle={toggle}
+                drillable={drillable}
+                onPrefetch={() => prefetch({ accountId: row.accountId })}
+              >
                 <DrillCell
                   expanded={expanded}
                   onToggle={toggle}
@@ -792,10 +810,13 @@ function LedgerDetail(props: {
     <>
       {lines.data.data.map((line) => {
         const party = line.party?.name ?? null;
-        const description = withoutNumber(line.lineDescription ?? line.entryDescription, [
-          line.documentNumber,
-          line.entryNumber,
-        ]);
+        // A voucher's own text (гүйлгээний утга) first: its entry is named only by the party.
+        const description =
+          line.memo ??
+          withoutNumber(line.lineDescription ?? line.entryDescription, [
+            line.documentNumber,
+            line.entryNumber,
+          ]);
         const parts = detailParts(
           null,
           [line.entryDate, party, description === party ? null : description],

@@ -1,4 +1,5 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import type { paths } from '@tugeel/api-client';
 import { useApiClient } from '@/app/api-client-context';
 import { unwrap } from '@/lib/problem';
@@ -99,22 +100,45 @@ export function useLedgerReport(query: LedgerQuery | null) {
   });
 }
 
-export function useLedgerLines(
+type LedgerLineRow = { accountId: number; partyId?: string };
+
+function ledgerLinesOptions(
+  api: ReturnType<typeof useApiClient>,
   query: LedgerQuery | null,
-  row: { accountId: number; partyId?: string } | null,
+  row: LedgerLineRow | null,
 ) {
-  const api = useApiClient();
-  return useQuery({
+  return {
     queryKey: [...KEYS.ledgerLines, query, row],
     enabled: query !== null && row !== null,
-    queryFn: async ({ signal }) =>
+    // A row opened, closed and opened again within the minute shows at once.
+    staleTime: 60_000,
+    queryFn: async ({ signal }: { signal: AbortSignal }) =>
       unwrap(
         await api.GET('/api/v1/finance/reports/ledger/lines', {
           params: { query: { ...(query ?? ({} as LedgerQuery)), ...(row ?? { accountId: 0 }) } },
           signal,
         }),
       ),
-  });
+  };
+}
+
+export function useLedgerLines(query: LedgerQuery | null, row: LedgerLineRow | null) {
+  const api = useApiClient();
+  return useQuery(ledgerLinesOptions(api, query, row));
+}
+
+/** Starts loading a row's lines before it is opened (the pointer is on the row). */
+export function usePrefetchLedgerLines(query: LedgerQuery | null) {
+  const api = useApiClient();
+  const client = useQueryClient();
+  return useCallback(
+    (row: LedgerLineRow) => {
+      if (query === null) return;
+      const { enabled: _enabled, ...options } = ledgerLinesOptions(api, query, row);
+      void client.prefetchQuery(options);
+    },
+    [api, client, query],
+  );
 }
 
 export function useStockBalance(query: StockBalanceQuery | null) {
